@@ -338,10 +338,10 @@ src/
 
 このリポジトリでは、PoC〜ハッカソン完了時点のアーキテクチャ整理として以下のドキュメントを管理しています。
 
-| ドキュメント | 内容 |
-|---|---|
-| [`docs/system-overview.md`](docs/system-overview.md) | システム全体像、As-Is / To-Be 構成、リポジトリ責務境界 |
-| [`docs/data-model.md`](docs/data-model.md) | Firestore データモデル案（Proposed） |
-| [`docs/adr/ADR-001-repository-responsibility-boundary.md`](docs/adr/ADR-001-repository-responsibility-boundary.md) | リポジトリ責務境界の ADR |
+主なドキュメント:
+
+- [docs/system-overview.md](https://github.com/sunaba-log/architecture/blob/main/docs/system-overview.md) — システム全体像、As-Is / To-Be 構成、リポジトリ責務境界
+- [docs/data-model.md](https://github.com/sunaba-log/architecture/blob/main/docs/data-model.md) — Firestore データモデル案（Proposed）
+- [docs/adr/ADR-001-repository-responsibility-boundary.md](https://github.com/sunaba-log/architecture/blob/main/docs/adr/ADR-001-repository-responsibility-boundary.md) — リポジトリ責務境界の ADR
 
 > 現時点では ADR-001 は `Proposed` であり、チームレビュー後に `Accepted` へ更新する想定です。
