@@ -250,3 +250,17 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 2. sns_promotions.status の状態遷移を pending -> success/failed 以外に拡張するか
 3. episode.number を Cloud SQL 側で持つか（現在はSNSドキュメント内の補助情報）
 4. transcript_summary の多言語対応（言語コード保持）を行うか
+
+## 8. MP3アップロード連携契約
+
+`podcast-ui` はCloud SQLにエピソードを作成し、ブラウザからGCSへ直接PUTするための署名付きURLを発行する。
+
+GCSオブジェクトパス:
+
+```text
+podcasts/{podcast_id}/episodes/{episode_id}/source/{filename}
+```
+
+`podcast-automator` はGCS finalizeイベントで受け取るオブジェクトパスから
+`podcast_id`と`episode_id`を抽出し、Cloud SQLおよびFirestoreへの書き戻しに使用する。
+API詳細と制約は `docs/contracts/episode-upload.md` を参照する。
