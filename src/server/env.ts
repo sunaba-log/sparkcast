@@ -24,4 +24,3 @@ export function getSignedUrlTtlMs(): number {
   }
   return seconds * 1000;
 }
-

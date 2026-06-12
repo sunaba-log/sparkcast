@@ -19,4 +19,3 @@ CREATE INDEX IF NOT EXISTS idx_episodes_podcast_created_at
 
 CREATE INDEX IF NOT EXISTS idx_episodes_podcast_published_at
   ON episodes (podcast_id, published_at DESC);
-

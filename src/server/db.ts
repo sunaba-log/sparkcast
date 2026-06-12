@@ -16,4 +16,3 @@ export function getDbPool(): Pool {
   }
   return globalThis.podcastDbPool;
 }
-
