@@ -13,13 +13,16 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     steps:
       - name: Build and send Discord message
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_ACTIVITY_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 << 'PYEOF'
-          import json, os, re, subprocess
+          import json, os, re, subprocess, urllib.request
 
           USER_MAP = {
               "k0heik": "1444623950364803138",
@@ -50,11 +53,37 @@ jobs:
               label = f"コメントでメンション (#{event['issue']['number']})"
 
           elif event_name == "pull_request" and action == "review_requested":
-              reviewer = event.get("requested_reviewer") or {}
-              if reviewer.get("login"):
-                  usernames = [reviewer["login"]]
+              pr_number = event["pull_request"]["number"]
               url = event["pull_request"]["html_url"]
-              label = f"PR レビュー依頼: #{event['pull_request']['number']} {event['pull_request']['title']}"
+              label = f"PR レビュー依頼: #{pr_number} {event['pull_request']['title']}"
+
+              # GitHub API でイベント履歴を取得し、同じタイムスタンプのreview_requestedを全て通知
+              # (UIで複数同時追加した場合も1イベントしか飛ばないケースに対応)
+              token = os.environ.get("GITHUB_TOKEN", "")
+              api_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/events?per_page=100"
+              req = urllib.request.Request(api_url, headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              })
+              with urllib.request.urlopen(req) as resp:
+                  issue_events = json.loads(resp.read())
+
+              review_events = [
+                  e for e in issue_events
+                  if e.get("event") == "review_requested"
+                  and e.get("requested_reviewer", {}).get("login")
+              ]
+              if review_events:
+                  latest_time = review_events[-1]["created_at"]
+                  usernames = [
+                      e["requested_reviewer"]["login"]
+                      for e in review_events
+                      if e["created_at"] == latest_time
+                  ]
+              else:
+                  reviewer = event.get("requested_reviewer") or {}
+                  usernames = [reviewer["login"]] if reviewer.get("login") else []
 
           elif event_name == "pull_request_review_comment" and action == "created":
               body = event["comment"]["body"]
