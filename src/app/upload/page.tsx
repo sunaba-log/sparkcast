@@ -10,7 +10,7 @@ export default function UploadPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">エピソードをアップロード</h1>
         <p className="mt-1 text-sm text-gray-500">
-          mp3ファイルをアップロードすると、RSS生成・Spotify・Apple Podcastsへの配信処理が開始されます（実装後）
+          エピソードを作成してmp3ファイルをアップロードすると、バックグラウンド処理が開始されます。
         </p>
       </div>
 
