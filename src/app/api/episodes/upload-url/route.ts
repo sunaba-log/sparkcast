@@ -8,20 +8,29 @@ import {
   setEpisodeAudioFilePath,
 } from "@/server/episodes/repository";
 import { createMp3UploadUrl } from "@/server/storage";
+import { getSessionUser, requirePodcastAccess } from "@/server/auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
     const input = createEpisodeUploadSchema.parse(await request.json());
+    await requirePodcastAccess(user.uid, input.podcastId);
     const result = await createEpisodeUpload(input, {
-      pool: getDbPool(),
+      pool: await getDbPool(),
       signUpload: createMp3UploadUrl,
       createRecord: createEpisodeRecord,
       setAudioPath: setEpisodeAudioFilePath,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });
+    }
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: "入力内容が不正です", details: error.issues },

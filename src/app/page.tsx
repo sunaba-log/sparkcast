@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { getEpisodes } from "@/lib/episodes";
 import { EpisodeCard } from "@/components/EpisodeCard";
+import {
+  requirePodcastAccess,
+  requireSessionUser,
+} from "@/server/auth";
+import { getDefaultPodcastId } from "@/server/env";
+
+export const dynamic = "force-dynamic";
 
 export default async function EpisodeListPage() {
+  const user = await requireSessionUser();
+  await requirePodcastAccess(user.uid, getDefaultPodcastId());
   const episodes = await getEpisodes();
 
   return (

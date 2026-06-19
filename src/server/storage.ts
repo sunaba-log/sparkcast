@@ -1,7 +1,12 @@
 import "server-only";
 
 import { Storage } from "@google-cloud/storage";
-import { getSignedUrlTtlMs, getUploadBucket } from "@/server/env";
+import {
+  getGoogleCloudProject,
+  getGoogleServiceAccountCredentials,
+  getSignedUrlTtlMs,
+  getUploadBucket,
+} from "@/server/env";
 
 declare global {
   var podcastStorage: Storage | undefined;
@@ -9,7 +14,10 @@ declare global {
 
 function getStorage(): Storage {
   if (!globalThis.podcastStorage) {
-    globalThis.podcastStorage = new Storage();
+    globalThis.podcastStorage = new Storage({
+      projectId: getGoogleCloudProject(),
+      credentials: getGoogleServiceAccountCredentials(),
+    });
   }
   return globalThis.podcastStorage;
 }

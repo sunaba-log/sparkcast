@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS episodes (
   podcast_id INT NOT NULL REFERENCES podcasts(podcast_id),
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  audio_file_path TEXT NOT NULL,
+  audio_file_path TEXT,
   duration_seconds INT,
   published_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT now(),

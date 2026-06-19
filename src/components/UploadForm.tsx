@@ -12,9 +12,8 @@ type UploadPreparation = {
   expiresAt: string;
 };
 
-export function UploadForm() {
+export function UploadForm({ podcastId }: { podcastId: number }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [podcastId, setPodcastId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<UploadStatus>("idle");
@@ -46,18 +45,13 @@ export function UploadForm() {
       return;
     }
 
-    const parsedPodcastId = Number(podcastId);
-    if (!Number.isInteger(parsedPodcastId) || parsedPodcastId <= 0) {
-      setErrorMessage("Podcast IDには正の整数を入力してください");
-      setStatus("error");
-      return;
-    }
     if (!title.trim()) {
       setErrorMessage("エピソードタイトルを入力してください");
       setStatus("error");
       return;
     }
 
+    let preparation: (UploadPreparation & { error?: string }) | null = null;
     try {
       setErrorMessage("");
       setStatus("preparing");
@@ -65,7 +59,7 @@ export function UploadForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          podcastId: parsedPodcastId,
+          podcastId,
           title: title.trim(),
           description: description.trim() || undefined,
           fileName: selectedFile.name,
@@ -74,7 +68,9 @@ export function UploadForm() {
         }),
       });
 
-      const preparation = (await response.json()) as UploadPreparation & { error?: string };
+      preparation = (await response.json()) as UploadPreparation & {
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(preparation.error || "アップロードの準備に失敗しました");
       }
@@ -89,17 +85,30 @@ export function UploadForm() {
         throw new Error("GCSへのアップロードに失敗しました");
       }
 
+      await fetch(`/api/episodes/${preparation.episodeId}/upload-result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "uploaded" }),
+      });
       setUploadedEpisodeId(preparation.episodeId);
       setStatus("success");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "アップロードに失敗しました");
+      const message =
+        error instanceof Error ? error.message : "アップロードに失敗しました";
+      if (preparation) {
+        await fetch(`/api/episodes/${preparation.episodeId}/upload-result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "failed", error: message }),
+        }).catch(() => undefined);
+      }
+      setErrorMessage(message);
       setStatus("error");
     }
   }
 
   function handleReset() {
     setSelectedFile(null);
-    setPodcastId("");
     setTitle("");
     setDescription("");
     setStatus("idle");
@@ -113,18 +122,6 @@ export function UploadForm() {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-8 max-w-xl">
       <div className="space-y-4 mb-6">
-        <label className="block">
-          <span className="text-sm font-medium text-gray-700">Podcast ID</span>
-          <input
-            type="number"
-            min="1"
-            value={podcastId}
-            onChange={(event) => setPodcastId(event.target.value)}
-            disabled={isBusy}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
-            placeholder="1"
-          />
-        </label>
         <label className="block">
           <span className="text-sm font-medium text-gray-700">エピソードタイトル</span>
           <input

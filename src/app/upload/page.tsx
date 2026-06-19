@@ -1,7 +1,18 @@
 import Link from "next/link";
 import { UploadForm } from "@/components/UploadForm";
+import {
+  requirePodcastAccess,
+  requireSessionUser,
+} from "@/server/auth";
+import { getDefaultPodcastId } from "@/server/env";
 
-export default function UploadPage() {
+export const dynamic = "force-dynamic";
+
+export default async function UploadPage() {
+  const user = await requireSessionUser();
+  const podcastId = getDefaultPodcastId();
+  await requirePodcastAccess(user.uid, podcastId);
+
   return (
     <div>
       <div className="mb-6">
@@ -14,7 +25,7 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <UploadForm />
+      <UploadForm podcastId={podcastId} />
     </div>
   );
 }

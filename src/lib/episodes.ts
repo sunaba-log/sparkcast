@@ -1,15 +1,13 @@
 import { Episode } from "@/types/episode";
-import { mockEpisodes } from "./mockEpisodes";
-
-// These functions are designed to be replaced with Firestore/API calls later.
-// The page components should only import from this file, not from mockEpisodes directly.
+import { getDefaultPodcastId } from "@/server/env";
+import { findEpisode, listEpisodes } from "@/server/episodes/data-repository";
 
 export async function getEpisodes(): Promise<Episode[]> {
-  // TODO: Replace with Firestore query
-  return mockEpisodes;
+  return listEpisodes(getDefaultPodcastId());
 }
 
 export async function getEpisodeById(id: string): Promise<Episode | null> {
-  // TODO: Replace with Firestore getDoc
-  return mockEpisodes.find((ep) => ep.id === id) ?? null;
+  const episodeId = Number(id);
+  if (!Number.isInteger(episodeId) || episodeId <= 0) return null;
+  return findEpisode(getDefaultPodcastId(), episodeId);
 }

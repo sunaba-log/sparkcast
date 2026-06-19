@@ -52,17 +52,24 @@ use them when updating Cloud SQL and writing Firestore generated content.
 
 ## Database Behavior
 
-The API inserts an `episodes` record and stores the GCS object path in
-`audio_file_path` before returning the signed URL. If URL signing fails, the
-database transaction is rolled back.
+The API inserts an `episodes` record with `status = upload_pending` and stores
+the GCS object path in `source_audio_path` before returning the signed URL. If
+URL signing fails, the database transaction is rolled back.
+
+After the browser PUT:
+
+- success: `POST /api/episodes/{episode_id}/upload-result` with `status=uploaded`
+- failure: the same endpoint with `status=failed` and an error summary
+
+The update only applies while the current state is `upload_pending`. If the GCS
+finalize event has already moved the episode to `processing`, the browser
+callback cannot move it backwards.
 
 The initial migration assumes that the `podcasts` table defined in
 `docs/schemas/episode-firestore-schema-spec.md` already exists.
 
 ## Current Constraints
 
-- Authentication and podcast ownership authorization are not implemented yet.
 - The API accepts MP3 files up to 500 MiB.
-- If the browser receives a signed URL but the subsequent GCS PUT fails, the
-  episode record remains. A later task must add upload state and abandoned
-  upload cleanup.
+- A scheduled cleanup for browsers that close before sending the result
+  callback is still required.

@@ -5,12 +5,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "db:migrate": "tsx scripts/migrate.ts",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.11.1",
     "@google-cloud/storage": "^7.17.3",
+    "firebase": "^12.15.0",
+    "firebase-admin": "^14.0.0",
     "next": "^16.2.7",
     "pg": "^8.16.3",
     "react": "^19.0.0",
@@ -26,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^4.0.18"
   }
