@@ -36,6 +36,10 @@ async function createPool(): Promise<Pool> {
     ? new GoogleAuth({
         projectId: getGoogleCloudProject(),
         credentials,
+        scopes: [
+          "https://www.googleapis.com/auth/sqlservice.admin",
+          "https://www.googleapis.com/auth/sqlservice.login",
+        ],
       })
     : undefined;
   const connector = new Connector(auth ? { auth } : undefined);
