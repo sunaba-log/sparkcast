@@ -60,7 +60,7 @@ upload_pending -> uploaded -> processing -> completed
 ```
 
 ブラウザから結果通知が届かない`upload_pending`レコードは、Vercel Cronによって
-1時間後に`failed`へ更新されます。
+24時間後に`failed`へ更新されます。HobbyプランのCron制約に合わせ、1日1回実行します。
 
 ## 検証
 
