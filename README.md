@@ -32,7 +32,8 @@ npm run dev
 ```
 
 `db:migrate`は`migrations/*.sql`をファイル名順に適用し、
-`schema_migrations`へ履歴を記録します。
+`schema_migrations`へ履歴を記録します。`DATABASE_URL`またはCloud SQL Connector用の
+環境変数を利用できます。
 
 ## 認証
 
