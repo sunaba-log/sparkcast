@@ -93,7 +93,13 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         body: selectedFile,
       });
       if (!uploadResponse.ok) {
-        throw new Error("GCSへのアップロードに失敗しました");
+        const detail = await uploadResponse.text().catch(() => "");
+        const summary = `${uploadResponse.status} ${uploadResponse.statusText}`.trim();
+        throw new Error(
+          `GCSへのアップロードに失敗しました (${summary})${
+            detail ? `: ${detail.slice(0, 300)}` : ""
+          }`,
+        );
       }
 
       await fetch(`/api/episodes/${preparation.episodeId}/upload-result`, {

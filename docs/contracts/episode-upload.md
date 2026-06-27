@@ -45,9 +45,11 @@ podcasts/{podcast_id}/episodes/{episode_id}/source/{filename}
 - `filename` is reduced to its basename and sanitized to ASCII letters, numbers,
   `.`, `_`, and `-`.
 - The file extension must be `.mp3` or `.m4a`.
-- The upload request must use the same `Content-Type` used when creating the
-  signed URL. Supported values are `audio/mpeg`, `audio/mp4`, `audio/x-m4a`,
-  and `audio/m4a`.
+- The API validates the requested `Content-Type`. Supported values are
+  `audio/mpeg`, `audio/mp4`, `audio/x-m4a`, and `audio/m4a`.
+- The signed URL is not bound to a specific `Content-Type`, because browsers and
+  operating systems may report M4A files with different audio MIME values. The
+  browser should still send the validated `Content-Type` on the PUT request.
 
 `podcast-automator` must parse `podcast_id` and `episode_id` from this path and
 use them when updating Cloud SQL and writing Firestore generated content.

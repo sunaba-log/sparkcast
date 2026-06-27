@@ -43,14 +43,13 @@ describe("createEpisodeUpload", () => {
     );
     expect(signUpload).toHaveBeenCalledWith(
       "podcasts/7/episodes/42/source/recording.mp3",
-      "audio/mpeg",
     );
     expect(client.query).toHaveBeenLastCalledWith("COMMIT");
     expect(client.release).toHaveBeenCalledOnce();
     expect(result.episodeId).toBe(42);
   });
 
-  it("preserves m4a filenames and content types for signed uploads", async () => {
+  it("preserves m4a filenames for signed uploads", async () => {
     const client = createClient();
     const signUpload = vi.fn().mockResolvedValue({
       uploadUrl: "https://storage.example/upload",
@@ -69,7 +68,6 @@ describe("createEpisodeUpload", () => {
 
     expect(signUpload).toHaveBeenCalledWith(
       "podcasts/7/episodes/42/source/recording.m4a",
-      "audio/mp4",
     );
   });
 
