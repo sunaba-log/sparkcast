@@ -66,7 +66,11 @@ export async function POST(request: Request) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
       return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
     }
-    console.error("Failed to create auth session", error);
+    console.error("Failed to create auth session", {
+      name: error instanceof Error ? error.name : undefined,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json({ error: "ログインに失敗しました" }, { status: 401 });
   }
 }
