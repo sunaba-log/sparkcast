@@ -29,18 +29,30 @@ export async function POST(request: Request) {
     const client = await (await getDbPool()).connect();
     try {
       await client.query("BEGIN");
-      await client.query(
-        `INSERT INTO users (user_id, email, display_name)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id)
-         DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name`,
-        [decoded.uid, email, decoded.name ?? null],
+      const existingUser = await client.query<{ user_id: string }>(
+        "SELECT user_id FROM users WHERE email = $1",
+        [email],
       );
+      const appUserId = existingUser.rows[0]?.user_id ?? decoded.uid;
+      if (existingUser.rowCount) {
+        await client.query(
+          "UPDATE users SET display_name = $2 WHERE user_id = $1",
+          [appUserId, decoded.name ?? null],
+        );
+      } else {
+        await client.query(
+          `INSERT INTO users (user_id, email, display_name)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id)
+           DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name`,
+          [appUserId, email, decoded.name ?? null],
+        );
+      }
       await client.query(
         `INSERT INTO podcast_ownerships (podcast_id, user_id, role)
          VALUES ($1, $2, 'owner')
          ON CONFLICT (podcast_id, user_id) DO NOTHING`,
-        [podcastId, decoded.uid],
+        [podcastId, appUserId],
       );
       await client.query("COMMIT");
     } catch (error) {

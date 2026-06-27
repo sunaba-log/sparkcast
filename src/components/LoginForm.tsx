@@ -44,9 +44,9 @@ export function LoginForm() {
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-8 max-w-md mx-auto">
-      <h1 className="text-xl font-bold text-gray-900">dev環境へログイン</h1>
+      <h1 className="text-xl font-bold text-gray-900">管理画面へログイン</h1>
       <p className="mt-2 text-sm text-gray-500">
-        Podcaster&apos;s DevLogの開発メンバー用画面です。
+        Podcaster&apos;s DevLogのメンバー用画面です。
       </p>
       {error && (
         <p className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">

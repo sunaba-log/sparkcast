@@ -19,9 +19,14 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   try {
     const token = await getAdminAuth().verifySessionCookie(sessionCookie, true);
     if (!token.email) return null;
+    const email = token.email.toLowerCase();
+    const user = await (await getDbPool()).query<{ user_id: string }>(
+      "SELECT user_id FROM users WHERE email = $1",
+      [email],
+    );
     return {
-      uid: token.uid,
-      email: token.email,
+      uid: user.rows[0]?.user_id ?? token.uid,
+      email,
       displayName: typeof token.name === "string" ? token.name : null,
     };
   } catch {
