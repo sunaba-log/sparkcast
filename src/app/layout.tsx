@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ChatWidget } from "@/components/ChatWidget";
 import { getSessionUser } from "@/server/auth";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <main className="max-w-4xl mx-auto px-4 py-8">{children}</main>
+        {user && <ChatWidget />}
       </body>
     </html>
   );
