@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 type UploadStatus = "idle" | "preparing" | "uploading" | "success" | "error";
+type SupportedAudioContentType = "audio/mpeg" | "audio/mp4" | "audio/x-m4a" | "audio/m4a";
 
 type UploadPreparation = {
   episodeId: number;
@@ -12,9 +13,18 @@ type UploadPreparation = {
   expiresAt: string;
 };
 
-export function UploadForm() {
+function getSupportedAudioContentType(file: File): SupportedAudioContentType | null {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".mp3")) return "audio/mpeg";
+  if (lowerName.endsWith(".m4a")) {
+    if (file.type === "audio/x-m4a" || file.type === "audio/m4a") return file.type;
+    return "audio/mp4";
+  }
+  return null;
+}
+
+export function UploadForm({ podcastId }: { podcastId: number }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [podcastId, setPodcastId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<UploadStatus>("idle");
@@ -24,8 +34,8 @@ export function UploadForm() {
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
-    if (file && (file.type !== "audio/mpeg" || !file.name.toLowerCase().endsWith(".mp3"))) {
-      setErrorMessage("MP3ファイルを選択してください");
+    if (file && !getSupportedAudioContentType(file)) {
+      setErrorMessage("MP3またはM4Aファイルを選択してください");
       setStatus("error");
       e.target.value = "";
       setSelectedFile(null);
@@ -33,7 +43,7 @@ export function UploadForm() {
     }
     setSelectedFile(file);
     if (file && !title) {
-      setTitle(file.name.replace(/\.mp3$/i, ""));
+      setTitle(file.name.replace(/\.(mp3|m4a)$/i, ""));
     }
     setStatus("idle");
     setErrorMessage("");
@@ -41,23 +51,18 @@ export function UploadForm() {
 
   async function handleUpload() {
     if (!selectedFile) {
-      setErrorMessage("MP3ファイルを選択してください");
+      setErrorMessage("MP3またはM4Aファイルを選択してください");
+      setStatus("error");
+      return;
+    }
+    const contentType = getSupportedAudioContentType(selectedFile);
+    if (!contentType) {
+      setErrorMessage("MP3またはM4Aファイルを選択してください");
       setStatus("error");
       return;
     }
 
-    const parsedPodcastId = Number(podcastId);
-    if (!Number.isInteger(parsedPodcastId) || parsedPodcastId <= 0) {
-      setErrorMessage("Podcast IDには正の整数を入力してください");
-      setStatus("error");
-      return;
-    }
-    if (!title.trim()) {
-      setErrorMessage("エピソードタイトルを入力してください");
-      setStatus("error");
-      return;
-    }
-
+    let preparation: (UploadPreparation & { error?: string }) | null = null;
     try {
       setErrorMessage("");
       setStatus("preparing");
@@ -65,16 +70,18 @@ export function UploadForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          podcastId: parsedPodcastId,
-          title: title.trim(),
+          podcastId,
+          title: title.trim() || undefined,
           description: description.trim() || undefined,
           fileName: selectedFile.name,
-          contentType: "audio/mpeg",
+          contentType,
           fileSize: selectedFile.size,
         }),
       });
 
-      const preparation = (await response.json()) as UploadPreparation & { error?: string };
+      preparation = (await response.json()) as UploadPreparation & {
+        error?: string;
+      };
       if (!response.ok) {
         throw new Error(preparation.error || "アップロードの準備に失敗しました");
       }
@@ -82,24 +89,37 @@ export function UploadForm() {
       setStatus("uploading");
       const uploadResponse = await fetch(preparation.uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": "audio/mpeg" },
+        headers: { "Content-Type": contentType },
         body: selectedFile,
       });
       if (!uploadResponse.ok) {
         throw new Error("GCSへのアップロードに失敗しました");
       }
 
+      await fetch(`/api/episodes/${preparation.episodeId}/upload-result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "uploaded" }),
+      });
       setUploadedEpisodeId(preparation.episodeId);
       setStatus("success");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "アップロードに失敗しました");
+      const message =
+        error instanceof Error ? error.message : "アップロードに失敗しました";
+      if (preparation) {
+        await fetch(`/api/episodes/${preparation.episodeId}/upload-result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "failed", error: message }),
+        }).catch(() => undefined);
+      }
+      setErrorMessage(message);
       setStatus("error");
     }
   }
 
   function handleReset() {
     setSelectedFile(null);
-    setPodcastId("");
     setTitle("");
     setDescription("");
     setStatus("idle");
@@ -114,19 +134,7 @@ export function UploadForm() {
     <div className="bg-white border border-gray-200 rounded-lg p-8 max-w-xl">
       <div className="space-y-4 mb-6">
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">Podcast ID</span>
-          <input
-            type="number"
-            min="1"
-            value={podcastId}
-            onChange={(event) => setPodcastId(event.target.value)}
-            disabled={isBusy}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
-            placeholder="1"
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-gray-700">エピソードタイトル</span>
+          <span className="text-sm font-medium text-gray-700">仮タイトル（任意）</span>
           <input
             type="text"
             maxLength={255}
@@ -134,7 +142,11 @@ export function UploadForm() {
             onChange={(event) => setTitle(event.target.value)}
             disabled={isBusy}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            placeholder="未入力の場合はファイル名を仮タイトルにします"
           />
+          <span className="mt-1 block text-xs text-gray-500">
+            AI処理完了後、生成されたエピソードタイトルで上書きされます。
+          </span>
         </label>
         <label className="block">
           <span className="text-sm font-medium text-gray-700">説明（任意）</span>
@@ -156,12 +168,12 @@ export function UploadForm() {
         <svg className="mx-auto w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
-        <p className="mt-3 text-sm text-gray-600">クリックしてmp3ファイルを選択</p>
-        <p className="mt-1 text-xs text-gray-400">MP3ファイルのみ対応</p>
+        <p className="mt-3 text-sm text-gray-600">クリックして音声ファイルを選択</p>
+        <p className="mt-1 text-xs text-gray-400">MP3 / M4Aファイルに対応</p>
         <input
           ref={inputRef}
           type="file"
-          accept=".mp3,audio/mpeg"
+          accept=".mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a,audio/m4a"
           className="hidden"
           disabled={isBusy}
           onChange={handleFileChange}
@@ -198,7 +210,7 @@ export function UploadForm() {
       {isBusy && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
           <p className="text-sm text-blue-800 font-medium">
-            {status === "preparing" ? "エピソードを作成しています..." : "MP3をアップロードしています..."}
+            {status === "preparing" ? "エピソードを作成しています..." : "音声ファイルをアップロードしています..."}
           </p>
         </div>
       )}

@@ -34,7 +34,6 @@ export function EpisodeCard({ episode }: { episode: Episode }) {
         <div className="mt-3 flex flex-wrap gap-3">
           <GeneratedIndicator generated={episode.minutesGenerated} label="議事録" />
           <GeneratedIndicator generated={episode.xPostsGenerated} label="X投稿文" />
-          <GeneratedIndicator generated={episode.seedsGenerated} label="会話のタネ" />
         </div>
       </div>
     </Link>

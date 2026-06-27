@@ -45,8 +45,11 @@ erDiagram
         INT podcast_id FK "REFERENCES podcasts"
         VARCHAR(255) title
         TEXT description
-        TEXT audio_file_path "R2/GCSの音声データパス"
+        TEXT source_audio_path "GCS入力パス"
+        TEXT audio_file_path "R2公開URL"
+        VARCHAR(20) status
         INT duration_seconds "再生時間(秒)"
+        TEXT processing_error
         TIMESTAMP published_at
         TIMESTAMP created_at
     }
@@ -90,8 +93,13 @@ erDiagram
 | podcast_id | INT | FK -> podcasts.podcast_id, NOT NULL | 所属番組 |
 | title | VARCHAR(255) | NOT NULL | エピソードタイトル |
 | description | TEXT | NULL | 説明文 |
-| audio_file_path | TEXT | NOT NULL | 音声ファイルパス |
+| source_audio_path | TEXT | NULL | GCS入力オブジェクトパス |
+| audio_file_path | TEXT | NULL | 処理後の公開音声URL |
+| status | VARCHAR(20) | NOT NULL | upload_pending, uploaded, processing, completed, failed |
 | duration_seconds | INT | NULL | 再生時間（秒） |
+| processing_error | TEXT | NULL | 失敗理由 |
+| processing_started_at | TIMESTAMP | NULL | 処理開始日時 |
+| processing_completed_at | TIMESTAMP | NULL | 処理終了日時 |
 | published_at | TIMESTAMP | NULL | 公開日時 |
 | created_at | TIMESTAMP | NOT NULL, DEFAULT now() | 作成日時 |
 
@@ -207,6 +215,7 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 1. podcast_ownerships.role は owner または editor を許容値とする
 2. episodes.duration_seconds は 0 以上
 3. episodes.published_at は episodes.created_at 以降
+4. episodes.status は定義済み状態のみを許可する
 
 ### PostgreSQL 推奨インデックス
 
@@ -251,7 +260,7 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 3. episode.number を Cloud SQL 側で持つか（現在はSNSドキュメント内の補助情報）
 4. transcript_summary の多言語対応（言語コード保持）を行うか
 
-## 8. MP3アップロード連携契約
+## 8. 音声アップロード連携契約
 
 `podcast-ui` はCloud SQLにエピソードを作成し、ブラウザからGCSへ直接PUTするための署名付きURLを発行する。
 

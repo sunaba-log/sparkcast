@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { getEpisodes } from "@/lib/episodes";
 import { EpisodeCard } from "@/components/EpisodeCard";
+import {
+  requirePodcastAccess,
+  requireSessionUser,
+} from "@/server/auth";
+import { getDefaultPodcastId } from "@/server/env";
+
+export const dynamic = "force-dynamic";
 
 export default async function EpisodeListPage() {
+  const user = await requireSessionUser();
+  await requirePodcastAccess(user.uid, getDefaultPodcastId());
   const episodes = await getEpisodes();
 
   return (
@@ -20,7 +29,7 @@ export default async function EpisodeListPage() {
       {episodes.length === 0 ? (
         <div className="text-center py-16 text-gray-500">
           <p className="text-lg">まだエピソードがありません</p>
-          <p className="mt-2 text-sm">mp3ファイルをアップロードして最初のエピソードを作りましょう</p>
+          <p className="mt-2 text-sm">音声ファイルをアップロードして最初のエピソードを作りましょう</p>
         </div>
       ) : (
         <div className="grid gap-4">
