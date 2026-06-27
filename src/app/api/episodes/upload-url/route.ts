@@ -7,7 +7,7 @@ import {
   createEpisodeRecord,
   setEpisodeAudioFilePath,
 } from "@/server/episodes/repository";
-import { createMp3UploadUrl } from "@/server/storage";
+import { createAudioUploadUrl } from "@/server/storage";
 import { getSessionUser, requirePodcastAccess } from "@/server/auth";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     await requirePodcastAccess(user.uid, input.podcastId);
     const result = await createEpisodeUpload(input, {
       pool: await getDbPool(),
-      signUpload: createMp3UploadUrl,
+      signUpload: createAudioUploadUrl,
       createRecord: createEpisodeRecord,
       setAudioPath: setEpisodeAudioFilePath,
     });

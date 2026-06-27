@@ -5,19 +5,32 @@ import { getDbPool } from "@/server/db";
 
 type CreateEpisodeRecordInput = {
   podcastId: number;
-  title: string;
+  title?: string;
   description?: string;
+  fileName: string;
 };
+
+function buildProvisionalTitle(fileName: string): string {
+  const baseName = fileName.split(/[\\/]/).pop() ?? "";
+  const title = baseName
+    .replace(/\.[^.]+$/, "")
+    .normalize("NFKC")
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  return (title || "Untitled episode").slice(0, 255);
+}
 
 export async function createEpisodeRecord(
   client: PoolClient,
   input: CreateEpisodeRecordInput,
 ): Promise<number> {
+  const title = input.title?.trim() || buildProvisionalTitle(input.fileName);
   const result = await client.query<{ episode_id: number }>(
     `INSERT INTO episodes (podcast_id, title, description, status)
      VALUES ($1, $2, $3, 'upload_pending')
      RETURNING episode_id`,
-    [input.podcastId, input.title, input.description ?? null],
+    [input.podcastId, title, input.description ?? null],
   );
   return result.rows[0].episode_id;
 }

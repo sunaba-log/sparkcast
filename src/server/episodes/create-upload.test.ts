@@ -43,10 +43,34 @@ describe("createEpisodeUpload", () => {
     );
     expect(signUpload).toHaveBeenCalledWith(
       "podcasts/7/episodes/42/source/recording.mp3",
+      "audio/mpeg",
     );
     expect(client.query).toHaveBeenLastCalledWith("COMMIT");
     expect(client.release).toHaveBeenCalledOnce();
     expect(result.episodeId).toBe(42);
+  });
+
+  it("preserves m4a filenames and content types for signed uploads", async () => {
+    const client = createClient();
+    const signUpload = vi.fn().mockResolvedValue({
+      uploadUrl: "https://storage.example/upload",
+      expiresAt: new Date("2026-06-12T00:15:00.000Z"),
+    });
+
+    await createEpisodeUpload(
+      { ...input, fileName: "recording.m4a", contentType: "audio/mp4" },
+      {
+        pool: { connect: vi.fn().mockResolvedValue(client) },
+        createRecord: vi.fn().mockResolvedValue(42),
+        setAudioPath: vi.fn().mockResolvedValue(undefined),
+        signUpload,
+      },
+    );
+
+    expect(signUpload).toHaveBeenCalledWith(
+      "podcasts/7/episodes/42/source/recording.m4a",
+      "audio/mp4",
+    );
   });
 
   it("rolls back when signing fails", async () => {

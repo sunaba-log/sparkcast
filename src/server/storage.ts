@@ -7,6 +7,7 @@ import {
   getSignedUrlTtlMs,
   getUploadBucket,
 } from "@/server/env";
+import type { SupportedAudioContentType } from "@/server/episodes/upload-contract";
 
 declare global {
   var podcastStorage: Storage | undefined;
@@ -22,8 +23,9 @@ function getStorage(): Storage {
   return globalThis.podcastStorage;
 }
 
-export async function createMp3UploadUrl(
+export async function createAudioUploadUrl(
   objectPath: string,
+  contentType: SupportedAudioContentType,
 ): Promise<{ uploadUrl: string; expiresAt: Date }> {
   const expiresAt = new Date(Date.now() + getSignedUrlTtlMs());
   const [uploadUrl] = await getStorage()
@@ -33,7 +35,7 @@ export async function createMp3UploadUrl(
       version: "v4",
       action: "write",
       expires: expiresAt,
-      contentType: "audio/mpeg",
+      contentType,
     });
 
   return { uploadUrl, expiresAt };

@@ -8,7 +8,7 @@ Podcaster's DevLogのdev環境向け管理Webアプリです。Next.jsのUIとWe
 - Firebase AuthenticationによるGoogleログイン
 - Cloud SQLのPodcast所有権確認
 - エピソード作成とGCS V4署名付きURL発行
-- ブラウザからGCSへのMP3直接アップロード
+- ブラウザからGCSへの音声ファイル直接アップロード
 - Cloud SQLの処理状態を使ったエピソード一覧・詳細表示
 - Firestoreの議事録、X投稿候補、収録アジェンダの閲覧・編集
 - アップロード結果通知と放置アップロードの定期クリーンアップ
@@ -17,7 +17,7 @@ Podcaster's DevLogのdev環境向け管理Webアプリです。Next.jsのUIとWe
 
 - Cloud SQL PostgreSQL: users、podcasts、podcast_ownerships、episodes
 - Firestore: 議事録、AIメタデータ、SNS投稿候補、収録アジェンダ
-- GCS: Automatorが処理する入力MP3
+- GCS: Automatorが処理する入力音声ファイル
 
 ブラウザはCloud SQLとFirestoreへ直接接続しません。データ操作はNext.js API
 またはServer Component経由で行います。

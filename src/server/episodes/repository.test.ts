@@ -1,8 +1,46 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createEpisodeRecord,
   markAbandonedUploadsFailed,
   markEpisodeUploadResult,
 } from "@/server/episodes/repository";
+
+describe("createEpisodeRecord", () => {
+  it("uses the provided title when present", async () => {
+    const client = {
+      query: vi.fn().mockResolvedValue({ rows: [{ episode_id: 42 }] }),
+    };
+
+    await expect(
+      createEpisodeRecord(client as never, {
+        podcastId: 7,
+        title: "Manual title",
+        fileName: "recording.m4a",
+      }),
+    ).resolves.toBe(42);
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO episodes"),
+      [7, "Manual title", null],
+    );
+  });
+
+  it("uses a provisional filename title when title is omitted", async () => {
+    const client = {
+      query: vi.fn().mockResolvedValue({ rows: [{ episode_id: 42 }] }),
+    };
+
+    await createEpisodeRecord(client as never, {
+      podcastId: 7,
+      fileName: "devlog_recording-01.m4a",
+    });
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO episodes"),
+      [7, "devlog recording 01", null],
+    );
+  });
+});
 
 describe("markEpisodeUploadResult", () => {
   it("updates only an episode still waiting for upload", async () => {

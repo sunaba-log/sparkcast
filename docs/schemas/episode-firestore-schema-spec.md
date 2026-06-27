@@ -260,7 +260,7 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 3. episode.number を Cloud SQL 側で持つか（現在はSNSドキュメント内の補助情報）
 4. transcript_summary の多言語対応（言語コード保持）を行うか
 
-## 8. MP3アップロード連携契約
+## 8. 音声アップロード連携契約
 
 `podcast-ui` はCloud SQLにエピソードを作成し、ブラウザからGCSへ直接PUTするための署名付きURLを発行する。
 

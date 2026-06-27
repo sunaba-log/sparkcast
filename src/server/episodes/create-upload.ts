@@ -7,7 +7,10 @@ import { buildEpisodeSourceObjectPath } from "@/server/episodes/upload-contract"
 
 type Dependencies = {
   pool: Pick<Pool, "connect">;
-  signUpload: (objectPath: string) => Promise<{ uploadUrl: string; expiresAt: Date }>;
+  signUpload: (
+    objectPath: string,
+    contentType: CreateEpisodeUploadInput["contentType"],
+  ) => Promise<{ uploadUrl: string; expiresAt: Date }>;
   createRecord: (client: PoolClient, input: CreateEpisodeUploadInput) => Promise<number>;
   setAudioPath: (client: PoolClient, episodeId: number, objectPath: string) => Promise<void>;
 };
@@ -26,7 +29,10 @@ export async function createEpisodeUpload(
       input.fileName,
     );
     await dependencies.setAudioPath(client, episodeId, objectPath);
-    const { uploadUrl, expiresAt } = await dependencies.signUpload(objectPath);
+    const { uploadUrl, expiresAt } = await dependencies.signUpload(
+      objectPath,
+      input.contentType,
+    );
     await client.query("COMMIT");
 
     return {

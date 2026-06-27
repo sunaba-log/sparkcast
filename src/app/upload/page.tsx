@@ -21,7 +21,7 @@ export default async function UploadPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">エピソードをアップロード</h1>
         <p className="mt-1 text-sm text-gray-500">
-          エピソードを作成してmp3ファイルをアップロードすると、バックグラウンド処理が開始されます。
+          エピソードを作成して音声ファイルをアップロードすると、バックグラウンド処理が開始されます。
         </p>
       </div>
 
