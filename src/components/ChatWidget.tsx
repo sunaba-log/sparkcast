@@ -235,14 +235,16 @@ export function ChatWidget() {
                 <button
                   type="button"
                   onClick={startNewChat}
+                  disabled={activeSessionId === null && messages.length === 0}
                   aria-label="新しいチャット"
                   title="新しいチャット"
-                  className="text-gray-500 hover:text-blue-600"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
+                  新規
                 </button>
               </>
             ) : (
