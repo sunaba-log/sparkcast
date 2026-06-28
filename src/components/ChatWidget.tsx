@@ -171,7 +171,12 @@ export function ChatWidget() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                // IME変換確定のEnterでは送信しない（日本語入力対策）。
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
                   event.preventDefault();
                   void send();
                 }
@@ -180,7 +185,10 @@ export function ChatWidget() {
               placeholder="議事録について質問する…"
               className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
             />
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-[11px] text-gray-400">
+                Enterで送信 / Shift+Enterで改行
+              </span>
               <button
                 type="button"
                 onClick={() => void send()}
