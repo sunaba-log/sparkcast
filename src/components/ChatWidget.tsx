@@ -530,6 +530,9 @@ export function ChatWidget() {
 
               <div className="border-t border-gray-200 p-3">
                 <textarea
+                  id="chat-input"
+                  name="chat-input"
+                  aria-label="議事録について質問する"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
