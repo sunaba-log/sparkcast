@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ChatMessage } from "@/types/chat";
 
 const GREETING =
@@ -139,16 +141,25 @@ export function ChatWidget() {
                     message.role === "user" ? "flex justify-end" : "flex justify-start"
                   }
                 >
-                  <div
-                    className={
-                      message.role === "user"
-                        ? "max-w-[85%] whitespace-pre-wrap rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
-                        : "max-w-[85%] whitespace-pre-wrap rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800"
-                    }
-                  >
-                    {message.content ||
-                      (isStreaming && message.role === "assistant" ? "…" : "")}
-                  </div>
+                  {message.role === "user" ? (
+                    <div className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-blue-600 px-3 py-2 text-sm text-white">
+                      {message.content}
+                    </div>
+                  ) : (
+                    <div className="max-w-[85%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800">
+                      {message.content ? (
+                        <div className="prose prose-sm prose-gray max-w-none break-words [&_:first-child]:mt-0 [&_:last-child]:mb-0 prose-pre:bg-gray-800 prose-pre:text-gray-100">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : isStreaming ? (
+                        "…"
+                      ) : (
+                        ""
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
