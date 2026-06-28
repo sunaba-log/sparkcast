@@ -9,7 +9,19 @@ variable "region" {
   default     = "asia-northeast1"
 }
 
-variable "app_service_account_email" {
+variable "app_service_account_id" {
   type        = string
-  description = "podcast-ui アプリ実行用のサービスアカウント（Vercel の FIREBASE_SERVICE_ACCOUNT_JSON に設定しているもの）"
+  description = "podcast-ui アプリ実行用サービスアカウントの account_id"
+  default     = "podcast-ui-dev"
+}
+
+variable "app_service_account_display_name" {
+  type        = string
+  description = "アプリ実行用サービスアカウントの表示名"
+  default     = "Podcast UI dev"
+}
+
+variable "upload_bucket" {
+  type        = string
+  description = "音声アップロード用 GCS バケット（署名付きURLのPUT先）"
 }
