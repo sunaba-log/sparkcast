@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-uploads",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/reindex-minutes",
+      "schedule": "0 4 * * *"
     }
   ]
 }

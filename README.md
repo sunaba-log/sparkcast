@@ -80,9 +80,10 @@ gcloud firestore indexes composite create \
   --field-config=field-path=embedding,vector-config='{"dimension":768,"flat":{}}'
 ```
 
-チャットウィンドウの「再インデックス」（`POST /api/chat/reindex`）で配信済み議事録を
-ベクトル化する。議事録が未変更のエピソードはスキップする。インデックス未構築でも
-全文コンテキストへ自動フォールバックして回答する。設計詳細は
+議事録のベクトル化は**Vercel Cronで日次自動実行**する（`/api/cron/reindex-minutes`）。
+冪等で、未変更のエピソードはスキップするため新規・変更分のみ埋め込む。即時に反映したい
+場合はチャットウィンドウの「再インデックス」（`POST /api/chat/reindex`）を手動実行する。
+インデックス未構築でも全文コンテキストへ自動フォールバックして回答する。設計詳細は
 `docs/adr/20260628-podcast-minutes-chat.md`を参照。
 
 ## 検証
