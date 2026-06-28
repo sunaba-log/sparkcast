@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
   ChatMessage,
@@ -11,6 +11,26 @@ import type {
 
 const GREETING =
   "配信済みエピソードの議事録について質問できます。気になるテーマや過去回の内容を聞いてみてください。";
+
+const SCROLL_THRESHOLD = 80;
+
+// 外部リンクは新規タブ + noopener、内部リンク（/episodes/... 等）は同タブで開く。
+const markdownComponents: Components = {
+  a({ href, children }) {
+    const isInternal = typeof href === "string" && href.startsWith("/");
+    return (
+      <a
+        href={href}
+        className="text-blue-600 underline"
+        {...(isInternal
+          ? {}
+          : { target: "_blank", rel: "noopener noreferrer" })}
+      >
+        {children}
+      </a>
+    );
+  },
+};
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,12 +42,21 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [retryAvailable, setRetryAvailable] = useState(false);
   const [reindexState, setReindexState] = useState<
     "idle" | "running" | "done" | "error"
   >("idle");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const loadSessions = useCallback(async () => {
+  useEffect(() => {
+    if (nearBottomRef.current) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+  }, [messages, view]);
+
+  async function loadSessions() {
     try {
       const response = await fetch("/api/chat/sessions");
       if (!response.ok) return;
@@ -36,11 +65,7 @@ export function ChatWidget() {
     } catch {
       // 一覧取得の失敗は致命的でないため握りつぶす
     }
-  }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, view]);
+  }
 
   function toggleOpen() {
     const willOpen = !isOpen;
@@ -54,11 +79,14 @@ export function ChatWidget() {
     setMessages([]);
     setInput("");
     setError("");
+    setRetryAvailable(false);
+    nearBottomRef.current = true;
     setView("chat");
   }
 
   async function openSession(id: string) {
     setError("");
+    setRetryAvailable(false);
     try {
       const response = await fetch(`/api/chat/sessions/${id}`);
       if (!response.ok) throw new Error();
@@ -66,6 +94,7 @@ export function ChatWidget() {
       setActiveSessionId(data.id);
       setTitle(data.title);
       setMessages(data.messages);
+      nearBottomRef.current = true;
       setView("chat");
     } catch {
       setError("チャットの読み込みに失敗しました");
@@ -73,12 +102,35 @@ export function ChatWidget() {
   }
 
   async function removeSession(id: string) {
+    if (!window.confirm("このチャットを削除しますか？")) return;
     setSessions((current) => current.filter((session) => session.id !== id));
     if (id === activeSessionId) startNewChat();
     try {
       await fetch(`/api/chat/sessions/${id}`, { method: "DELETE" });
     } catch {
       // 削除失敗時は次回の一覧取得で復帰する
+    }
+  }
+
+  async function renameSession(id: string, currentTitle: string) {
+    const next = window.prompt("チャット名を変更", currentTitle);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === currentTitle) return;
+    setSessions((current) =>
+      current.map((session) =>
+        session.id === id ? { ...session, title: trimmed } : session,
+      ),
+    );
+    if (id === activeSessionId) setTitle(trimmed);
+    try {
+      await fetch(`/api/chat/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+    } catch {
+      // 失敗時は次回の一覧取得で復帰する
     }
   }
 
@@ -91,74 +143,6 @@ export function ChatWidget() {
         )
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     );
-  }
-
-  async function send() {
-    const text = input.trim();
-    if (!text || isStreaming) return;
-
-    const nextMessages: ChatMessage[] = [
-      ...messages,
-      { role: "user", content: text },
-    ];
-    setMessages([...nextMessages, { role: "assistant", content: "" }]);
-    setInput("");
-    setError("");
-    setIsStreaming(true);
-
-    let sessionId = activeSessionId;
-    try {
-      // 新規チャットなら先にセッションを作成して履歴へ残す
-      if (!sessionId) {
-        const created = await createRemoteSession(nextMessages);
-        sessionId = created.id;
-        setActiveSessionId(created.id);
-        setTitle(created.title);
-        setSessions((current) => [created, ...current]);
-      }
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
-      });
-      if (!response.ok || !response.body) {
-        const result = (await response.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(result.error ?? "応答の生成に失敗しました");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistant = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        assistant += decoder.decode(value, { stream: true });
-        setMessages((current) => {
-          const updated = [...current];
-          updated[updated.length - 1] = {
-            role: "assistant",
-            content: assistant,
-          };
-          return updated;
-        });
-      }
-      if (!assistant) throw new Error("応答が空でした");
-
-      const finalMessages: ChatMessage[] = [
-        ...nextMessages,
-        { role: "assistant", content: assistant },
-      ];
-      await persistSession(sessionId, finalMessages);
-      bumpSession(sessionId);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "応答の生成に失敗しました");
-      setMessages((current) => current.filter((message) => message.content !== ""));
-    } finally {
-      setIsStreaming(false);
-    }
   }
 
   async function createRemoteSession(
@@ -183,6 +167,114 @@ export function ChatWidget() {
     } catch {
       // 保存失敗は表示中の会話には影響しないため握りつぶす
     }
+  }
+
+  // base は末尾がユーザー発言の配列。これに対する回答を生成・保存する。
+  async function generate(base: ChatMessage[]) {
+    setMessages([...base, { role: "assistant", content: "" }]);
+    setError("");
+    setRetryAvailable(false);
+    setIsStreaming(true);
+    nearBottomRef.current = true;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let assistant = "";
+    let sessionId = activeSessionId;
+
+    try {
+      if (!sessionId) {
+        const created = await createRemoteSession(base);
+        sessionId = created.id;
+        setActiveSessionId(created.id);
+        setTitle(created.title);
+        setSessions((current) => [created, ...current]);
+      }
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: base }),
+        signal: controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        const result = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(result.error ?? "応答の生成に失敗しました");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        assistant += decoder.decode(value, { stream: true });
+        setMessages((current) => {
+          const updated = [...current];
+          updated[updated.length - 1] = {
+            role: "assistant",
+            content: assistant,
+          };
+          return updated;
+        });
+      }
+      if (!assistant) throw new Error("応答が空でした");
+
+      const finalMessages: ChatMessage[] = [
+        ...base,
+        { role: "assistant", content: assistant },
+      ];
+      if (sessionId) {
+        await persistSession(sessionId, finalMessages);
+        bumpSession(sessionId);
+      }
+    } catch (caught) {
+      if (controller.signal.aborted) {
+        // 停止: 生成済みの部分応答は保持する
+        if (assistant) {
+          const finalMessages: ChatMessage[] = [
+            ...base,
+            { role: "assistant", content: assistant },
+          ];
+          setMessages(finalMessages);
+          if (sessionId) {
+            await persistSession(sessionId, finalMessages);
+            bumpSession(sessionId);
+          }
+        } else {
+          setMessages(base);
+        }
+      } else {
+        setMessages(base);
+        setError(
+          caught instanceof Error ? caught.message : "応答の生成に失敗しました",
+        );
+        setRetryAvailable(true);
+      }
+    } finally {
+      setIsStreaming(false);
+      abortRef.current = null;
+    }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || isStreaming) return;
+    setInput("");
+    await generate([...messages, { role: "user", content: text }]);
+  }
+
+  async function retry() {
+    if (isStreaming) return;
+    if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+      return;
+    }
+    await generate(messages);
+  }
+
+  function stop() {
+    abortRef.current?.abort();
   }
 
   async function reindex() {
@@ -279,7 +371,7 @@ export function ChatWidget() {
                     {sessions.map((session) => (
                       <li
                         key={session.id}
-                        className={`flex items-center gap-2 rounded-md px-2 py-2 hover:bg-gray-100 ${
+                        className={`flex items-center gap-1 rounded-md px-2 py-2 hover:bg-gray-100 ${
                           session.id === activeSessionId ? "bg-blue-50" : ""
                         }`}
                       >
@@ -289,6 +381,18 @@ export function ChatWidget() {
                           className="flex-1 truncate text-left text-sm text-gray-800"
                         >
                           {session.title}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void renameSession(session.id, session.title)}
+                          aria-label="名前を変更"
+                          title="名前を変更"
+                          className="text-gray-300 hover:text-blue-500"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                          </svg>
                         </button>
                         <button
                           type="button"
@@ -324,7 +428,16 @@ export function ChatWidget() {
             </>
           ) : (
             <>
-              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+              <div
+                ref={scrollRef}
+                onScroll={(event) => {
+                  const el = event.currentTarget;
+                  nearBottomRef.current =
+                    el.scrollHeight - el.scrollTop - el.clientHeight <
+                    SCROLL_THRESHOLD;
+                }}
+                className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
+              >
                 {messages.length === 0 ? (
                   <p className="text-sm leading-relaxed text-gray-500">{GREETING}</p>
                 ) : (
@@ -343,7 +456,10 @@ export function ChatWidget() {
                         <div className="max-w-[85%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800">
                           {message.content ? (
                             <div className="prose prose-sm prose-gray max-w-none break-words [&_:first-child]:mt-0 [&_:last-child]:mb-0 prose-pre:bg-gray-800 prose-pre:text-gray-100">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={markdownComponents}
+                              >
                                 {message.content}
                               </ReactMarkdown>
                             </div>
@@ -357,7 +473,20 @@ export function ChatWidget() {
                     </div>
                   ))
                 )}
-                {error && <p className="text-xs text-red-600">{error}</p>}
+                {error && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-red-600">{error}</p>
+                    {retryAvailable && (
+                      <button
+                        type="button"
+                        onClick={() => void retry()}
+                        className="text-xs font-medium text-blue-600 hover:underline"
+                      >
+                        再試行
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-gray-200 p-3">
@@ -383,14 +512,24 @@ export function ChatWidget() {
                   <span className="text-[11px] text-gray-400">
                     Enterで送信 / Shift+Enterで改行
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => void send()}
-                    disabled={isStreaming || !input.trim()}
-                    className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {isStreaming ? "送信中…" : "送信"}
-                  </button>
+                  {isStreaming ? (
+                    <button
+                      type="button"
+                      onClick={stop}
+                      className="rounded-md border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    >
+                      停止
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void send()}
+                      disabled={!input.trim()}
+                      className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      送信
+                    </button>
+                  )}
                 </div>
               </div>
             </>

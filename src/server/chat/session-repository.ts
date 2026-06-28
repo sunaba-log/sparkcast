@@ -77,14 +77,14 @@ export async function createSession(
 export async function updateSession(
   userId: string,
   sessionId: string,
-  input: { messages: ChatMessage[]; title?: string },
+  input: { messages?: ChatMessage[]; title?: string },
 ): Promise<boolean> {
   const ref = sessionsCollection(userId).doc(sessionId);
   if (!(await ref.get()).exists) return false;
   const update: Record<string, unknown> = {
-    messages: input.messages,
     updated_at: new Date().toISOString(),
   };
+  if (input.messages !== undefined) update.messages = input.messages;
   if (input.title !== undefined) update.title = input.title;
   await ref.set(update, { merge: true });
   return true;

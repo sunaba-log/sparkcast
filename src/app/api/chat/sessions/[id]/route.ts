@@ -10,18 +10,23 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const updateSchema = z.object({
-  messages: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().min(1).max(10_000),
-      }),
-    )
-    .min(1)
-    .max(200),
-  title: z.string().min(1).max(200).optional(),
-});
+const updateSchema = z
+  .object({
+    messages: z
+      .array(
+        z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().min(1).max(10_000),
+        }),
+      )
+      .min(1)
+      .max(200)
+      .optional(),
+    title: z.string().min(1).max(200).optional(),
+  })
+  .refine((value) => value.messages !== undefined || value.title !== undefined, {
+    message: "messages か title が必要です",
+  });
 
 export async function GET(
   _request: Request,
