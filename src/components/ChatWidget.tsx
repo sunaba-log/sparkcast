@@ -14,9 +14,48 @@ const GREETING =
 
 const SCROLL_THRESHOLD = 80;
 
-// 外部リンクは新規タブ + noopener、内部リンク（/episodes/... 等）は同タブで開く。
+// Markdownを明示スタイルで描画する（Tailwindのpreflightで消える見出し/リストの
+// 体裁を確実に当て、チャットバブル向けにコンパクトに整える）。
 const markdownComponents: Components = {
-  a({ href, children }) {
+  h1: ({ children }) => (
+    <h3 className="mb-1 mt-3 text-sm font-bold text-gray-900">{children}</h3>
+  ),
+  h2: ({ children }) => (
+    <h3 className="mb-1 mt-3 text-sm font-bold text-gray-900">{children}</h3>
+  ),
+  h3: ({ children }) => (
+    <h4 className="mb-1 mt-2 text-sm font-semibold text-gray-900">{children}</h4>
+  ),
+  p: ({ children }) => <p className="my-1.5 leading-relaxed">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="my-1.5 list-disc space-y-1 pl-5">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-1.5 list-decimal space-y-1 pl-5">{children}</ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => (
+    <strong className="font-semibold text-gray-900">{children}</strong>
+  ),
+  em: ({ children }) => <em className="italic">{children}</em>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-l-2 border-gray-300 pl-3 text-gray-600">
+      {children}
+    </blockquote>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-gray-200 px-1 py-0.5 text-[0.85em]">
+      {children}
+    </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-2 overflow-x-auto rounded-md bg-gray-800 p-3 text-xs text-gray-100 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">
+      {children}
+    </pre>
+  ),
+  hr: () => <hr className="my-3 border-gray-200" />,
+  // 外部リンクは新規タブ + noopener、内部リンク（/episodes/... 等）は同タブで開く。
+  a: ({ href, children }) => {
     const isInternal = typeof href === "string" && href.startsWith("/");
     return (
       <a
@@ -455,7 +494,7 @@ export function ChatWidget() {
                       ) : (
                         <div className="max-w-[85%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800">
                           {message.content ? (
-                            <div className="prose prose-sm prose-gray max-w-none break-words [&_:first-child]:mt-0 [&_:last-child]:mb-0 prose-pre:bg-gray-800 prose-pre:text-gray-100">
+                            <div className="text-sm leading-relaxed break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={markdownComponents}
