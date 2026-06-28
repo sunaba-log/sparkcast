@@ -88,3 +88,15 @@ export function getSignedUrlTtlMs(): number {
 export function getCronSecret(): string {
   return required("CRON_SECRET");
 }
+
+export function getVertexAiLocation(): string {
+  return process.env.VERTEX_AI_LOCATION ?? "global";
+}
+
+export function getVertexAiModel(): string {
+  return process.env.VERTEX_AI_MODEL ?? "gemini-2.5-flash";
+}
+
+export function getVertexAiEmbeddingModel(): string {
+  return process.env.VERTEX_AI_EMBEDDING_MODEL ?? "text-multilingual-embedding-002";
+}
