@@ -13,6 +13,15 @@ function displayUrl(url: string) {
   }
 }
 
+function splitSourceReason(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return [];
+  return normalized
+    .split(/\n+/)
+    .map((line) => line.replace(/^・/, "").trim())
+    .filter(Boolean);
+}
+
 export function TopicProposalEditor({
   proposal,
 }: {
@@ -53,8 +62,101 @@ export function TopicProposalEditor({
         <p className="text-xs text-gray-400 mt-1">{proposal.generatedAt}</p>
       </div>
 
+      <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-5">
+        <h3 className="text-base font-semibold text-gray-900">
+          🎙️ 今週の会話のタネ
+        </h3>
+
+        <div className="mt-4">
+          <h4 className="text-sm font-semibold text-gray-800">
+            🧵 最近よく出てきたテーマ
+          </h4>
+          {topics.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">テーマはまだ生成されていません。</p>
+          ) : (
+            <ul className="mt-2 space-y-1 text-sm text-gray-700">
+              {topics.map((topic, index) => (
+                <li key={`${topic.title}-${index}`}>・{topic.title || "テーマ未生成"}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <h4 className="text-sm font-semibold text-gray-800">
+            🔍 今週の会話の続きになりそうな話題
+          </h4>
+          {news.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">関連ニュースはまだ生成されていません。</p>
+          ) : (
+            <div className="mt-3 space-y-5">
+              {news.map((item, index) => {
+                const reasons = splitSourceReason(item.sourceReason);
+                return (
+                  <div key={`${item.url}-preview-${index}`} className="text-sm text-gray-700">
+                    <p className="font-medium text-gray-900">
+                      {item.title || "タイトル未生成"}{" "}
+                      <span className="text-gray-500">（出典: {displayUrl(item.url)}）</span>
+                    </p>
+                    {item.url ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-block break-all text-xs text-blue-700 hover:underline"
+                      >
+                        {item.url}
+                      </a>
+                    ) : null}
+                    {item.summary ? (
+                      <p className="mt-2 whitespace-pre-wrap">・概要: {item.summary}</p>
+                    ) : null}
+                    {reasons.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {reasons.map((reason, reasonIndex) => (
+                          <li key={reasonIndex}>・{reason}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-gray-500">・関連理由は未生成です。</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <h4 className="text-sm font-semibold text-gray-800">💡 気になっている問い</h4>
+          {topics.some((topic) => topic.suggestedPoints.length > 0) ? (
+            <ul className="mt-2 space-y-2 text-sm text-gray-700">
+              {topics.flatMap((topic) =>
+                topic.suggestedPoints.map((point, pointIndex) => (
+                  <li key={`${topic.title}-${pointIndex}`}>
+                    ・{point}
+                    {topic.relatedPastEpisodes.length > 0 ? (
+                      <span className="ml-1 text-gray-500">
+                        [{topic.relatedPastEpisodes.map((episodeId) => `#${episodeId}`).join(", ")}]
+                      </span>
+                    ) : null}
+                  </li>
+                )),
+              )}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">問いはまだ生成されていません。</p>
+          )}
+        </div>
+
+        <p className="mt-5 text-xs font-medium text-gray-500">
+          📊 {topics.reduce((total, topic) => total + topic.relatedPastEpisodes.length, 0)}{" "}
+          関連エピソード / AI リサーチ
+        </p>
+      </section>
+
       <section>
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">関連ニュース</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">関連ニュースを編集</h3>
         {news.length === 0 ? (
           <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-500">
             関連ニュースはまだ生成されていません。
@@ -140,7 +242,7 @@ export function TopicProposalEditor({
       </section>
 
       <section>
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">会話の種</h3>
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">会話の種を編集</h3>
         {topics.length === 0 ? (
           <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-500">
             会話の種はまだ生成されていません。
