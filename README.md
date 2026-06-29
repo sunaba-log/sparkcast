@@ -36,6 +36,9 @@ npm run dev
 `schema_migrations`へ履歴を記録します。`DATABASE_URL`またはCloud SQL Connector用の
 環境変数を利用できます。
 
+`.env.local`にはSecretが含まれるため、ファイル自体は共有しません。必要なキーと
+取得元は`docs/runbooks/environment-variables.md`を参照してください。
+
 ## 認証
 
 `DEV_ALLOWED_EMAILS`に指定されたユーザーだけがログインできます。初回ログイン時に
