@@ -21,8 +21,9 @@ real secret values. Share this runbook and `.env.example`, not `.env.local`.
 | `GCS_SIGNED_URL_TTL_SECONDS` | Optional | `.env.example` default | Vercel Environment Variables | Defaults to `900` seconds. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Required outside GCP | Vercel env | Vercel Environment Variables | JSON for server-side Firebase/GCS signing credentials. |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Public Firebase Web SDK config. |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Example: `sunabalog-dev.firebaseapp.com`. |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Dev/Preview can use `sunabalog-dev.firebaseapp.com`. Production on Vercel should use the UI host, for example `podcast-ui-kentakashimas-projects.vercel.app`, so mobile redirect sign-in can restore the Firebase result. |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Must match the Firebase project used for auth. |
+| `FIREBASE_AUTH_HELPER_DOMAIN` | Optional | Firebase project auth helper domain | Vercel Environment Variables | Defaults to `${NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`. Used by Next.js rewrites for `/__/auth/*`. |
 | `CRON_SECRET` | Required | Vercel env or generated local value | Vercel Environment Variables | Used by scheduled upload cleanup endpoint. |
 
 ## Current Secret Stores
@@ -54,6 +55,7 @@ team-agreed source for that environment and do not duplicate it in docs.
    GCS_UPLOAD_BUCKET
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
    NEXT_PUBLIC_FIREBASE_PROJECT_ID
+   FIREBASE_AUTH_HELPER_DOMAIN
    ```
 
 3. Fill secret values from the appropriate secret store:
@@ -92,3 +94,26 @@ npm run build
 For upload testing, use the target environment's matching Cloud SQL database,
 GCS bucket, Firebase project, and service account. Mixing dev and prod values
 can create signed URLs that fail with GCS `AccessDenied`.
+
+## Firebase Redirect Sign-In on Vercel
+
+Mobile browsers may block the cross-origin storage access used by Firebase
+`signInWithRedirect()` when the app is served from Vercel but `authDomain`
+points at `<project>.firebaseapp.com`. In that state, Google sign-in appears to
+complete, but the app returns to `/login` because `getRedirectResult()` is empty
+and `/api/auth/session` is never called.
+
+Production Vercel should therefore use:
+
+```text
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=podcast-ui-kentakashimas-projects.vercel.app
+FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-prod.firebaseapp.com
+```
+
+The Next.js rewrite proxies `/__/auth/*` to the Firebase helper domain. Also
+make sure Firebase Auth authorized domains includes the UI host, and the Google
+OAuth client allows this redirect URI:
+
+```text
+https://podcast-ui-kentakashimas-projects.vercel.app/__/auth/handler
+```
