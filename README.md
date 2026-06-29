@@ -45,6 +45,14 @@ npm run dev
 ユーザーをCloud SQLへ登録し、`DEFAULT_PODCAST_ID`のowner権限を付与します。
 この自動付与は単一Podcastのdev環境専用です。
 
+### ローカル開発時のモック認証
+
+ローカル環境（`localhost`）での開発時にGoogle認証をスキップし、ワンクリックでログイン状態を再現するためのモック認証機能を利用できます。
+
+1. `.env.local` に `NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH="true"` を設定します。
+2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
+3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）で自動的にデータベース登録および所有権付与が行われ、Firebase認証なしで即座にログインできます。
+
 VercelなどGoogle Cloud外で動かす場合、`FIREBASE_SERVICE_ACCOUNT_JSON`へ
 Firestore、Firebase Auth、GCS署名に使用するサービスアカウントJSONを設定します。
 
