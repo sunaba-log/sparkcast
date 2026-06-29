@@ -1,14 +1,12 @@
-import { getEpisodes } from "@/lib/episodes";
-import { EpisodeMasterDetail } from "@/components/EpisodeMasterDetail";
+import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
 import { requirePodcastAccess, requireSessionUser } from "@/server/auth";
 import { getDefaultPodcastId } from "@/server/env";
 
 export const dynamic = "force-dynamic";
 
-export default async function EpisodeListPage() {
+export default async function SNSPostPage() {
   const user = await requireSessionUser();
   await requirePodcastAccess(user.uid, getDefaultPodcastId());
-  const episodes = await getEpisodes();
 
-  return <EpisodeMasterDetail initialEpisodes={episodes} />;
+  return <SNSPostMasterDetail />;
 }

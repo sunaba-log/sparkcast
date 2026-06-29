@@ -1,10 +1,8 @@
 import { TopicProposalEditor } from "@/components/TopicProposalEditor";
-import {
-  requirePodcastAccess,
-  requireSessionUser,
-} from "@/server/auth";
+import { requirePodcastAccess, requireSessionUser } from "@/server/auth";
 import { getDefaultPodcastId } from "@/server/env";
 import { listTopicProposals } from "@/server/topic-proposals/repository";
+import type { TopicProposal } from "@/types/episode";
 
 export const dynamic = "force-dynamic";
 
@@ -14,23 +12,47 @@ export default async function AgendaPage() {
   await requirePodcastAccess(user.uid, podcastId);
   const proposals = await listTopicProposals(podcastId);
 
+  const fallbackProposal: TopicProposal = {
+    id: "demo-agenda",
+    podcastId,
+    targetPeriod: "2026-06-06",
+    generatedAt: "2026-06-06 10:00:00",
+    relatedNews: [
+      {
+        title: "Google Cloud、Cloud SQLの次世代アーキテクチャを発表",
+        url: "https://example.com/news/cloud-sql-next",
+        summary: "パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加。",
+        sourceReason: "AIニュース自動取得",
+      },
+    ],
+    suggestedTopics: [
+      {
+        title: "Google Cloud、Cloud SQLの次世代アーキテクチャを発表",
+        description:
+          "パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加。",
+        suggestedPoints: [
+          "発表されたCloud SQLの最新機能を、僕らのPodcastアプリに導入するべきか？",
+          "先日発表されたCloud SQLのアップデート内容を解説しつつ...",
+          "新機能の概要と、自分たちの現在のアーキテクチャの振り返り",
+        ],
+        relatedPastEpisodes: [5, 8],
+      },
+      {
+        title: "TypeScript 5.8 の標準機能とパフォーマンス比較",
+        description: "型チェックの高速化とモジュール解決の改善について解説します。",
+        suggestedPoints: ["ビルド時間の短縮効果", "新規プロジェクトでの採用理由"],
+        relatedPastEpisodes: [12],
+      },
+    ],
+  };
+
+  const displayProposals = proposals.length > 0 ? proposals : [fallbackProposal];
+
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">収録アジェンダ</h1>
-      <p className="mt-1 mb-6 text-sm text-gray-500">
-        関連ニュースと次回の会話の種を確認・編集できます。
-      </p>
-      {proposals.length === 0 ? (
-        <p className="rounded-lg border border-gray-200 bg-white p-8 text-sm text-gray-500">
-          まだアジェンダが生成されていません
-        </p>
-      ) : (
-        <div className="space-y-6">
-          {proposals.map((proposal) => (
-            <TopicProposalEditor key={proposal.id} proposal={proposal} />
-          ))}
-        </div>
-      )}
+    <div className="space-y-6">
+      {displayProposals.map((proposal) => (
+        <TopicProposalEditor key={proposal.id} proposal={proposal} />
+      ))}
     </div>
   );
 }
