@@ -13,21 +13,12 @@ function displayUrl(url: string) {
   }
 }
 
-function splitSourceReason(value: string) {
-  const normalized = value.trim();
-  if (!normalized) return [];
-  return normalized
-    .split(/\n+/)
-    .map((line) => line.replace(/^・/, "").trim())
-    .filter(Boolean);
-}
-
 export function TopicProposalEditor({
   proposal,
 }: {
   proposal: TopicProposal;
 }) {
-  const [news, setNews] = useState(proposal.relatedNews);
+  const [news] = useState(proposal.relatedNews);
   const [topics, setTopics] = useState(proposal.suggestedTopics);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
@@ -63,14 +54,10 @@ export function TopicProposalEditor({
       </div>
 
       <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-5">
-        <h3 className="text-base font-semibold text-gray-900">
-          🎙️ 今週の会話のタネ
-        </h3>
-
-        <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-800">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">
             🧵 最近よく出てきたテーマ
-          </h4>
+          </h3>
           {topics.length === 0 ? (
             <p className="mt-2 text-sm text-gray-500">テーマはまだ生成されていません。</p>
           ) : (
@@ -83,256 +70,99 @@ export function TopicProposalEditor({
         </div>
 
         <div className="mt-5">
-          <h4 className="text-sm font-semibold text-gray-800">
-            🔍 今週の会話の続きになりそうな話題
-          </h4>
-          {news.length === 0 ? (
-            <p className="mt-2 text-sm text-gray-500">関連ニュースはまだ生成されていません。</p>
+          <h3 className="text-sm font-semibold text-gray-800">💡 会話のタネ</h3>
+          {topics.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">会話のタネはまだ生成されていません。</p>
           ) : (
-            <div className="mt-3 space-y-5">
-              {news.map((item, index) => {
-                const reasons = splitSourceReason(item.sourceReason);
-                return (
-                  <div key={`${item.url}-preview-${index}`} className="text-sm text-gray-700">
-                    <p className="font-medium text-gray-900">
-                      {item.title || "タイトル未生成"}{" "}
-                      <span className="text-gray-500">（出典: {displayUrl(item.url)}）</span>
+            <div className="mt-3 space-y-4">
+              {topics.map((topic, index) => (
+                <div key={index} className="rounded-md bg-white p-4 ring-1 ring-blue-100">
+                  <label className="block">
+                    <span className="text-xs font-medium text-gray-600">テーマ</span>
+                    <input
+                      value={topic.title}
+                      placeholder="仮タイトルを入力"
+                      onChange={(event) =>
+                        setTopics((current) =>
+                          current.map((value, itemIndex) =>
+                            itemIndex === index
+                              ? { ...value, title: event.target.value }
+                              : value,
+                          ),
+                        )
+                      }
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm font-medium"
+                    />
+                  </label>
+                  <label className="mt-3 block">
+                    <span className="text-xs font-medium text-gray-600">話す観点</span>
+                    <textarea
+                      value={topic.suggestedPoints.join("\n")}
+                      placeholder={
+                        "最近の論点との接続:\n何が面白いか:\n次に話せそうな問い:"
+                      }
+                      onChange={(event) =>
+                        setTopics((current) =>
+                          current.map((value, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...value,
+                                  suggestedPoints: event.target.value
+                                    .split("\n")
+                                    .map((line) => line.trim())
+                                    .filter(Boolean),
+                                }
+                              : value,
+                          ),
+                        )
+                      }
+                      rows={5}
+                      className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  {topic.relatedPastEpisodes.length > 0 ? (
+                    <p className="mt-2 text-xs text-gray-500">
+                      関連過去回:{" "}
+                      {topic.relatedPastEpisodes.map((episodeId) => `#${episodeId}`).join(", ")}
                     </p>
-                    {item.url ? (
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 inline-block break-all text-xs text-blue-700 hover:underline"
-                      >
-                        {item.url}
-                      </a>
-                    ) : null}
-                    {item.summary ? (
-                      <p className="mt-2 whitespace-pre-wrap">・概要: {item.summary}</p>
-                    ) : null}
-                    {reasons.length > 0 ? (
-                      <ul className="mt-2 space-y-1">
-                        {reasons.map((reason, reasonIndex) => (
-                          <li key={reasonIndex}>・{reason}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-2 text-gray-500">・関連理由は未生成です。</p>
-                    )}
-                  </div>
-                );
-              })}
+                  ) : null}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         <div className="mt-5">
-          <h4 className="text-sm font-semibold text-gray-800">💡 気になっている問い</h4>
-          {topics.some((topic) => topic.suggestedPoints.length > 0) ? (
-            <ul className="mt-2 space-y-2 text-sm text-gray-700">
-              {topics.flatMap((topic) =>
-                topic.suggestedPoints.map((point, pointIndex) => (
-                  <li key={`${topic.title}-${pointIndex}`}>
-                    ・{point}
-                    {topic.relatedPastEpisodes.length > 0 ? (
-                      <span className="ml-1 text-gray-500">
-                        [{topic.relatedPastEpisodes.map((episodeId) => `#${episodeId}`).join(", ")}]
-                      </span>
-                    ) : null}
-                  </li>
-                )),
-              )}
-            </ul>
+          <h3 className="text-sm font-semibold text-gray-800">関連URL</h3>
+          {news.length === 0 ? (
+            <p className="mt-2 text-sm text-gray-500">関連URLはまだ生成されていません。</p>
           ) : (
-            <p className="mt-2 text-sm text-gray-500">問いはまだ生成されていません。</p>
-          )}
-        </div>
-
-        <p className="mt-5 text-xs font-medium text-gray-500">
-          📊 {topics.reduce((total, topic) => total + topic.relatedPastEpisodes.length, 0)}{" "}
-          関連エピソード / AI リサーチ
-        </p>
-      </section>
-
-      <section>
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">関連ニュースを編集</h3>
-        {news.length === 0 ? (
-          <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-500">
-            関連ニュースはまだ生成されていません。
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {news.map((item, index) => (
-              <div key={`${item.url}-${index}`} className="rounded-md bg-gray-50 p-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                    {displayUrl(item.url)}
-                  </span>
+            <ul className="mt-2 space-y-2 text-sm text-gray-700">
+              {news.map((item, index) => (
+                <li key={`${item.url}-${index}`}>
+                  ・{item.title || displayUrl(item.url)}{" "}
                   {item.url ? (
                     <a
                       href={item.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
+                      className="break-all text-blue-700 hover:underline"
                     >
-                      元記事を開く
+                      {displayUrl(item.url)}
                     </a>
-                  ) : null}
-                </div>
-                <label className="block">
-                  <span className="text-xs font-medium text-gray-600">ニュースタイトル</span>
-                  <input
-                    value={item.title}
-                    placeholder="タイトル未生成"
-                    onChange={(event) =>
-                      setNews((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? { ...value, title: event.target.value }
-                            : value,
-                        ),
-                      )
-                    }
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm font-medium"
-                  />
-                </label>
-                <label className="mt-3 block">
-                  <span className="text-xs font-medium text-gray-600">要約</span>
-                  <textarea
-                    value={item.summary}
-                    placeholder="要約未生成"
-                    onChange={(event) =>
-                      setNews((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? { ...value, summary: event.target.value }
-                            : value,
-                        ),
-                      )
-                    }
-                    rows={3}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="mt-3 block">
-                  <span className="text-xs font-medium text-gray-600">
-                    このニュースを選んだ理由
-                  </span>
-                  <textarea
-                    value={item.sourceReason}
-                    placeholder="関連理由未生成"
-                    onChange={(event) =>
-                      setNews((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? { ...value, sourceReason: event.target.value }
-                            : value,
-                        ),
-                      )
-                    }
-                    rows={2}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </label>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">会話の種を編集</h3>
-        {topics.length === 0 ? (
-          <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-500">
-            会話の種はまだ生成されていません。
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {topics.map((topic, index) => (
-              <div key={index} className="rounded-md bg-gray-50 p-4">
-                <label className="block">
-                  <span className="text-xs font-medium text-gray-600">テーマ</span>
-                  <input
-                    value={topic.title}
-                    placeholder="テーマ未生成"
-                    onChange={(event) =>
-                      setTopics((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? { ...value, title: event.target.value }
-                            : value,
-                        ),
-                      )
-                    }
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm font-medium"
-                  />
-                </label>
-                <label className="mt-3 block">
-                  <span className="text-xs font-medium text-gray-600">概要</span>
-                  <textarea
-                    value={topic.description}
-                    placeholder="概要未生成"
-                    onChange={(event) =>
-                      setTopics((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? { ...value, description: event.target.value }
-                            : value,
-                        ),
-                      )
-                    }
-                    rows={3}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="mt-3 block">
-                  <span className="text-xs font-medium text-gray-600">
-                    話す観点・根拠
-                  </span>
-                  <textarea
-                    value={topic.suggestedPoints.join("\n")}
-                    placeholder="1行ごとに話す観点を入力"
-                    onChange={(event) =>
-                      setTopics((current) =>
-                        current.map((value, itemIndex) =>
-                          itemIndex === index
-                            ? {
-                                ...value,
-                                suggestedPoints: event.target.value
-                                  .split("\n")
-                                  .map((line) => line.trim())
-                                  .filter(Boolean),
-                              }
-                            : value,
-                        ),
-                      )
-                    }
-                    rows={4}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </label>
-                <div className="mt-3">
-                  <p className="text-xs font-medium text-gray-600">関連過去回</p>
-                  {topic.relatedPastEpisodes.length === 0 ? (
-                    <p className="mt-1 text-xs text-gray-500">関連過去回は未設定です。</p>
                   ) : (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {topic.relatedPastEpisodes.map((episodeId) => (
-                        <span
-                          key={episodeId}
-                          className="rounded-full bg-white px-2 py-1 text-xs text-gray-700 ring-1 ring-gray-200"
-                        >
-                          #{episodeId}
-                        </span>
-                      ))}
-                    </div>
+                    <span className="text-gray-500">URL未設定</span>
                   )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <p className="mt-5 text-xs font-medium text-gray-500">
+          📊 {new Set(topics.flatMap((topic) => topic.relatedPastEpisodes)).size}{" "}
+          関連エピソード / AI リサーチ
+        </p>
       </section>
 
       <div className="flex items-center gap-3">
