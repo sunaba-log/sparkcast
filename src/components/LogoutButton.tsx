@@ -8,10 +8,12 @@ export function LogoutButton() {
   const router = useRouter();
 
   async function logout() {
-    await Promise.all([
-      fetch("/api/auth/session", { method: "DELETE" }),
-      signOut(getFirebaseAuth()),
-    ]);
+    await fetch("/api/auth/session", { method: "DELETE" });
+    try {
+      await signOut(getFirebaseAuth());
+    } catch {
+      // Ignore errors when signed in with mock authentication
+    }
     router.push("/login");
     router.refresh();
   }

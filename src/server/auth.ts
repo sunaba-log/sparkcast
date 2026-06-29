@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDbPool } from "@/server/db";
+import { isLocalMockAuthEnabled } from "@/server/env";
 import { getAdminAuth } from "@/server/firebase-admin";
 
 export const SESSION_COOKIE_NAME = "podcast_session";
@@ -16,6 +17,29 @@ export type SessionUser = {
 export async function getSessionUser(): Promise<SessionUser | null> {
   const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!sessionCookie) return null;
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    isLocalMockAuthEnabled() &&
+    sessionCookie.startsWith("mock_session:")
+  ) {
+    const email = sessionCookie.slice("mock_session:".length).toLowerCase();
+    try {
+      const user = await (await getDbPool()).query<{
+        user_id: string;
+        display_name: string | null;
+      }>("SELECT user_id, display_name FROM users WHERE email = $1", [email]);
+      if (user.rows.length === 0) return null;
+      return {
+        uid: user.rows[0].user_id,
+        email,
+        displayName: user.rows[0].display_name ?? "Dev Mock User",
+      };
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const token = await getAdminAuth().verifySessionCookie(sessionCookie, true);
     if (!token.email) return null;

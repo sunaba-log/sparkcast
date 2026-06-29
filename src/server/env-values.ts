@@ -34,12 +34,52 @@ export function getFirebaseServiceAccountJson(): string | undefined {
   return process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 }
 
+export function parseServiceAccountJson(raw: string): any {
+  let str = raw.trim();
+  if (str.startsWith('"') && str.endsWith('"')) {
+    str = str.slice(1, -1);
+  }
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(str);
+  } catch {
+    const fixedNewlines = str
+      .replace(/\r\n/g, "\\n")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\n");
+    try {
+      parsed = JSON.parse(fixedNewlines);
+    } catch {
+      try {
+        parsed = JSON.parse(fixedNewlines.replace(/\\"/g, '"'));
+      } catch {
+        try {
+          const unescaped = JSON.parse(`"${str}"`);
+          parsed = JSON.parse(unescaped);
+        } catch {
+          parsed = JSON.parse(raw);
+        }
+      }
+    }
+  }
+
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    typeof parsed.private_key === "string"
+  ) {
+    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+  }
+  return parsed;
+}
+
 export function getGoogleServiceAccountCredentials():
   | { client_email: string; private_key: string }
   | undefined {
   const raw = getFirebaseServiceAccountJson();
   if (!raw) return undefined;
-  const value = JSON.parse(raw) as {
+  const value = parseServiceAccountJson(raw) as {
     client_email?: unknown;
     private_key?: unknown;
   };
@@ -53,7 +93,7 @@ export function getGoogleServiceAccountCredentials():
   }
   return {
     client_email: value.client_email,
-    private_key: value.private_key,
+    private_key: value.private_key.replace(/\\n/g, "\n"),
   };
 }
 
@@ -62,6 +102,10 @@ export function getAllowedDevEmails(): string[] {
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+}
+
+export function isLocalMockAuthEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 }
 
 export function getDefaultPodcastId(): number {

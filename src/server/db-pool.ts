@@ -58,7 +58,12 @@ async function createPool(): Promise<Pool> {
 }
 
 export async function getDbPool(): Promise<Pool> {
-  globalThis.podcastDbPoolPromise ??= createPool();
+  if (!globalThis.podcastDbPoolPromise) {
+    globalThis.podcastDbPoolPromise = createPool().catch((err) => {
+      globalThis.podcastDbPoolPromise = undefined;
+      throw err;
+    });
+  }
   return globalThis.podcastDbPoolPromise;
 }
 
