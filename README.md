@@ -11,6 +11,7 @@ Podcaster's DevLogのdev環境向け管理Webアプリです。Next.jsのUIとWe
 - ブラウザからGCSへの音声ファイル直接アップロード
 - Cloud SQLの処理状態を使ったエピソード一覧・詳細表示
 - Firestoreの議事録、X投稿候補、収録アジェンダの閲覧・編集
+- 配信済み議事録を横断するRAGチャット（Vertex AI Gemini + Firestoreベクトル検索）
 - アップロード結果通知と放置アップロードの定期クリーンアップ
 
 ## データ構成
@@ -44,6 +45,14 @@ npm run dev
 ユーザーをCloud SQLへ登録し、`DEFAULT_PODCAST_ID`のowner権限を付与します。
 この自動付与は単一Podcastのdev環境専用です。
 
+### ローカル開発時のモック認証
+
+ローカル環境（`localhost`）での開発時にGoogle認証をスキップし、ワンクリックでログイン状態を再現するためのモック認証機能を利用できます。
+
+1. `.env.local` に `NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH="true"` を設定します。
+2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
+3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）で自動的にデータベース登録および所有権付与が行われ、Firebase認証なしで即座にログインできます。
+
 VercelなどGoogle Cloud外で動かす場合、`FIREBASE_SERVICE_ACCOUNT_JSON`へ
 Firestore、Firebase Auth、GCS署名に使用するサービスアカウントJSONを設定します。
 
@@ -65,6 +74,28 @@ upload_pending -> uploaded -> processing -> completed
 
 ブラウザから結果通知が届かない`upload_pending`レコードは、Vercel Cronによって
 24時間後に`failed`へ更新されます。HobbyプランのCron制約に合わせ、1日1回実行します。
+
+## 議事録チャット（RAG）
+
+全ページ右下のアイコンから、配信済みエピソードの議事録を横断して質問できる。
+回答生成はVertex AIのGemini、横断検索はFirestoreのベクトル検索を使う。認証は
+`FIREBASE_SERVICE_ACCOUNT_JSON`と`GOOGLE_CLOUD_PROJECT`を流用する。
+
+利用前にFirestoreのベクトルインデックスをVertex AIの埋め込み次元(768)で作成する。
+
+```bash
+gcloud firestore indexes composite create \
+  --project="$GOOGLE_CLOUD_PROJECT" \
+  --collection-group=minutes_index \
+  --query-scope=COLLECTION \
+  --field-config=field-path=embedding,vector-config='{"dimension":768,"flat":{}}'
+```
+
+議事録のベクトル化は**Vercel Cronで日次自動実行**する（`/api/cron/reindex-minutes`）。
+冪等で、未変更のエピソードはスキップするため新規・変更分のみ埋め込む。即時に反映したい
+場合はチャットウィンドウの「再インデックス」（`POST /api/chat/reindex`）を手動実行する。
+インデックス未構築でも全文コンテキストへ自動フォールバックして回答する。設計詳細は
+`docs/adr/20260628-podcast-minutes-chat.md`を参照。
 
 ## 検証
 

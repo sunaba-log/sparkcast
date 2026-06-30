@@ -6,6 +6,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
   getFirebaseServiceAccountJson,
   getGoogleCloudProject,
+  parseServiceAccountJson,
 } from "@/server/env";
 
 function getAdminApp() {
@@ -16,7 +17,7 @@ function getAdminApp() {
   return initializeApp({
     projectId: getGoogleCloudProject(),
     credential: serviceAccountJson
-      ? cert(JSON.parse(serviceAccountJson))
+      ? cert(parseServiceAccountJson(serviceAccountJson))
       : applicationDefault(),
   });
 }
