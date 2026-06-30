@@ -25,6 +25,7 @@ export type Episode = {
   status: EpisodeStatus;
   audioFileName: string;
   audioUrl: string | null;
+  artworkUrl: string | null;
   processingError: string | null;
   minutesGenerated: boolean;
   xPostsGenerated: boolean;

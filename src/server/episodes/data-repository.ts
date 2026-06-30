@@ -15,6 +15,7 @@ type EpisodeRow = QueryResultRow & {
   status: EpisodeStatus;
   processing_error: string | null;
   created_at: Date;
+  artwork_url: string | null;
 };
 
 type FirestoreEpisodeContent = {
@@ -96,6 +97,7 @@ function toEpisode(
     status: row.status,
     audioFileName: audioFileName(row.source_audio_path ?? row.audio_file_path),
     audioUrl: row.status === "completed" ? row.audio_file_path : null,
+    artworkUrl: row.artwork_url || null,
     processingError: row.processing_error,
     minutesGenerated: Boolean(content.minutes),
     xPostsGenerated: content.promotions.length > 0,
@@ -109,7 +111,7 @@ function toEpisode(
 export async function listEpisodes(podcastId: number): Promise<Episode[]> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at
+            audio_file_path, status, processing_error, created_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC`,
@@ -128,7 +130,7 @@ export async function findEpisode(
 ): Promise<Episode | null> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at
+            audio_file_path, status, processing_error, created_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1 AND episode_id = $2`,
     [podcastId, episodeId],
@@ -200,7 +202,7 @@ export async function listEpisodesAndPromotionsPaginated(
 
   const result = await pool.query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at
+            audio_file_path, status, processing_error, created_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC

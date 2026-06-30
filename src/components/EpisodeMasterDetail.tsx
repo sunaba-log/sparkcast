@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Episode, EpisodePromotion } from "@/types/episode";
-import { Check, Play, Pause, SkipBack, SkipForward, Trash2 } from "lucide-react";
+import { Check, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
 
 type TabType = "overview" | "minutes" | "promotions";
 
@@ -20,7 +20,21 @@ function formatDate(dateStr: string) {
   }
 }
 
-export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Episode[] }) {
+type PodcastInfo = {
+  id: number;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  rssFeedPath: string | null;
+};
+
+export function EpisodeMasterDetail({
+  initialEpisodes,
+  podcast,
+}: {
+  initialEpisodes: Episode[];
+  podcast: PodcastInfo | null;
+}) {
   const [episodes, setEpisodes] = useState<Episode[]>(initialEpisodes);
   const [selectedId, setSelectedId] = useState<string>(
     initialEpisodes.length > 0 ? initialEpisodes[0].id : ""
@@ -38,8 +52,72 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Audio player mock state
+  // Audio player state
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Sync state and handle source changes when selectedEpisode changes
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.load();
+    }
+  }, [selectedId]);
+
+  const togglePlay = () => {
+    if (!audioRef.current || !selectedEpisode?.audioUrl) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch((err) => {
+        console.error("Audio play failed:", err);
+      });
+    }
+  };
+
+  const handleSkipBackward = () => {
+    if (!audioRef.current) return;
+    const newTime = Math.max(0, audioRef.current.currentTime - 15);
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleSkipForward = () => {
+    if (!audioRef.current || !duration) return;
+    const newTime = Math.min(duration, audioRef.current.currentTime + 15);
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const newTime = percentage * duration;
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  function formatTime(seconds: number): string {
+    if (isNaN(seconds)) return "00:00";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (h > 0) {
+      parts.push(String(h).padStart(2, "0"));
+    }
+    parts.push(String(m).padStart(2, "0"));
+    parts.push(String(s).padStart(2, "0"));
+    return parts.join(":");
+  }
 
   // When selected episode changes, sync form state
   const handleSelectEpisode = (ep: Episode) => {
@@ -212,18 +290,37 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
               </div>
 
               {/* Audio Player Preview */}
-              <div className="rounded-xs p-4 border border-brand flex items-center gap-4">
-                <div className="w-24 h-24 bg-gray-300/80 rounded-lg shrink-0 flex items-center justify-center text-gray-400 font-bold text-xs">
-                  artwork
-                </div>
+              <div className="rounded-xs p-4 border border-brand flex items-center gap-4 bg-white/50 backdrop-blur-xs">
+                {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
+                  <img
+                    src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
+                    alt={selectedEpisode.title}
+                    className="w-24 h-24 object-cover rounded-lg shrink-0 border border-brand/20 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-24 h-24 bg-gradient-to-br from-brand/60 to-brand/20 rounded-lg shrink-0 flex flex-col items-center justify-center text-white/90 border border-brand/20 shadow-sm">
+                    <Radio className={`w-8 h-8 stroke-[1.5] mb-1 ${isPlaying ? "animate-pulse" : ""}`} />
+                    <span className="text-[9px] font-bold tracking-wider uppercase opacity-80">
+                      No Cover
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center justify-center gap-6">
-                    <button className="text-gray-600 hover:text-gray-900 transition-colors">
+                    <button
+                      onClick={handleSkipBackward}
+                      disabled={!selectedEpisode.audioUrl}
+                      className="text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
+                      title="15秒戻る"
+                    >
                       <SkipBack className="w-5 h-5 fill-current" />
                     </button>
                     <button
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 hover:scale-105 transition-transform"
+                      onClick={togglePlay}
+                      disabled={!selectedEpisode.audioUrl}
+                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-white cursor-pointer"
+                      title={isPlaying ? "一時停止" : "再生"}
                     >
                       {isPlaying ? (
                         <Pause className="w-5 h-5 fill-current" />
@@ -231,15 +328,66 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                         <Play className="w-5 h-5 fill-current ml-0.5" />
                       )}
                     </button>
-                    <button className="text-gray-600 hover:text-gray-900 transition-colors">
+                    <button
+                      onClick={handleSkipForward}
+                      disabled={!selectedEpisode.audioUrl}
+                      className="text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
+                      title="15秒進む"
+                    >
                       <SkipForward className="w-5 h-5 fill-current" />
                     </button>
                   </div>
-                  {/* Progress Bar */}
-                  <div className="w-full bg-gray-300 h-2 rounded-full overflow-hidden relative">
-                    <div className="bg-brand h-full w-1/3 rounded-full" />
+
+                  {/* Progress Bar & Time Display */}
+                  <div className="space-y-1">
+                    <div
+                      onClick={handleProgressBarClick}
+                      className={`w-full bg-gray-200 h-2 rounded-full overflow-hidden relative ${
+                        selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
+                      }`}
+                    >
+                      <div
+                        className="bg-brand h-full rounded-full transition-all duration-100 ease-out"
+                        style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-500 font-medium">
+                      {selectedEpisode.audioUrl ? (
+                        <>
+                          <span>{formatTime(currentTime)}</span>
+                          <span>{formatTime(duration)}</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-400 text-center w-full">
+                          {selectedEpisode.status === "completed"
+                            ? "音声ファイルが存在しません"
+                            : "音声ファイル処理中..."}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                <audio
+                  ref={audioRef}
+                  src={selectedEpisode.audioUrl || ""}
+                  onTimeUpdate={() => {
+                    if (audioRef.current) {
+                      setCurrentTime(audioRef.current.currentTime);
+                    }
+                  }}
+                  onDurationChange={() => {
+                    if (audioRef.current) {
+                      setDuration(audioRef.current.duration);
+                    }
+                  }}
+                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  onEnded={() => {
+                    setIsPlaying(false);
+                    setCurrentTime(0);
+                  }}
+                />
               </div>
 
               {/* Tab Form Views */}
