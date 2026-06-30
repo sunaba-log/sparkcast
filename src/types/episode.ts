@@ -10,6 +10,10 @@ export type EpisodePromotion = {
   message: string;
   status: string;
   scheduledTime: string | null;
+  platformUrls?: { apple: string; amazon: string; spotify: string };
+  hashtags?: string[];
+  generatedAt?: string;
+  updatedAt?: string;
 };
 
 export type Episode = {
@@ -21,6 +25,7 @@ export type Episode = {
   status: EpisodeStatus;
   audioFileName: string;
   audioUrl: string | null;
+  artworkUrl: string | null;
   processingError: string | null;
   minutesGenerated: boolean;
   xPostsGenerated: boolean;

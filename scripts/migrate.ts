@@ -1,5 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(process.cwd());
+
 import { closeDbPool, getDbPool } from "../src/server/db-pool";
 
 async function main() {
