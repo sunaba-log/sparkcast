@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import type { Episode, EpisodePromotion } from "@/types/episode";
 import { Check, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type TabType = "overview" | "minutes" | "promotions";
 
@@ -40,6 +42,7 @@ export function EpisodeMasterDetail({
     initialEpisodes.length > 0 ? initialEpisodes[0].id : ""
   );
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [minutesTab, setMinutesTab] = useState<"preview" | "edit">("preview");
 
   // Selected episode
   const selectedEpisode = episodes.find((e) => e.id === selectedId) || episodes[0];
@@ -126,6 +129,7 @@ export function EpisodeMasterDetail({
     setDescription(ep.description);
     setMinutes(ep.minutes);
     setPosts(ep.xPosts);
+    setMinutesTab("preview");
     setStatus("idle");
     setErrorMsg("");
   };
@@ -342,9 +346,8 @@ export function EpisodeMasterDetail({
                   <div className="space-y-1">
                     <div
                       onClick={handleProgressBarClick}
-                      className={`w-full bg-gray-200 h-2 rounded-full overflow-hidden relative ${
-                        selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
-                      }`}
+                      className={`w-full bg-gray-200 h-2 rounded-full overflow-hidden relative ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
+                        }`}
                     >
                       <div
                         className="bg-brand h-full rounded-full transition-all duration-100 ease-out"
@@ -420,16 +423,56 @@ export function EpisodeMasterDetail({
 
               {activeTab === "minutes" && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                    議事録 / ショーノート
-                  </label>
-                  <textarea
-                    rows={12}
-                    value={minutes}
-                    onChange={(e) => setMinutes(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
-                    placeholder="まだ議事録が生成されていません"
-                  />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-gray-700">
+                      議事録 / ショーノート
+                    </label>
+                    <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-sm">
+                      <button
+                        type="button"
+                        onClick={() => setMinutesTab("preview")}
+                        className={`px-3 py-1 text-xs font-semibold rounded-xs transition-colors cursor-pointer ${minutesTab === "preview"
+                            ? "bg-white text-gray-800 shadow-xs"
+                            : "text-gray-500 hover:text-gray-800"
+                          }`}
+                      >
+                        プレビュー
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMinutesTab("edit")}
+                        className={`px-3 py-1 text-xs font-semibold rounded-xs transition-colors cursor-pointer ${minutesTab === "edit"
+                            ? "bg-white text-gray-800 shadow-xs"
+                            : "text-gray-500 hover:text-gray-800"
+                          }`}
+                      >
+                        コード
+                      </button>
+                    </div>
+                  </div>
+
+                  {minutesTab === "preview" ? (
+                    <div className="w-full min-h-[300px] max-h-[400px] overflow-y-auto px-4 py-3 rounded-xs border border-brand text-sm text-gray-800 shadow-inner markdown-preview">
+                      {minutes ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
+                          {minutes}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="text-gray-400 italic">まだ議事録が生成されていません</p>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      rows={12}
+                      value={minutes}
+                      onChange={(e) => setMinutes(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
+                      placeholder="まだ議事録が生成されていません"
+                    />
+                  )}
                 </div>
               )}
 
@@ -485,6 +528,7 @@ export function EpisodeMasterDetail({
                     setDescription(selectedEpisode.description);
                     setMinutes(selectedEpisode.minutes);
                     setPosts(selectedEpisode.xPosts);
+                    setMinutesTab("preview");
                   }}
                   className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
                 >
@@ -506,3 +550,53 @@ export function EpisodeMasterDetail({
     </div>
   );
 }
+
+const markdownComponents: Components = {
+  h1: ({ children }) => (
+    <h1 className="mb-3 mt-5 text-lg font-bold text-gray-900 border-b border-gray-200 pb-1">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="mb-2 mt-4 text-base font-bold text-gray-900">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="mb-1.5 mt-3 text-sm font-semibold text-gray-900">{children}</h3>
+  ),
+  p: ({ children }) => <p className="my-2.5 leading-relaxed text-gray-700">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="my-2.5 list-disc space-y-1.5 pl-6">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-2.5 list-decimal space-y-1.5 pl-6">{children}</ol>
+  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  strong: ({ children }) => (
+    <strong className="font-semibold text-gray-900">{children}</strong>
+  ),
+  em: ({ children }) => <em className="italic">{children}</em>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-3 border-l-4 border-gray-300 pl-4 text-gray-600 italic bg-gray-50 py-1 pr-2 rounded-r-sm">
+      {children}
+    </blockquote>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[0.9em] font-mono text-pink-600">
+      {children}
+    </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-4 overflow-x-auto rounded-md bg-gray-900 p-4 text-xs text-gray-100 font-mono leading-relaxed">
+      {children}
+    </pre>
+  ),
+  hr: () => <hr className="my-5 border-gray-200" />,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-brand underline hover:text-brand-dark transition-colors"
+    >
+      {children}
+    </a>
+  ),
+};
