@@ -50,9 +50,7 @@ export default async function AgendaPage() {
 
   return (
     <div className="space-y-6">
-      {displayProposals.map((proposal) => (
-        <TopicProposalEditor key={proposal.id} proposal={proposal} />
-      ))}
+      <TopicProposalEditor proposals={displayProposals} />
     </div>
   );
 }

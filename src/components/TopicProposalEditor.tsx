@@ -4,7 +4,100 @@ import { useState } from "react";
 import type { TopicProposal } from "@/types/episode";
 import { ChevronUp, ChevronDown, Plus, X, ArrowLeft, ArrowRight } from "lucide-react";
 
-export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
+export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] }) {
+  // Sort proposals by generatedAt in ascending chronological order
+  const sortedProposals = [...proposals].sort((a, b) => {
+    return new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime();
+  });
+
+  // Select the latest proposal by default
+  const latestProposal = sortedProposals[sortedProposals.length - 1];
+  const [selectedProposalId, setSelectedProposalId] = useState<string>(
+    latestProposal?.id || ""
+  );
+
+  const selectedProposal = sortedProposals.find((p) => p.id === selectedProposalId) || latestProposal;
+
+  if (!selectedProposal) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        提案されたトピックはありません。
+      </div>
+    );
+  }
+
+  const currentIndex = sortedProposals.findIndex((p) => p.id === selectedProposal.id);
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setSelectedProposalId(sortedProposals[currentIndex - 1].id);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentIndex < sortedProposals.length - 1) {
+      setSelectedProposalId(sortedProposals[currentIndex + 1].id);
+    }
+  };
+
+  const getOnlyDate = (dateTimeStr: string) => {
+    return dateTimeStr.split(" ")[0].split("T")[0];
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header Bar with Breadcrumbs and Date Pagination */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center text-xs text-gray-500 gap-2">
+          <span>ホーム</span>
+          <span>&gt;</span>
+          <span className="font-medium text-gray-800">次回議題</span>
+        </div>
+
+        {/* Date Switcher Bar */}
+        <div className="flex items-center space-x-2 text-xs overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={handlePrev}
+            disabled={currentIndex <= 0}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Previous
+          </button>
+          
+          {sortedProposals.map((p) => {
+            const isSelected = p.id === selectedProposal.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProposalId(p.id)}
+                className={`px-2.5 py-1 rounded transition-colors shrink-0 ${
+                  isSelected
+                    ? "bg-brand text-white font-medium"
+                    : "border border-brand/30 text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {getOnlyDate(p.generatedAt)}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={handleNext}
+            disabled={currentIndex >= sortedProposals.length - 1}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            Next <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Accordion Topics List keyed by selectedProposal.id to reset state on change */}
+      <TopicProposalInnerEditor key={selectedProposal.id} proposal={selectedProposal} />
+    </div>
+  );
+}
+
+function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
   const [topics, setTopics] = useState(proposal.suggestedTopics);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // First card open by default
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -60,218 +153,188 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header Bar with Breadcrumbs and Date Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center text-xs text-gray-500 gap-2">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">次回議題</span>
-        </div>
+    <div className="space-y-4">
+      {topics.map((topic, index) => {
+        const isExpanded = expandedIndex === index;
+        const relatedNewsItem = proposal.relatedNews[index] || proposal.relatedNews[0];
 
-        {/* Date Switcher Bar (matching Image 1) */}
-        <div className="flex items-center space-x-2 text-xs">
-          <button className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Previous
-          </button>
-          <span className="text-gray-400">...</span>
-          <button className="px-2.5 py-1 rounded border border-brand/30 text-gray-700">
-            2026-06-07
-          </button>
-          <button className="px-2.5 py-1 rounded bg-brand text-white font-medium">
-            2026-06-06
-          </button>
-          <span className="text-gray-400">...</span>
-          <button className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1">
-            Next <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Accordion Topics List */}
-      <div className="space-y-4">
-        {topics.map((topic, index) => {
-          const isExpanded = expandedIndex === index;
-          const relatedNewsItem = proposal.relatedNews[index] || proposal.relatedNews[0];
-
-          return (
+        return (
+          <div
+            key={index}
+            className="border border-brand/30 rounded-xs overflow-hidden transition-all duration-200"
+          >
+            {/* Header Bar / Collapsed view */}
             <div
-              key={index}
-              className="border border-brand/30 rounded-xs overflow-hidden transition-all duration-200"
+              onClick={() => toggleAccordion(index)}
+              className="p-5 flex items-start justify-between cursor-pointer"
             >
-              {/* Header Bar / Collapsed view */}
-              <div
-                onClick={() => toggleAccordion(index)}
-                className="p-5 flex items-start justify-between cursor-pointer"
-              >
-                <div className="space-y-1 pr-4 flex-1">
-                  <h2 className="text-base font-bold text-gray-900 leading-snug">
-                    {topic.title || "Google Cloud、Cloud SQLの次世代アーキテクチャを発表"}
-                  </h2>
-                  <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
-                    {topic.description ||
-                      "パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加。"}
-                  </p>
-                  {relatedNewsItem?.url && (
-                    <div className="text-[11px] text-gray-400 pt-1">
-                      出典:{" "}
-                      <a
-                        href={relatedNewsItem.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-brand hover:underline"
-                      >
-                        {relatedNewsItem.url}
-                      </a>
-                    </div>
-                  )}
-                </div>
-                <button className="p-1 text-gray-500 hover:text-gray-800 shrink-0">
-                  {isExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-brand" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-brand" />
-                  )}
-                </button>
+              <div className="space-y-1 pr-4 flex-1">
+                <h2 className="text-base font-bold text-gray-900 leading-snug">
+                  {topic.title || "Google Cloud、Cloud SQLの次世代アーキテクチャを発表"}
+                </h2>
+                <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                  {topic.description ||
+                    "パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加パフォーマンスが大幅に向上し、NoSQLライクな柔軟なインデックス機能が追加。"}
+                </p>
+                {relatedNewsItem?.url && (
+                  <div className="text-[11px] text-gray-400 pt-1">
+                    出典:{" "}
+                    <a
+                      href={relatedNewsItem.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-brand hover:underline"
+                    >
+                      {relatedNewsItem.url}
+                    </a>
+                  </div>
+                )}
               </div>
+              <button className="p-1 text-gray-500 hover:text-gray-800 shrink-0">
+                {isExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-brand" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-brand" />
+                )}
+              </button>
+            </div>
 
-              {/* Expanded Content View (Form Fields) */}
-              {isExpanded && (
-                <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
-                  {/* Field: トピックの提案 */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      トピックの提案
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={topic.title}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setTopics((prev) =>
-                          prev.map((t, i) => (i === index ? { ...t, title: val } : t))
-                        );
-                      }}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900"
-                    />
+            {/* Expanded Content View (Form Fields) */}
+            {isExpanded && (
+              <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
+                {/* Field: トピックの提案 */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    トピックの提案
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={topic.title}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTopics((prev) =>
+                        prev.map((t, i) => (i === index ? { ...t, title: val } : t))
+                      );
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900"
+                  />
+                </div>
+
+                {/* Field: 説明 */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    説明
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={topic.description}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTopics((prev) =>
+                        prev.map((t, i) => (i === index ? { ...t, description: val } : t))
+                      );
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed"
+                  />
+                </div>
+
+                {/* Field: 提案ポイント */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    提案ポイント
+                  </label>
+                  <div className="space-y-2 mb-2">
+                    {topic.suggestedPoints.map((point, ptIdx) => (
+                      <input
+                        key={ptIdx}
+                        type="text"
+                        value={point}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTopics((prev) =>
+                            prev.map((t, i) =>
+                              i === index
+                                ? {
+                                  ...t,
+                                  suggestedPoints: t.suggestedPoints.map((p, pI) =>
+                                    pI === ptIdx ? val : p
+                                  ),
+                                }
+                                : t
+                            )
+                          );
+                        }}
+                        className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900"
+                      />
+                    ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPoint(index)}
+                    className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" /> 新規提案ポイントを追加
+                  </button>
+                </div>
 
-                  {/* Field: 説明 */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      説明
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={topic.description}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setTopics((prev) =>
-                          prev.map((t, i) => (i === index ? { ...t, description: val } : t))
-                        );
-                      }}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed"
-                    />
+                {/* Field: 過去の関連エピソード */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                    過去の関連エピソード
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 p-3 border border-brand/30 rounded-xs">
+                    {topic.relatedPastEpisodes.map((epId) => (
+                      <span
+                        key={epId}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-200 rounded text-xs font-mono font-medium text-gray-800"
+                      >
+                        {epId}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEpisodeTag(index, epId)}
+                          className="text-gray-500 hover:text-gray-900"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
                   </div>
+                </div>
 
-                  {/* Field: 提案ポイント */}
+                {/* Action Buttons Right Aligned */}
+                <div className="pt-2 flex items-center justify-between border-t border-gray-200/60">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      提案ポイント
-                    </label>
-                    <div className="space-y-2 mb-2">
-                      {topic.suggestedPoints.map((point, ptIdx) => (
-                        <input
-                          key={ptIdx}
-                          type="text"
-                          value={point}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setTopics((prev) =>
-                              prev.map((t, i) =>
-                                i === index
-                                  ? {
-                                    ...t,
-                                    suggestedPoints: t.suggestedPoints.map((p, pI) =>
-                                      pI === ptIdx ? val : p
-                                    ),
-                                  }
-                                  : t
-                              )
-                            );
-                          }}
-                          className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900"
-                        />
-                      ))}
-                    </div>
+                    {status === "saved" && (
+                      <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
+                    )}
+                    {status === "error" && (
+                      <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => handleAddPoint(index)}
-                      className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                      onClick={() => toggleAccordion(index)}
+                      className="px-5 py-2 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors"
                     >
-                      <Plus className="w-4 h-4" /> 新規提案ポイントを追加
+                      破棄
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={status === "saving"}
+                      className="px-6 py-2 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      {status === "saving" ? "保存中..." : "保存"}
                     </button>
                   </div>
-
-                  {/* Field: 過去の関連エピソード */}
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                      過去の関連エピソード
-                    </label>
-                    <div className="flex flex-wrap items-center gap-2 p-3 border border-brand/30 rounded-xs">
-                      {topic.relatedPastEpisodes.map((epId) => (
-                        <span
-                          key={epId}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-200 rounded text-xs font-mono font-medium text-gray-800"
-                        >
-                          {epId}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEpisodeTag(index, epId)}
-                            className="text-gray-500 hover:text-gray-900"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons Right Aligned */}
-                  <div className="pt-2 flex items-center justify-between border-t border-gray-200/60">
-                    <div>
-                      {status === "saved" && (
-                        <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
-                      )}
-                      {status === "error" && (
-                        <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleAccordion(index)}
-                        className="px-5 py-2 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors"
-                      >
-                        破棄
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={status === "saving"}
-                        className="px-6 py-2 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50"
-                      >
-                        {status === "saving" ? "保存中..." : "保存"}
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
