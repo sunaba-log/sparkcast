@@ -22,7 +22,7 @@ export function LogoutButton() {
     <button
       type="button"
       onClick={logout}
-      className="text-sm text-gray-600 hover:text-gray-900"
+      className="px-4 py-2 text-xs text-gray-600 hover:text-gray-900 border border-gray-400 rounded-xs hover:bg-gray-200"
     >
       ログアウト
     </button>

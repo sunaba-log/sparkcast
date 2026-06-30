@@ -18,7 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-app-bg text-gray-900 antialiased h-full flex flex-col font-sans">
         <header className="border-b border-brand/30 shrink-0 z-20">
           <div className="w-full px-5 h-14 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-1.5 text-lg font-bold tracking-tight text-brand hover:opacity-90 transition-opacity">
+            <Link href="/" className="flex items-center gap-1.5 text-xl font-bold tracking-tight text-brand hover:opacity-90 transition-opacity">
               <span>SparkCast</span>
               <span className="text-xs font-normal text-brand bg-brand-light px-2 py-0.5 rounded-full border border-brand/30">for everyone</span>
             </Link>
@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <LogoutButton />
                 <Link
                   href="/upload"
-                  className="px-4 py-2 text-sm font-medium bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5"
                 >
                   <span>+</span> 新規エピソード追加
                 </Link>
