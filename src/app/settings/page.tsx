@@ -27,10 +27,10 @@ export default function SettingsPage() {
         <span className="font-medium text-gray-800">番組設定</span>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-xs p-6 space-y-6">
+      <div className="rounded-xs border border-brand/30 p-6 space-y-6">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Radio className="w-5 h-5 text-blue-600" />
+            <Radio className="w-5 h-5 text-brand" />
             番組基本設定 (Show Settings)
           </h1>
           <p className="text-xs text-gray-500 mt-1">
@@ -47,7 +47,7 @@ export default function SettingsPage() {
               type="text"
               value={showName}
               onChange={(e) => setShowName(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -59,7 +59,7 @@ export default function SettingsPage() {
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -72,18 +72,18 @@ export default function SettingsPage() {
                 type="text"
                 value={rssUrl}
                 onChange={(e) => setRssUrl(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-xs font-mono text-gray-800 focus:outline-none focus:border-blue-600"
+                className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-blue-500" /> ホスト名 (Host Name)
+                <Globe className="w-3.5 h-3.5 text-brand" /> ホスト名 (Host Name)
               </label>
               <input
                 type="text"
                 value={hostName}
                 onChange={(e) => setHostName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-sm text-gray-800 focus:outline-none focus:border-blue-600"
+                className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-800 focus:outline-none focus:border-brand"
               />
             </div>
           </div>
@@ -98,7 +98,7 @@ export default function SettingsPage() {
             </div>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-xs flex items-center gap-2"
+              className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center gap-2"
             >
               <Save className="w-4 h-4" /> 設定を保存
             </button>

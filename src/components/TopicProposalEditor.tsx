@@ -51,9 +51,9 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
       prev.map((t, i) =>
         i === topicIndex
           ? {
-              ...t,
-              relatedPastEpisodes: t.relatedPastEpisodes.filter((id) => id !== episodeId),
-            }
+            ...t,
+            relatedPastEpisodes: t.relatedPastEpisodes.filter((id) => id !== episodeId),
+          }
           : t
       )
     );
@@ -75,10 +75,10 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
             <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
           <span className="text-gray-400">...</span>
-          <button className="px-2.5 py-1 rounded bg-white border border-gray-200 text-gray-700">
+          <button className="px-2.5 py-1 rounded border border-brand/30 text-gray-700">
             2026-06-07
           </button>
-          <button className="px-2.5 py-1 rounded bg-blue-600 text-white font-medium shadow-xs">
+          <button className="px-2.5 py-1 rounded bg-brand text-white font-medium">
             2026-06-06
           </button>
           <span className="text-gray-400">...</span>
@@ -97,12 +97,12 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
           return (
             <div
               key={index}
-              className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden transition-all duration-200"
+              className="border border-brand/30 rounded-xs overflow-hidden transition-all duration-200"
             >
               {/* Header Bar / Collapsed view */}
               <div
                 onClick={() => toggleAccordion(index)}
-                className="p-5 flex items-start justify-between cursor-pointer hover:bg-gray-50/60 transition-colors"
+                className="p-5 flex items-start justify-between cursor-pointer"
               >
                 <div className="space-y-1 pr-4 flex-1">
                   <h2 className="text-base font-bold text-gray-900 leading-snug">
@@ -120,7 +120,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-gray-500 hover:underline"
+                        className="text-brand hover:underline"
                       >
                         {relatedNewsItem.url}
                       </a>
@@ -129,16 +129,16 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                 </div>
                 <button className="p-1 text-gray-500 hover:text-gray-800 shrink-0">
                   {isExpanded ? (
-                    <ChevronUp className="w-5 h-5" />
+                    <ChevronUp className="w-5 h-5 text-brand" />
                   ) : (
-                    <ChevronDown className="w-5 h-5" />
+                    <ChevronDown className="w-5 h-5 text-brand" />
                   )}
                 </button>
               </div>
 
               {/* Expanded Content View (Form Fields) */}
               {isExpanded && (
-                <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4 bg-gray-50/30">
+                <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
                   {/* Field: トピックの提案 */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -153,7 +153,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                           prev.map((t, i) => (i === index ? { ...t, title: val } : t))
                         );
                       }}
-                      className="w-full px-3.5 py-2.5 bg-white rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900"
                     />
                   </div>
 
@@ -171,7 +171,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                           prev.map((t, i) => (i === index ? { ...t, description: val } : t))
                         );
                       }}
-                      className="w-full px-3.5 py-2.5 bg-white rounded-lg border border-gray-300 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed"
                     />
                   </div>
 
@@ -192,23 +192,23 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                               prev.map((t, i) =>
                                 i === index
                                   ? {
-                                      ...t,
-                                      suggestedPoints: t.suggestedPoints.map((p, pI) =>
-                                        pI === ptIdx ? val : p
-                                      ),
-                                    }
+                                    ...t,
+                                    suggestedPoints: t.suggestedPoints.map((p, pI) =>
+                                      pI === ptIdx ? val : p
+                                    ),
+                                  }
                                   : t
                               )
                             );
                           }}
-                          className="w-full px-3.5 py-2 bg-white rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:border-blue-600"
+                          className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900"
                         />
                       ))}
                     </div>
                     <button
                       type="button"
                       onClick={() => handleAddPoint(index)}
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 shadow-xs"
+                      className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors flex items-center justify-center gap-1"
                     >
                       <Plus className="w-4 h-4" /> 新規提案ポイントを追加
                     </button>
@@ -219,7 +219,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       過去の関連エピソード
                     </label>
-                    <div className="flex flex-wrap items-center gap-2 p-3 bg-white border border-gray-300 rounded-lg">
+                    <div className="flex flex-wrap items-center gap-2 p-3 border border-brand/30 rounded-xs">
                       {topic.relatedPastEpisodes.map((epId) => (
                         <span
                           key={epId}
@@ -252,7 +252,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                       <button
                         type="button"
                         onClick={() => toggleAccordion(index)}
-                        className="px-5 py-2 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-lg text-xs font-medium transition-colors"
+                        className="px-5 py-2 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors"
                       >
                         破棄
                       </button>
@@ -260,7 +260,7 @@ export function TopicProposalEditor({ proposal }: { proposal: TopicProposal }) {
                         type="button"
                         onClick={handleSave}
                         disabled={status === "saving"}
-                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors shadow-xs disabled:opacity-50"
+                        className="px-6 py-2 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50"
                       >
                         {status === "saving" ? "保存中..." : "保存"}
                       </button>

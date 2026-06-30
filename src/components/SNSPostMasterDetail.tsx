@@ -124,14 +124,14 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
         {/* Left Column: Timeline Master List (6 cols) */}
         <div className="col-span-6 flex flex-col space-y-4 overflow-y-auto pr-2 relative">
           {/* Vertical Timeline Line */}
-          <div className="absolute left-6 top-3 bottom-3 w-0.5 bg-gray-200 z-0" />
+          <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
 
           {posts.map((post) => {
             const isSelected = post.id === selectedPost.id;
             return (
               <div key={post.id} className="flex items-start gap-4 relative z-10">
                 {/* Timeline Icon Node */}
-                <div className="mt-4 shrink-0 bg-[#f8f9fa] p-1 rounded-full">
+                <div className="mt-1 shrink-0 bg-app-bg p-1 rounded-full">
                   {post.status === "pending" ? (
                     <Clock className="w-5 h-5 text-gray-800 fill-gray-800 text-white" />
                   ) : (
@@ -140,7 +140,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                 </div>
 
                 {/* Date Label Pill */}
-                <div className="mt-4 shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700">
+                <div className="mt-2 shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700">
                   {post.scheduledDate.yyyy}/{post.scheduledDate.mm}/{post.scheduledDate.dd}
                 </div>
 
@@ -148,14 +148,14 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                 <div
                   onClick={() => handleSelect(post)}
                   className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white ${isSelected
-                    ? "border-2 border-blue-600 shadow-md ring-1 ring-blue-600"
-                    : "border-gray-200 hover:border-blue-300 shadow-sm"
+                    ? "border-2 border-brand shadow-sm"
+                    : "border-gray-200 hover:border-brand/50 shadow-sm"
                     }`}
                 >
                   {/* Mock Twitter Header */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                      <div className="w-10 h-10 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
                         SC
                       </div>
                       <div>
@@ -163,7 +163,6 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                         <div className="text-[10px] text-gray-400">@sparkcast_jp</div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-800">𝕏</span>
                   </div>
 
                   <p className="text-xs text-gray-800 leading-relaxed line-clamp-3 mb-2">
@@ -173,7 +172,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                   <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono">
                     <span>{post.scheduledDate.hh}:{post.scheduledDate.min}</span>
                     <span>・</span>
-                    <span className="text-blue-600 font-medium">#{post.episodeId} {post.episodeTitle}</span>
+                    <span className="text-brand font-medium">#{post.episodeId} {post.episodeTitle}</span>
                   </div>
                 </div>
               </div>
@@ -183,19 +182,19 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost && (
-          <div className="col-span-6 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+          <div className="col-span-6 rounded-sm border-l border-brand/30 flex flex-col overflow-hidden">
             {/* Top Action Bar */}
-            <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50/50">
+            <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
-                className={`px-3 py-1 rounded-md text-xs font-semibold shadow-xs ${selectedPost.status === "pending"
-                  ? "bg-blue-600 text-white"
+                className={`px-3 py-1 rounded-xs text-xs font-semibold ${selectedPost.status === "pending"
+                  ? "bg-brand text-white"
                   : "bg-emerald-600 text-white"
                   }`}
               >
-                {selectedPost.status === "pending" ? "投稿予定" : "配信済み"}
+                {selectedPost.status === "pending" ? "投稿予定" : "投稿済み"}
               </span>
 
-              <button className="px-3 py-1 bg-white border border-gray-300 hover:bg-gray-50 rounded-md text-xs font-medium text-gray-700 transition-colors flex items-center gap-1">
+              <button className="px-3 py-1 border border-gray-300 rounded-xs text-xs font-medium text-brand flex items-center gap-1">
                 <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                 削除
               </button>
@@ -203,13 +202,13 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="text-xs text-gray-500 font-mono">
+              <div className="text-xs">
                 更新日時 : {selectedPost.updatedAt}
               </div>
 
               {/* Form: Scheduled Datetime */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                <label className="block text-xs font-semibold mb-1.5">
                   投稿日時
                 </label>
                 <div className="grid grid-cols-12 gap-2">
@@ -217,36 +216,36 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                     type="text"
                     value={scheduledDate.yyyy}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, yyyy: e.target.value })}
-                    className="col-span-3 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center font-mono focus:outline-none focus:border-blue-600"
+                    className="col-span-3 px-1 py-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="YYYY"
                   />
                   <input
                     type="text"
                     value={scheduledDate.mm}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, mm: e.target.value })}
-                    className="col-span-2 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center font-mono focus:outline-none focus:border-blue-600"
+                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="MM"
                   />
                   <input
                     type="text"
                     value={scheduledDate.dd}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, dd: e.target.value })}
-                    className="col-span-2 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center font-mono focus:outline-none focus:border-blue-600"
+                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="DD"
                   />
-                  <div className="col-span-1 flex items-center justify-center font-bold text-gray-400">:</div>
+                  <div className="col-span-1 flex items-center justify-center font-bold">:</div>
                   <input
                     type="text"
                     value={scheduledDate.hh}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, hh: e.target.value })}
-                    className="col-span-2 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center font-mono focus:outline-none focus:border-blue-600"
+                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="HH"
                   />
                   <input
                     type="text"
                     value={scheduledDate.min}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, min: e.target.value })}
-                    className="col-span-2 px-3 py-2 rounded-lg border border-gray-300 text-sm text-center font-mono focus:outline-none focus:border-blue-600"
+                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="mm"
                   />
                 </div>
@@ -261,7 +260,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 />
               </div>
 
@@ -275,21 +274,21 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                   value={platformUrls.apple}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, apple: e.target.value })}
                   placeholder="Apple Podcast"
-                  className="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.amazon}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, amazon: e.target.value })}
                   placeholder="Amazon Music"
-                  className="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.spotify}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, spotify: e.target.value })}
                   placeholder="Spotify"
-                  className="w-full px-3.5 py-2 rounded-lg border border-gray-300 text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
               </div>
 
@@ -298,11 +297,11 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   ハッシュタグ
                 </label>
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex flex-wrap items-center gap-2 p-3 border border-brand rounded-xs">
                   {hashtags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-gray-200 text-gray-800 text-xs font-medium"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm bg-gray-200 text-gray-800 text-xs font-medium"
                     >
                       {tag}
                       <button
@@ -327,7 +326,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
+            <div className="p-4 border-t border-brand/30 flex items-center justify-between shrink-0">
               <div>
                 {saveStatus === "saved" && (
                   <span className="text-xs text-emerald-600 font-semibold">変更を保存しました</span>
@@ -342,14 +341,14 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                     setPlatformUrls(selectedPost.platformUrls);
                     setHashtags(selectedPost.hashtags);
                   }}
-                  className="px-5 py-2 rounded-lg bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
+                  className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-sm"
+                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors"
                 >
                   変更
                 </button>

@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@theme {
+  --color-app-bg: #F6F7EB;
+  --color-brand: #3E43F0;
+  --color-brand-hover: #4338ca;
+  --color-brand-light: #eef2ff;
+  --color-brand-subtle: #e0e7ff;
+}
+
+body {
+  background-color: var(--color-app-bg);
+}

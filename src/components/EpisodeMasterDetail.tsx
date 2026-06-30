@@ -76,12 +76,12 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
         prev.map((e) =>
           e.id === selectedEpisode.id
             ? {
-                ...e,
-                title,
-                description,
-                minutes,
-                xPosts: posts,
-              }
+              ...e,
+              title,
+              description,
+              minutes,
+              xPosts: posts,
+            }
             : e
         )
       );
@@ -94,7 +94,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
 
   if (episodes.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-500">
+      <div className="rounded-xs border border-gray-200 p-12 text-center text-gray-500">
         <p className="text-lg font-medium">まだエピソードがありません</p>
         <p className="mt-1 text-sm">右上ボタンから音声ファイルをアップロードして最初のエピソードを作成しましょう</p>
       </div>
@@ -120,22 +120,21 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
               <div
                 key={ep.id}
                 onClick={() => handleSelectEpisode(ep)}
-                className={`p-4 rounded-xl cursor-pointer transition-all duration-150 border relative ${
-                  isSelected
-                    ? "bg-white border-2 border-blue-600 shadow-md ring-1 ring-blue-600"
-                    : "bg-white border-gray-200 hover:border-blue-300 shadow-sm"
-                }`}
+                className={`p-4 rounded-xs cursor-pointer transition-all duration-150 border relative ${isSelected
+                  ? "border-2 border-brand"
+                  : "border-brand hover:bg-gray-100"
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">
-                    #{ep.id} {ep.title}
+                    {ep.title}
                   </h3>
-                  <span className="shrink-0 text-[10px] font-semibold bg-gray-800 text-white px-2 py-0.5 rounded">
+                  <span className="shrink-0 text-[10px] font-semibold bg-brand text-white px-2 py-0.5">
                     {ep.status === "completed" ? "完了" : ep.status}
                   </span>
                 </div>
 
-                <div className="flex items-center text-xs text-gray-500 space-x-3 mb-2 font-mono">
+                <div className="flex items-center text-xs space-x-3 mb-2">
                   <span>再生時間: 45:12</span>
                   <span>収録日: {ep.createdAt.split("T")[0]}</span>
                 </div>
@@ -144,7 +143,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                   概要: {ep.description || ep.minutes?.slice(0, 80) || "概要文がまだ設定されていません。"}
                 </p>
 
-                <div className="flex items-center gap-4 text-[11px] text-gray-600 border-t border-gray-100 pt-2 font-medium">
+                <div className="flex items-center gap-4 text-[11px] text-gray-600 border-t border-brand/30 pt-2 font-medium">
                   <span className="flex items-center gap-1">
                     <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" /> 配信済み
                   </span>
@@ -162,47 +161,44 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
 
         {/* Right Column: Inspector Panel (7 cols) */}
         {selectedEpisode && (
-          <div className="col-span-7 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+          <div className="col-span-7 rounded-xs border-l border-brand/30 flex flex-col overflow-hidden">
             {/* Top Bar Tabs & Actions */}
-            <div className="px-5 pt-3 border-b border-gray-200 flex items-center justify-between bg-gray-50/50">
+            <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <div className="flex items-center space-x-6">
                 <button
                   onClick={() => setActiveTab("overview")}
-                  className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
-                    activeTab === "overview"
-                      ? "border-blue-600 text-blue-700"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                  }`}
+                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "overview"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
                 >
                   概要
                 </button>
                 <button
                   onClick={() => setActiveTab("minutes")}
-                  className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
-                    activeTab === "minutes"
-                      ? "border-blue-600 text-blue-700"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                  }`}
+                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "minutes"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
                 >
                   議事録
                 </button>
                 <button
                   onClick={() => setActiveTab("promotions")}
-                  className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
-                    activeTab === "promotions"
-                      ? "border-blue-600 text-blue-700"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                  }`}
+                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "promotions"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
                 >
                   SNS投稿文
                 </button>
               </div>
 
               <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold shadow-xs">
+                <span className="px-3 py-1 bg-emerald-600 text-white rounded-xs text-xs font-semibold">
                   配信済み
                 </span>
-                <button className="px-3 py-1 bg-white border border-gray-300 hover:bg-gray-50 rounded-md text-xs font-medium text-gray-700 transition-colors flex items-center gap-1">
+                <button className="px-3 py-1 border border-gray-300 hover:bg-gray-50 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1">
                   <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                   削除
                 </button>
@@ -211,12 +207,12 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="text-xs text-gray-500 font-mono">
+              <div className="text-xs text-gray-500">
                 更新日時 : {formatDate(selectedEpisode.createdAt)}
               </div>
 
               {/* Audio Player Preview */}
-              <div className="bg-gray-100/80 rounded-xl p-4 border border-gray-200/80 flex items-center gap-4">
+              <div className="rounded-xs p-4 border border-brand flex items-center gap-4">
                 <div className="w-24 h-24 bg-gray-300/80 rounded-lg shrink-0 flex items-center justify-center text-gray-400 font-bold text-xs">
                   artwork
                 </div>
@@ -227,7 +223,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                     </button>
                     <button
                       onClick={() => setIsPlaying(!isPlaying)}
-                      className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 hover:scale-105 transition-transform"
+                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 hover:scale-105 transition-transform"
                     >
                       {isPlaying ? (
                         <Pause className="w-5 h-5 fill-current" />
@@ -241,7 +237,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                   </div>
                   {/* Progress Bar */}
                   <div className="w-full bg-gray-300 h-2 rounded-full overflow-hidden relative">
-                    <div className="bg-blue-600 h-full w-1/3 rounded-full" />
+                    <div className="bg-brand h-full w-1/3 rounded-full" />
                   </div>
                 </div>
               </div>
@@ -257,7 +253,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
                     />
                   </div>
                   <div>
@@ -268,7 +264,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                       rows={6}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                     />
                   </div>
                 </div>
@@ -283,7 +279,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                     rows={12}
                     value={minutes}
                     onChange={(e) => setMinutes(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono"
+                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                     placeholder="まだ議事録が生成されていません"
                   />
                 </div>
@@ -298,7 +294,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                     <p className="text-sm text-gray-400 py-4">まだ投稿案が生成されていません</p>
                   ) : (
                     posts.map((post, index) => (
-                      <div key={post.id} className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                      <div key={post.id} className="p-3 border border-brand rounded-xs space-y-2">
                         <span className="text-xs font-semibold text-gray-500">候補 {index + 1}</span>
                         <textarea
                           rows={4}
@@ -311,7 +307,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                               )
                             );
                           }}
-                          className="w-full px-3 py-2 bg-white rounded-md border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          className="w-full px-3 py-2 rounded-xs border border-brand/30 text-sm text-gray-900 focus:outline-none"
                         />
                         <div className="text-right text-[11px] text-gray-400">
                           {post.message.length} 文字
@@ -324,7 +320,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
+            <div className="p-4 border-t border-brand/30 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 {status === "saved" && (
                   <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
@@ -342,7 +338,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                     setMinutes(selectedEpisode.minutes);
                     setPosts(selectedEpisode.xPosts);
                   }}
-                  className="px-5 py-2 rounded-lg bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
+                  className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
                 >
                   キャンセル
                 </button>
@@ -350,7 +346,7 @@ export function EpisodeMasterDetail({ initialEpisodes }: { initialEpisodes: Epis
                   type="button"
                   onClick={handleSave}
                   disabled={status === "saving"}
-                  className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-sm disabled:opacity-50"
+                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50"
                 >
                   {status === "saving" ? "保存中..." : "変更"}
                 </button>
