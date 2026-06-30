@@ -67,6 +67,16 @@ async function loadEpisodeContent(
       scheduledTime: data.scheduled_time
         ? String(data.scheduled_time)
         : null,
+      platformUrls: {
+        apple: String(data.platform_urls?.apple ?? ""),
+        amazon: String(data.platform_urls?.amazon ?? ""),
+        spotify: String(data.platform_urls?.spotify ?? ""),
+      },
+      hashtags: Array.isArray(data.hashtags)
+        ? data.hashtags.map(String)
+        : [],
+      generatedAt: data.generated_at ? String(data.generated_at) : new Date().toISOString(),
+      updatedAt: data.edited_at ? String(data.edited_at) : (data.generated_at ? String(data.generated_at) : new Date().toISOString()),
     };
   });
 
@@ -173,4 +183,87 @@ export async function updateEpisodeGeneratedContent(input: {
     );
   }
   await Promise.all(writes);
+}
+
+export async function listEpisodesAndPromotionsPaginated(
+  podcastId: number,
+  limit: number,
+  offset: number,
+): Promise<{ episodes: Episode[]; hasMore: boolean }> {
+  const pool = await getDbPool();
+
+  const countResult = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) FROM episodes WHERE podcast_id = $1`,
+    [podcastId]
+  );
+  const totalCount = parseInt(countResult.rows[0].count, 10);
+
+  const result = await pool.query<EpisodeRow>(
+    `SELECT episode_id, podcast_id, title, description, source_audio_path,
+            audio_file_path, status, processing_error, created_at
+     FROM episodes
+     WHERE podcast_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [podcastId, limit, offset],
+  );
+
+  const episodes = await Promise.all(
+    result.rows.map(async (row) =>
+      toEpisode(row, await loadEpisodeContent(row.podcast_id, row.episode_id)),
+    ),
+  );
+
+  const hasMore = offset + result.rows.length < totalCount;
+
+  return { episodes, hasMore };
+}
+
+export async function updateSnsPromotion(input: {
+  podcastId: number;
+  episodeId: number;
+  promotionId: string;
+  message?: string;
+  status?: string;
+  scheduledTime?: string | null;
+  platformUrls?: { apple: string; amazon: string; spotify: string };
+  hashtags?: string[];
+  updatedBy: string;
+}): Promise<void> {
+  const firestore = getAdminFirestore();
+  const docRef = firestore
+    .collection("podcasts")
+    .doc(String(input.podcastId))
+    .collection("episodes_contents")
+    .doc(String(input.episodeId))
+    .collection("sns_promotions")
+    .doc(input.promotionId);
+
+  const updateData: any = {
+    edited_at: new Date().toISOString(),
+    edited_by: input.updatedBy,
+  };
+  if (input.message !== undefined) updateData.message = input.message;
+  if (input.status !== undefined) updateData.status = input.status;
+  if (input.scheduledTime !== undefined) updateData.scheduled_time = input.scheduledTime;
+  if (input.platformUrls !== undefined) updateData.platform_urls = input.platformUrls;
+  if (input.hashtags !== undefined) updateData.hashtags = input.hashtags;
+
+  await docRef.set(updateData, { merge: true });
+}
+
+export async function deleteSnsPromotion(input: {
+  podcastId: number;
+  episodeId: number;
+  promotionId: string;
+}): Promise<void> {
+  const firestore = getAdminFirestore();
+  await firestore
+    .collection("podcasts")
+    .doc(String(input.podcastId))
+    .collection("episodes_contents")
+    .doc(String(input.episodeId))
+    .collection("sns_promotions")
+    .doc(input.promotionId)
+    .delete();
 }

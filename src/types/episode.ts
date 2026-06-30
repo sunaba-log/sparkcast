@@ -10,6 +10,10 @@ export type EpisodePromotion = {
   message: string;
   status: string;
   scheduledTime: string | null;
+  platformUrls?: { apple: string; amazon: string; spotify: string };
+  hashtags?: string[];
+  generatedAt?: string;
+  updatedAt?: string;
 };
 
 export type Episode = {

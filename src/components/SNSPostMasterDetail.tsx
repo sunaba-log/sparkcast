@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trash2, Clock, CheckCircle2, X } from "lucide-react";
 
 export type SNSPostItem = {
@@ -16,66 +16,110 @@ export type SNSPostItem = {
   updatedAt: string;
 };
 
-export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostItem[] }) {
-  const defaultPosts: SNSPostItem[] = initialPosts && initialPosts.length > 0 ? initialPosts : [
-    {
-      id: "1",
-      episodeId: "21",
-      episodeTitle: "大規模データ時代のDB選定ガイド",
-      status: "pending",
-      scheduledDate: { yyyy: "2026", mm: "06", dd: "27", hh: "18", min: "00" },
-      message: "GoogleCloud の Cloud SQLとFirestoreの使い分けについてGoogleデータ時代のSQLとFirestoreの使い方について議論しました。これまでに...",
-      platformUrls: { apple: "https://podcasts.apple.com/...", amazon: "", spotify: "https://spotify.com/..." },
-      hashtags: ["Podcast", "CloudSQL", "Firestore"],
-      generatedAt: "2026-06-06 12:00:00",
-      updatedAt: "2026-06-06 12:00:00",
-    },
-    {
-      id: "2",
-      episodeId: "20",
-      episodeTitle: "WebAssemblyとエッジコンピューティングの未来",
-      status: "posted",
-      scheduledDate: { yyyy: "2026", mm: "06", dd: "26", hh: "12", min: "00" },
-      message: "The hottest new programming language is English. 最新のエピソードを公開しました！ぜひお聴きください。",
-      platformUrls: { apple: "", amazon: "", spotify: "" },
-      hashtags: ["Wasm", "Edge"],
-      generatedAt: "2026-06-05 15:30:00",
-      updatedAt: "2026-06-05 15:30:00",
-    },
-    {
-      id: "3",
-      episodeId: "19",
-      episodeTitle: "次世代フロントエンドフレームワーク比較",
-      status: "posted",
-      scheduledDate: { yyyy: "2026", mm: "06", dd: "25", hh: "09", min: "00" },
-      message: "Next.js 16 と React 19 の進化に伴うベストプラクティスを語ります。ハッシュタグをつけて感想をお寄せください！",
-      platformUrls: { apple: "", amazon: "", spotify: "" },
-      hashtags: ["Nextjs", "React"],
-      generatedAt: "2026-06-04 10:00:00",
-      updatedAt: "2026-06-04 10:00:00",
-    },
-  ];
-
-  const [posts, setPosts] = useState<SNSPostItem[]>(defaultPosts);
-  const [selectedId, setSelectedId] = useState<string>(defaultPosts[0].id);
+export function SNSPostMasterDetail({
+  initialPosts = [],
+  initialHasMore = false,
+}: {
+  initialPosts?: SNSPostItem[];
+  initialHasMore?: boolean;
+}) {
+  const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
+  const [selectedId, setSelectedId] = useState<string>(
+    initialPosts.length > 0 ? initialPosts[0].id : ""
+  );
 
   const selectedPost = posts.find((p) => p.id === selectedId) || posts[0];
 
   // Inspector form state
-  const [scheduledDate, setScheduledDate] = useState(selectedPost.scheduledDate);
-  const [message, setMessage] = useState(selectedPost.message);
-  const [platformUrls, setPlatformUrls] = useState(selectedPost.platformUrls);
-  const [hashtags, setHashtags] = useState<string[]>(selectedPost.hashtags);
+  const [scheduledDate, setScheduledDate] = useState(() =>
+    selectedPost
+      ? selectedPost.scheduledDate
+      : { yyyy: "", mm: "", dd: "", hh: "", min: "" }
+  );
+  const [message, setMessage] = useState(() => (selectedPost ? selectedPost.message : ""));
+  const [platformUrls, setPlatformUrls] = useState(() =>
+    selectedPost ? selectedPost.platformUrls : { apple: "", amazon: "", spotify: "" }
+  );
+  const [hashtags, setHashtags] = useState<string[]>(() =>
+    selectedPost ? selectedPost.hashtags : []
+  );
   const [newTagInput, setNewTagInput] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Pagination states
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [offset, setOffset] = useState(initialPosts.length > 0 ? 5 : 0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize inspector fields when the selected post changes
+  useEffect(() => {
+    if (selectedPost) {
+      setScheduledDate(selectedPost.scheduledDate);
+      setMessage(selectedPost.message);
+      setPlatformUrls(selectedPost.platformUrls);
+      setHashtags(selectedPost.hashtags);
+      setSaveStatus("idle");
+    }
+  }, [selectedPost?.id]);
+
+  // If no post is selected but posts exist, select the first one
+  useEffect(() => {
+    if (!selectedId && posts.length > 0) {
+      setSelectedId(posts[0].id);
+    }
+  }, [posts, selectedId]);
+
+  const loadMore = async () => {
+    if (isLoading || !hasMore) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/sns?limit=5&offset=${offset}`);
+      if (!res.ok) throw new Error("Failed to load posts");
+      const data = (await res.json()) as { posts: SNSPostItem[]; hasMore: boolean };
+      setPosts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newPosts = data.posts.filter((p) => !existingIds.has(p.id));
+        return [...prev, ...newPosts];
+      });
+      setHasMore(data.hasMore);
+      setOffset((prev) => prev + 5);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!hasMore || isLoading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+         if (entries[0].isIntersecting) {
+           loadMore();
+         }
+      },
+      {
+        root: containerRef.current,
+        rootMargin: "100px",
+      }
+    );
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, isLoading, offset]);
 
   const handleSelect = (post: SNSPostItem) => {
     setSelectedId(post.id);
-    setScheduledDate(post.scheduledDate);
-    setMessage(post.message);
-    setPlatformUrls(post.platformUrls);
-    setHashtags(post.hashtags);
-    setSaveStatus("idle");
   };
 
   const handleAddHashtag = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -92,22 +136,84 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
     setHashtags(hashtags.filter((t) => t !== tagToRemove));
   };
 
-  const handleSave = () => {
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === selectedPost.id
-          ? {
-            ...p,
-            scheduledDate,
-            message,
-            platformUrls,
-            hashtags,
-          }
-          : p
-      )
-    );
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 2500);
+  const handleSave = async () => {
+    if (!selectedPost) return;
+    setIsSaving(true);
+    try {
+      const dateStr = `${scheduledDate.yyyy}-${scheduledDate.mm.padStart(2, "0")}-${scheduledDate.dd.padStart(2, "0")}T${scheduledDate.hh.padStart(2, "0")}:${scheduledDate.min.padStart(2, "0")}:00`;
+      const dateObj = new Date(dateStr);
+      const scheduledTime = isNaN(dateObj.getTime()) ? null : dateObj.toISOString();
+
+      const res = await fetch("/api/sns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          episodeId: selectedPost.episodeId,
+          id: selectedPost.id,
+          message,
+          scheduledTime,
+          platformUrls,
+          hashtags,
+          status: selectedPost.status,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save post");
+      }
+
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === selectedPost.id
+            ? {
+                ...p,
+                scheduledDate,
+                message,
+                platformUrls,
+                hashtags,
+              }
+            : p
+        )
+      );
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2500);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "保存に失敗しました");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedPost) return;
+    if (!confirm("この投稿文を削除してもよろしいですか？")) return;
+
+    try {
+      const res = await fetch(
+        `/api/sns?episodeId=${selectedPost.episodeId}&id=${selectedPost.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to delete post");
+      }
+
+      const updatedPosts = posts.filter((p) => p.id !== selectedPost.id);
+      setPosts(updatedPosts);
+      if (updatedPosts.length > 0) {
+        setSelectedId(updatedPosts[0].id);
+      } else {
+        setSelectedId("");
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "削除に失敗しました");
+    }
   };
 
   return (
@@ -122,12 +228,15 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
       {/* Master-Detail Container */}
       <div className="flex-1 grid grid-cols-12 gap-5 min-h-0">
         {/* Left Column: Timeline Master List (6 cols) */}
-        <div className="col-span-6 flex flex-col space-y-4 overflow-y-auto pr-2 relative">
+        <div
+          ref={containerRef}
+          className="col-span-6 flex flex-col space-y-4 overflow-y-auto pr-2 relative"
+        >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
 
           {posts.map((post) => {
-            const isSelected = post.id === selectedPost.id;
+            const isSelected = selectedPost && post.id === selectedPost.id;
             return (
               <div key={post.id} className="flex items-start gap-4 relative z-10">
                 {/* Timeline Icon Node */}
@@ -147,10 +256,11 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                 {/* Post Preview Card */}
                 <div
                   onClick={() => handleSelect(post)}
-                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white ${isSelected
-                    ? "border-2 border-brand shadow-sm"
-                    : "border-gray-200 hover:border-brand/50 shadow-sm"
-                    }`}
+                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white ${
+                    isSelected
+                      ? "border-2 border-brand shadow-sm"
+                      : "border-gray-200 hover:border-brand/50 shadow-sm"
+                  }`}
                 >
                   {/* Mock Twitter Header */}
                   <div className="flex items-center justify-between mb-2">
@@ -159,7 +269,9 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                         SC
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-gray-900 leading-none">SparkCast Official</div>
+                        <div className="text-xs font-bold text-gray-900 leading-none">
+                          SparkCast Official
+                        </div>
                         <div className="text-[10px] text-gray-400">@sparkcast_jp</div>
                       </div>
                     </div>
@@ -170,31 +282,58 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                   </p>
 
                   <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono">
-                    <span>{post.scheduledDate.hh}:{post.scheduledDate.min}</span>
+                    <span>
+                      {post.scheduledDate.hh}:{post.scheduledDate.min}
+                    </span>
                     <span>・</span>
-                    <span className="text-brand font-medium">#{post.episodeId} {post.episodeTitle}</span>
+                    <span className="text-brand font-medium">
+                      #{post.episodeId} {post.episodeTitle}
+                    </span>
                   </div>
                 </div>
               </div>
             );
           })}
+
+          {/* Infinite Scroll Sentinel */}
+          <div ref={sentinelRef} className="h-4 w-full shrink-0" />
+
+          {isLoading && (
+            <div className="flex justify-center items-center py-4 shrink-0">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand" />
+            </div>
+          )}
+
+          {!hasMore && posts.length > 0 && (
+            <div className="text-center text-xs text-gray-400 py-4 shrink-0">
+              すべての過去のエピソードを読み込みました
+            </div>
+          )}
+
+          {posts.length === 0 && !isLoading && (
+            <div className="text-center text-sm text-gray-400 py-8">
+              SNS投稿文が見つかりません
+            </div>
+          )}
         </div>
 
         {/* Right Column: Inspector Panel (6 cols) */}
-        {selectedPost && (
+        {selectedPost ? (
           <div className="col-span-6 rounded-sm border-l border-brand/30 flex flex-col overflow-hidden">
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
-                className={`px-3 py-1 rounded-xs text-xs font-semibold ${selectedPost.status === "pending"
-                  ? "bg-brand text-white"
-                  : "bg-emerald-600 text-white"
-                  }`}
+                className={`px-3 py-1 rounded-xs text-xs font-semibold ${
+                  selectedPost.status === "pending" ? "bg-brand text-white" : "bg-emerald-600 text-white"
+                }`}
               >
                 {selectedPost.status === "pending" ? "投稿予定" : "投稿済み"}
               </span>
 
-              <button className="px-3 py-1 border border-gray-300 rounded-xs text-xs font-medium text-brand flex items-center gap-1">
+              <button
+                onClick={handleDelete}
+                className="px-3 py-1 border border-gray-300 rounded-xs text-xs font-medium text-brand flex items-center gap-1 hover:bg-gray-50 transition-colors"
+              >
                 <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                 削除
               </button>
@@ -202,15 +341,11 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="text-xs">
-                更新日時 : {selectedPost.updatedAt}
-              </div>
+              <div className="text-xs text-gray-500">更新日時 : {selectedPost.updatedAt}</div>
 
               {/* Form: Scheduled Datetime */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5">
-                  投稿日時
-                </label>
+                <label className="block text-xs font-semibold mb-1.5">投稿日時</label>
                 <div className="grid grid-cols-12 gap-2">
                   <input
                     type="text"
@@ -253,9 +388,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
 
               {/* Form: Message */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                  Message
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Message</label>
                 <textarea
                   rows={5}
                   value={message}
@@ -266,9 +399,7 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
 
               {/* Form: Platform URLs */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-gray-700">
-                  URL
-                </label>
+                <label className="block text-xs font-semibold text-gray-700">URL</label>
                 <input
                   type="text"
                   value={platformUrls.apple}
@@ -348,12 +479,17 @@ export function SNSPostMasterDetail({ initialPosts }: { initialPosts?: SNSPostIt
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors"
+                  disabled={isSaving}
+                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50"
                 >
-                  変更
+                  {isSaving ? "保存中..." : "変更"}
                 </button>
               </div>
             </div>
+          </div>
+        ) : (
+          <div className="col-span-6 rounded-sm border-l border-brand/30 flex items-center justify-center text-sm text-gray-400">
+            投稿文を選択してください
           </div>
         )}
       </div>
