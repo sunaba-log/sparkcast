@@ -96,8 +96,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         const detail = await uploadResponse.text().catch(() => "");
         const summary = `${uploadResponse.status} ${uploadResponse.statusText}`.trim();
         throw new Error(
-          `GCSへのアップロードに失敗しました (${summary})${
-            detail ? `: ${detail.slice(0, 300)}` : ""
+          `GCSへのアップロードに失敗しました (${summary})${detail ? `: ${detail.slice(0, 300)}` : ""
           }`,
         );
       }
@@ -137,17 +136,17 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
   const isBusy = status === "preparing" || status === "uploading";
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-8 max-w-xl">
+    <div className="border border-brand rounded-xs p-8 max-w-xl">
       <div className="space-y-4 mb-6">
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">仮タイトル（任意）</span>
+          <span className="text-sm font-medium text-black">仮タイトル（任意）</span>
           <input
             type="text"
             maxLength={255}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             disabled={isBusy}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-sm text-black"
             placeholder="未入力の場合はファイル名を仮タイトルにします"
           />
           <span className="mt-1 block text-xs text-gray-500">
@@ -155,14 +154,14 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
           </span>
         </label>
         <label className="block">
-          <span className="text-sm font-medium text-gray-700">説明（任意）</span>
+          <span className="text-sm font-medium text-black">説明（任意）</span>
           <textarea
             maxLength={10_000}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             disabled={isBusy}
             rows={3}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-sm text-black"
           />
         </label>
       </div>
@@ -187,7 +186,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
       </div>
 
       {selectedFile && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xs">
           <p className="text-sm text-blue-800">
             <span className="font-medium">アップロード予定ファイル：</span>
             {selectedFile.name}
@@ -199,7 +198,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
       )}
 
       {status === "success" && (
-        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xs">
           <p className="text-sm text-green-800 font-medium">アップロードが完了しました</p>
           <p className="text-xs text-green-600 mt-0.5">
             エピソードID: {uploadedEpisodeId}。バックグラウンド処理が開始されます。
@@ -208,13 +207,13 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
       )}
 
       {status === "error" && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xs">
           <p className="text-sm text-red-800 font-medium">{errorMessage}</p>
         </div>
       )}
 
       {isBusy && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xs">
           <p className="text-sm text-blue-800 font-medium">
             {status === "preparing" ? "エピソードを作成しています..." : "音声ファイルをアップロードしています..."}
           </p>
@@ -225,7 +224,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         <button
           onClick={handleUpload}
           disabled={!selectedFile || status === "success" || isBusy}
-          className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-xs hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {isBusy ? "処理中..." : "アップロード開始"}
         </button>
@@ -233,7 +232,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
           <button
             onClick={handleReset}
             disabled={isBusy}
-            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-xs hover:bg-gray-50 transition-colors"
           >
             リセット
           </button>

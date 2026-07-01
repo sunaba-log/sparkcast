@@ -294,7 +294,7 @@ export function EpisodeMasterDetail({
               </div>
 
               {/* Audio Player Preview */}
-              <div className="rounded-xs p-4 border border-brand flex items-center gap-4 bg-white/50 backdrop-blur-xs">
+              <div className="rounded-xs p-4 border border-brand flex items-center gap-4 backdrop-blur-xs">
                 {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
                   <img
                     src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
@@ -323,7 +323,7 @@ export function EpisodeMasterDetail({
                     <button
                       onClick={togglePlay}
                       disabled={!selectedEpisode.audioUrl}
-                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-white cursor-pointer"
+                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-brand text-white cursor-pointer"
                       title={isPlaying ? "一時停止" : "再生"}
                     >
                       {isPlaying ? (
@@ -432,8 +432,8 @@ export function EpisodeMasterDetail({
                         type="button"
                         onClick={() => setMinutesTab("preview")}
                         className={`px-3 py-1 text-xs font-semibold rounded-xs transition-colors cursor-pointer ${minutesTab === "preview"
-                            ? "bg-white text-gray-800 shadow-xs"
-                            : "text-gray-500 hover:text-gray-800"
+                          ? "bg-brand text-white shadow-xs"
+                          : "text-gray-500 hover:text-gray-800"
                           }`}
                       >
                         プレビュー
@@ -442,8 +442,8 @@ export function EpisodeMasterDetail({
                         type="button"
                         onClick={() => setMinutesTab("edit")}
                         className={`px-3 py-1 text-xs font-semibold rounded-xs transition-colors cursor-pointer ${minutesTab === "edit"
-                            ? "bg-white text-gray-800 shadow-xs"
-                            : "text-gray-500 hover:text-gray-800"
+                          ? "bg-brand text-white shadow-xs"
+                          : "text-gray-500 hover:text-gray-800"
                           }`}
                       >
                         コード
@@ -452,7 +452,7 @@ export function EpisodeMasterDetail({
                   </div>
 
                   {minutesTab === "preview" ? (
-                    <div className="w-full min-h-[300px] max-h-[400px] overflow-y-auto px-4 py-3 rounded-xs border border-brand text-sm text-gray-800 shadow-inner markdown-preview">
+                    <div className="w-full min-h-[300px] overflow-y-auto px-4 py-3 rounded-xs border border-brand text-sm text-gray-800 shadow-inner markdown-preview">
                       {minutes ? (
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
