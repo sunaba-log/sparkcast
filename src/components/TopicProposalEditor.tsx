@@ -44,18 +44,44 @@ export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] 
     return dateTimeStr.split(" ")[0].split("T")[0];
   };
 
+  // Calculate pagination pages with ellipses
+  const pages: (number | string)[] = [];
+  const N = sortedProposals.length;
+  if (N > 0) {
+    const corePages = new Set<number>();
+    corePages.add(0);
+    corePages.add(N - 1);
+    corePages.add(currentIndex);
+    if (currentIndex - 1 >= 0) corePages.add(currentIndex - 1);
+    if (currentIndex + 1 < N) corePages.add(currentIndex + 1);
+
+    const sortedPages = Array.from(corePages).sort((a, b) => a - b);
+    for (let idx = 0; idx < sortedPages.length; idx++) {
+      const curr = sortedPages[idx];
+      if (idx > 0) {
+        const prev = sortedPages[idx - 1];
+        if (curr - prev === 2) {
+          pages.push(prev + 1);
+        } else if (curr - prev > 2) {
+          pages.push(`ellipsis-${prev}-${curr}`);
+        }
+      }
+      pages.push(curr);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Header Bar with Breadcrumbs and Date Pagination */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center text-xs text-gray-500 gap-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start text-xs text-gray-500 gap-2">
           <span>ホーム</span>
           <span>&gt;</span>
           <span className="font-medium text-gray-800">次回議題</span>
         </div>
 
         {/* Date Switcher Bar */}
-        <div className="flex items-center space-x-2 text-xs overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center flex-wrap gap-2 text-xs justify-center">
           <button
             onClick={handlePrev}
             disabled={currentIndex <= 0}
@@ -64,15 +90,23 @@ export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] 
             <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
 
-          {sortedProposals.map((p) => {
+          {pages.map((item) => {
+            if (typeof item === "string") {
+              return (
+                <span key={item} className="px-1.5 py-1 text-gray-400 select-none shrink-0">
+                  ...
+                </span>
+              );
+            }
+            const p = sortedProposals[item];
             const isSelected = p.id === selectedProposal.id;
             return (
               <button
                 key={p.id}
                 onClick={() => setSelectedProposalId(p.id)}
                 className={`px-2.5 py-1 rounded transition-colors shrink-0 ${isSelected
-                    ? "bg-brand text-white font-medium"
-                    : "border border-brand/30 text-gray-700 hover:bg-gray-50"
+                  ? "bg-brand text-white font-medium"
+                  : "border border-brand/30 text-gray-700 hover:bg-gray-50"
                   }`}
               >
                 {getOnlyDate(p.generatedAt)}
