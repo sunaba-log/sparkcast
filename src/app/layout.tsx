@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   return (
-    <html lang="ja" className="h-full">
+    <html lang="ja" className="h-full" suppressHydrationWarning>
       <body className="bg-app-bg text-gray-900 antialiased h-full flex flex-col font-sans">
         <header className="border-b border-brand/30 shrink-0 z-20">
           <div className="w-full px-5 h-14 flex items-center justify-between">
@@ -27,10 +27,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <LogoutButton />
                 <Link
                   href="/upload"
-                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5 border border-brand"
                 >
                   <span>+</span> 新規エピソード追加
                 </Link>
+                <ChatWidget />
               </div>
             )}
           </div>
@@ -39,7 +40,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {user && <Sidebar />}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>
         </div>
-        {user && <ChatWidget />}
       </body>
     </html>
   );
