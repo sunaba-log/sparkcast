@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   return (
-    <html lang="ja" className="h-full">
+    <html lang="ja" className="h-full" suppressHydrationWarning>
       <body className="bg-app-bg text-gray-900 antialiased h-full flex flex-col font-sans">
         <header className="border-b border-brand/30 shrink-0 z-20">
           <div className="w-full px-5 h-14 flex items-center justify-between">
