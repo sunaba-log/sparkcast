@@ -48,24 +48,17 @@ resource "google_service_account_iam_member" "app_hosting_self_token_creator" {
   member             = "serviceAccount:${google_service_account.app_hosting_compute.email}"
 }
 
-# apphosting.yaml が参照するシークレット。メタデータのみ管理し、
-# 値（バージョン）は秘匿情報のため Terraform では管理しない:
-#   printf '%s' '<value>' | gcloud secrets versions add DB_PASSWORD --data-file=-
-resource "google_secret_manager_secret" "app" {
-  for_each = toset(["DB_PASSWORD", "CRON_SECRET"])
+# apphosting.yaml が参照するシークレット。本体・値は既存（手動作成）のものを
+# 参照のみ行い、Terraform では所有しない。
+data "google_secret_manager_secret" "app" {
+  for_each = toset(["db-password", "cron-secret", "firebase-api-key"])
 
   project   = var.project_id
   secret_id = each.value
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [google_project_service.secretmanager]
 }
 
 resource "google_secret_manager_secret_iam_member" "app_hosting_secrets" {
-  for_each = google_secret_manager_secret.app
+  for_each = data.google_secret_manager_secret.app
 
   project   = var.project_id
   secret_id = each.value.secret_id

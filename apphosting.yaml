@@ -24,7 +24,7 @@ env:
     availability:
       - RUNTIME
   - variable: DB_PASSWORD
-    secret: DB_PASSWORD
+    secret: db-password
     availability:
       - RUNTIME
   - variable: GCS_UPLOAD_BUCKET
@@ -36,13 +36,13 @@ env:
     availability:
       - RUNTIME
   - variable: CRON_SECRET
-    secret: CRON_SECRET
+    secret: cron-secret
     availability:
       - RUNTIME
 
   # Firebase Web SDK（クライアント公開設定。ビルド時にバンドルへ埋め込まれる）
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI
+    secret: firebase-api-key
     availability:
       - BUILD
       - RUNTIME

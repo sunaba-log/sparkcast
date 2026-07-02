@@ -1,18 +1,17 @@
 # vercel.json の crons から移行した定期実行ジョブ。
 # スケジュールは Vercel Cron（UTC）当時の実行時刻を維持する。
 resource "google_project_service" "cloudscheduler" {
-  project            = var.project_id
-  service            = "cloudscheduler.googleapis.com"
+  project = var.project_id
+  service = "cloudscheduler.googleapis.com"
 
   # 他サービスも共有する API のため、destroy 時に無効化しない。
   disable_on_destroy = false
 }
 
 # アプリ側の検証と同じ Bearer トークンを Scheduler のヘッダに設定する。
-# 値のバージョンは gcloud で投入しておくこと（app-hosting.tf のコメント参照）。
 data "google_secret_manager_secret_version" "cron_secret" {
   project = var.project_id
-  secret  = google_secret_manager_secret.app["CRON_SECRET"].secret_id
+  secret  = data.google_secret_manager_secret.app["cron-secret"].secret_id
 }
 
 locals {
