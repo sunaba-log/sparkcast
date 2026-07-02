@@ -1,5 +1,10 @@
-# Firebase App Hosting の backend（dev 環境）と、そのランタイム SA・シークレット。
-# backend は GitHub（develop ブランチ）からの自動ロールアウトでデプロイされる。
+# Firebase App Hosting の backend（dev 環境）。GitHub（develop ブランチ）からの
+# 自動ロールアウトでデプロイされ、ランタイム SA には既存のアプリ SA
+# （podcast-ui-dev@…）を使う。
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
 resource "google_project_service" "firebaseapphosting" {
   project            = var.project_id
   service            = "firebaseapphosting.googleapis.com"
@@ -12,40 +17,35 @@ resource "google_project_service" "secretmanager" {
   disable_on_destroy = false
 }
 
-# App Hosting のランタイム SA。既定名（firebase-app-hosting-compute@…）を明示的に管理する。
-resource "google_service_account" "app_hosting_compute" {
-  project      = var.project_id
-  account_id   = "firebase-app-hosting-compute"
-  display_name = "Firebase App Hosting compute service account"
+# App Hosting のサービスエージェントを明示的にプロビジョニングする。
+resource "google_project_service_identity" "apphosting" {
+  provider = google-beta
+
+  project = var.project_id
+  service = "firebaseapphosting.googleapis.com"
+
+  depends_on = [google_project_service.firebaseapphosting]
 }
 
-# App Hosting のビルド・実行に必要な既定ロール。
-resource "google_project_iam_member" "app_hosting_compute_runner" {
+# アプリ SA を App Hosting のランタイム SA として使うためのロール。
+resource "google_project_iam_member" "app_hosting_runner" {
   project = var.project_id
   role    = "roles/firebaseapphosting.computeRunner"
-  member  = "serviceAccount:${google_service_account.app_hosting_compute.email}"
+  member  = "serviceAccount:${google_service_account.app.email}"
 }
 
-# アプリが必要とするロール一式（iam.tf の app_project_roles を共用）。
-resource "google_project_iam_member" "app_hosting_compute" {
-  for_each = toset(local.app_project_roles)
-
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.app_hosting_compute.email}"
-}
-
-resource "google_storage_bucket_iam_member" "app_hosting_upload_object_creator" {
-  bucket = var.upload_bucket
-  role   = "roles/storage.objectCreator"
-  member = "serviceAccount:${google_service_account.app_hosting_compute.email}"
+# App Hosting のサービスエージェントがアプリ SA で Cloud Run をデプロイするための権限。
+resource "google_service_account_iam_member" "app_hosting_agent_user" {
+  service_account_id = google_service_account.app.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_project_service_identity.apphosting.email}"
 }
 
 # 鍵なし（ADC）で GCS V4 署名付きURLを発行するには、SA 自身への signBlob 権限が必要。
-resource "google_service_account_iam_member" "app_hosting_self_token_creator" {
-  service_account_id = google_service_account.app_hosting_compute.name
+resource "google_service_account_iam_member" "app_self_token_creator" {
+  service_account_id = google_service_account.app.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${google_service_account.app_hosting_compute.email}"
+  member             = "serviceAccount:${google_service_account.app.email}"
 }
 
 # apphosting.yaml が参照するシークレット。本体・値は既存（手動作成）のものを
@@ -57,13 +57,13 @@ data "google_secret_manager_secret" "app" {
   secret_id = each.value
 }
 
-resource "google_secret_manager_secret_iam_member" "app_hosting_secrets" {
+resource "google_secret_manager_secret_iam_member" "app_secrets" {
   for_each = data.google_secret_manager_secret.app
 
   project   = var.project_id
   secret_id = each.value.secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.app_hosting_compute.email}"
+  member    = "serviceAccount:${google_service_account.app.email}"
 }
 
 # backend 本体。GitHub リポジトリと Firebase ウェブアプリ（podcast-ui-dev）を関連付ける。
@@ -73,16 +73,16 @@ resource "google_firebase_app_hosting_backend" "podcast_ui" {
   backend_id       = "podcast-ui"
   app_id           = var.firebase_web_app_id
   serving_locality = "GLOBAL_ACCESS"
-  service_account  = google_service_account.app_hosting_compute.email
+  service_account  = google_service_account.app.email
 
   codebase {
-    repository     = google_developer_connect_git_repository_link.podcast_ui.id
+    repository     = google_developer_connect_git_repository_link.default.id
     root_directory = "/"
   }
 
   depends_on = [
-    google_project_service.firebaseapphosting,
-    google_project_iam_member.app_hosting_compute_runner,
+    google_project_iam_member.app_hosting_runner,
+    google_service_account_iam_member.app_hosting_agent_user,
   ]
 }
 

@@ -1,10 +1,8 @@
 # vercel.json の crons から移行した定期実行ジョブ。
-# スケジュールは Vercel Cron（UTC）当時の実行時刻を維持する。
+# 配信先はカスタムドメイン（DNS・ドメイン接続は別途管理）。
 resource "google_project_service" "cloudscheduler" {
-  project = var.project_id
-  service = "cloudscheduler.googleapis.com"
-
-  # 他サービスも共有する API のため、destroy 時に無効化しない。
+  project            = var.project_id
+  service            = "cloudscheduler.googleapis.com"
   disable_on_destroy = false
 }
 
@@ -15,43 +13,44 @@ data "google_secret_manager_secret_version" "cron_secret" {
 }
 
 locals {
-  cron_jobs = {
-    cleanup-uploads = {
-      path        = "/api/cron/cleanup-uploads"
-      schedule    = "0 3 * * *"
-      description = "放置された upload_pending エピソードを failed へ更新する"
-    }
-    reindex-minutes = {
-      path        = "/api/cron/reindex-minutes"
-      schedule    = "0 4 * * *"
-      description = "議事録RAGの埋め込みインデックスを全チャンネル分更新する"
-    }
-  }
-
-  # backend の uri はスキーム無しのホスト名で返るため補完する。
-  app_hosting_base_url = "https://${trimprefix(google_firebase_app_hosting_backend.podcast_ui.uri, "https://")}"
+  app_base_url = "https://podcast-ui-dev.web.sunabalog.com"
 }
 
-resource "google_cloud_scheduler_job" "cron" {
-  for_each = local.cron_jobs
-
-  project     = var.project_id
-  region      = var.region
-  name        = "podcast-ui-${each.key}"
-  description = each.value.description
-  schedule    = each.value.schedule
-  time_zone   = "Etc/UTC"
+resource "google_cloud_scheduler_job" "cleanup_uploads" {
+  project          = var.project_id
+  region           = var.region
+  name             = "podcast-ui-cleanup-uploads"
+  description      = "Triggers Next.js cleanup-uploads api endpoint"
+  schedule         = "0 3 * * *"
+  time_zone        = "Asia/Tokyo"
+  attempt_deadline = "320s"
 
   http_target {
     http_method = "GET"
-    uri         = "${local.app_hosting_base_url}${each.value.path}"
+    uri         = "${local.app_base_url}/api/cron/cleanup-uploads"
     headers = {
       Authorization = "Bearer ${data.google_secret_manager_secret_version.cron_secret.secret_data}"
     }
   }
 
-  retry_config {
-    retry_count = 1
+  depends_on = [google_project_service.cloudscheduler]
+}
+
+resource "google_cloud_scheduler_job" "reindex_minutes" {
+  project          = var.project_id
+  region           = var.region
+  name             = "podcast-ui-reindex-minutes"
+  description      = "Triggers Next.js reindex-minutes api endpoint"
+  schedule         = "0 4 * * *"
+  time_zone        = "Asia/Tokyo"
+  attempt_deadline = "320s"
+
+  http_target {
+    http_method = "GET"
+    uri         = "${local.app_base_url}/api/cron/reindex-minutes"
+    headers = {
+      Authorization = "Bearer ${data.google_secret_manager_secret_version.cron_secret.secret_data}"
+    }
   }
 
   depends_on = [google_project_service.cloudscheduler]
