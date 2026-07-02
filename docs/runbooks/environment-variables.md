@@ -15,7 +15,6 @@ real secret values. Share this runbook and `.env.example`, not `.env.local`.
 | `DB_USER` | Required without `DATABASE_URL` | Vercel env | Vercel Environment Variables | Cloud SQL database user. |
 | `DB_PASSWORD` | Required without `DATABASE_URL` | Vercel env or GCP Secret Manager | Vercel Environment Variables | Do not paste into docs or chat. |
 | `GOOGLE_CLOUD_PROJECT` | Required | Vercel env or GCP project ID | Vercel Environment Variables | `sunabalog-dev` or `sunabalog-prod`. |
-| `DEFAULT_PODCAST_ID` | Required | Vercel env | Vercel Environment Variables | Current single-channel default is `1`. |
 | `DEV_ALLOWED_EMAILS` | Required | Vercel env / team allowlist | Vercel Environment Variables | Comma-separated login allowlist. |
 | `GCS_UPLOAD_BUCKET` | Required | Vercel env or GCS bucket name | Vercel Environment Variables | Dev and prod buckets must not be mixed. |
 | `GCS_SIGNED_URL_TTL_SECONDS` | Optional | `.env.example` default | Vercel Environment Variables | Defaults to `900` seconds. |
@@ -51,7 +50,6 @@ team-agreed source for that environment and do not duplicate it in docs.
 
    ```text
    GOOGLE_CLOUD_PROJECT
-   DEFAULT_PODCAST_ID
    GCS_UPLOAD_BUCKET
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
    NEXT_PUBLIC_FIREBASE_PROJECT_ID

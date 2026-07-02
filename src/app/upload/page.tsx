@@ -1,17 +1,13 @@
 import Link from "next/link";
 import { UploadForm } from "@/components/UploadForm";
-import {
-  requirePodcastAccess,
-  requireSessionUser,
-} from "@/server/auth";
-import { getDefaultPodcastId } from "@/server/env";
+import { requireRegisteredUser } from "@/server/auth";
+import { requireSelectedPodcast } from "@/server/podcasts/selection";
 
 export const dynamic = "force-dynamic";
 
 export default async function UploadPage() {
-  const user = await requireSessionUser();
-  const podcastId = getDefaultPodcastId();
-  await requirePodcastAccess(user.uid, podcastId);
+  const user = await requireRegisteredUser();
+  const podcastId = await requireSelectedPodcast(user);
 
   return (
     <div>

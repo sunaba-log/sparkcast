@@ -3,7 +3,9 @@ import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
-import { getSessionUser } from "@/server/auth";
+import { getSessionUser, hasPodcastAccess } from "@/server/auth";
+import { getPodcast } from "@/server/podcasts/data-repository";
+import { getSelectedPodcastId } from "@/server/podcasts/selection";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,6 +15,13 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  let channelTitle: string | null = null;
+  if (user?.registered) {
+    const podcastId = await getSelectedPodcastId();
+    if (podcastId && (await hasPodcastAccess(user.uid, podcastId))) {
+      channelTitle = (await getPodcast(podcastId))?.title ?? null;
+    }
+  }
   return (
     <html lang="ja" className="h-full" suppressHydrationWarning>
       <body className="bg-app-bg text-gray-900 antialiased h-full flex flex-col font-sans">
@@ -37,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <div className="flex-1 flex overflow-hidden min-h-0">
-          {user && <Sidebar />}
+          {user && <Sidebar channelTitle={channelTitle} />}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>
         </div>
       </body>

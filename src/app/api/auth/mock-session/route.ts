@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import {
-  getAllowedDevEmails,
-  getDefaultPodcastId,
-  isLocalMockAuthEnabled,
-} from "@/server/env";
+import { getAllowedDevEmails, isLocalMockAuthEnabled } from "@/server/env";
 
 const SESSION_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 
@@ -19,48 +15,16 @@ export async function POST() {
 
   try {
     const email = getAllowedDevEmails()[0] ?? "admin@sunabalog.com";
-    const displayName = "Dev Mock User";
-    const podcastId = getDefaultPodcastId();
-    const mockUid = "dev_mock_" + email.replace(/[^a-zA-Z0-9]/g, "_");
 
-    const client = await (await getDbPool()).connect();
-    try {
-      await client.query("BEGIN");
-      const existingUser = await client.query<{ user_id: string }>(
-        "SELECT user_id FROM users WHERE email = $1",
-        [email],
-      );
-      const appUserId = existingUser.rows[0]?.user_id ?? mockUid;
-      if (existingUser.rowCount) {
-        await client.query(
-          "UPDATE users SET display_name = COALESCE(display_name, $2) WHERE user_id = $1",
-          [appUserId, displayName],
-        );
-      } else {
-        await client.query(
-          `INSERT INTO users (user_id, email, display_name)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id)
-           DO UPDATE SET email = EXCLUDED.email`,
-          [appUserId, email, displayName],
-        );
-      }
-      await client.query(
-        `INSERT INTO podcast_ownerships (podcast_id, user_id, role)
-         VALUES ($1, $2, 'owner')
-         ON CONFLICT (podcast_id, user_id) DO NOTHING`,
-        [podcastId, appUserId],
-      );
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    // ユーザ登録は /register からの明示的な操作でのみ行う（暗黙の自動登録はしない）
+    const existingUser = await (await getDbPool()).query(
+      "SELECT 1 FROM users WHERE email = $1",
+      [email],
+    );
+    const registered = (existingUser.rowCount ?? 0) > 0;
 
     const mockSessionCookie = `mock_session:${email}`;
-    const response = NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true, registered });
     response.cookies.set(SESSION_COOKIE_NAME, mockSessionCookie, {
       httpOnly: true,
       secure: false,

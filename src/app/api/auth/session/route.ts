@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import {
-  getAllowedDevEmails,
-  getDefaultPodcastId,
-} from "@/server/env";
+import { getAllowedDevEmails } from "@/server/env";
 import { getAdminAuth } from "@/server/firebase-admin";
+import { SELECTED_PODCAST_COOKIE_NAME } from "@/server/podcasts/selection";
 
 const requestSchema = z.object({
   idToken: z.string().min(1),
@@ -25,47 +23,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const podcastId = getDefaultPodcastId();
-    const client = await (await getDbPool()).connect();
-    try {
-      await client.query("BEGIN");
-      const existingUser = await client.query<{ user_id: string }>(
-        "SELECT user_id FROM users WHERE email = $1",
-        [email],
-      );
-      const appUserId = existingUser.rows[0]?.user_id ?? decoded.uid;
-      if (existingUser.rowCount) {
-        await client.query(
-          "UPDATE users SET display_name = $2 WHERE user_id = $1",
-          [appUserId, decoded.name ?? null],
-        );
-      } else {
-        await client.query(
-          `INSERT INTO users (user_id, email, display_name)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id)
-           DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name`,
-          [appUserId, email, decoded.name ?? null],
-        );
-      }
-      await client.query(
-        `INSERT INTO podcast_ownerships (podcast_id, user_id, role)
-         VALUES ($1, $2, 'owner')
-         ON CONFLICT (podcast_id, user_id) DO NOTHING`,
-        [podcastId, appUserId],
-      );
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    // ユーザ登録は /register からの明示的な操作でのみ行う（暗黙の自動登録はしない）
+    const existingUser = await (await getDbPool()).query(
+      "SELECT 1 FROM users WHERE email = $1",
+      [email],
+    );
+    const registered = (existingUser.rowCount ?? 0) > 0;
 
     const sessionCookie = await getAdminAuth().createSessionCookie(idToken, {
       expiresIn: SESSION_DURATION_MS,
     });
-    const response = NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true, registered });
     response.cookies.set(SESSION_COOKIE_NAME, sessionCookie, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -90,6 +58,13 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  response.cookies.set(SELECTED_PODCAST_COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

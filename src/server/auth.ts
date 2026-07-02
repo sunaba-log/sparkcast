@@ -12,7 +12,12 @@ export type SessionUser = {
   uid: string;
   email: string;
   displayName: string | null;
+  registered: boolean;
 };
+
+export function mockUidForEmail(email: string): string {
+  return "dev_mock_" + email.replace(/[^a-zA-Z0-9]/g, "_");
+}
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
@@ -29,11 +34,12 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         user_id: string;
         display_name: string | null;
       }>("SELECT user_id, display_name FROM users WHERE email = $1", [email]);
-      if (user.rows.length === 0) return null;
+      const row = user.rows[0];
       return {
-        uid: user.rows[0].user_id,
+        uid: row?.user_id ?? mockUidForEmail(email),
         email,
-        displayName: user.rows[0].display_name ?? "Dev Mock User",
+        displayName: row?.display_name ?? "Dev Mock User",
+        registered: user.rows.length > 0,
       };
     } catch {
       return null;
@@ -44,14 +50,18 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const token = await getAdminAuth().verifySessionCookie(sessionCookie, true);
     if (!token.email) return null;
     const email = token.email.toLowerCase();
-    const user = await (await getDbPool()).query<{ user_id: string }>(
-      "SELECT user_id FROM users WHERE email = $1",
-      [email],
-    );
+    const user = await (await getDbPool()).query<{
+      user_id: string;
+      display_name: string | null;
+    }>("SELECT user_id, display_name FROM users WHERE email = $1", [email]);
+    const row = user.rows[0];
     return {
-      uid: user.rows[0]?.user_id ?? token.uid,
+      uid: row?.user_id ?? token.uid,
       email,
-      displayName: typeof token.name === "string" ? token.name : null,
+      displayName:
+        row?.display_name ??
+        (typeof token.name === "string" ? token.name : null),
+      registered: user.rows.length > 0,
     };
   } catch {
     return null;
@@ -61,6 +71,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 export async function requireSessionUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+// 未登録ユーザは /register で明示的に登録してから利用する
+export async function requireRegisteredUser(): Promise<SessionUser> {
+  const user = await requireSessionUser();
+  if (!user.registered) redirect("/register");
   return user;
 }
 

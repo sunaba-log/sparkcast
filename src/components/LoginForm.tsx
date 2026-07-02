@@ -42,11 +42,14 @@ export function LoginForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
     });
-    const result = (await response.json()) as { error?: string };
+    const result = (await response.json()) as {
+      error?: string;
+      registered?: boolean;
+    };
     if (!response.ok) {
       throw new Error(result.error ?? "ログインに失敗しました");
     }
-    router.push("/");
+    router.push(result.registered ? "/" : "/register");
     router.refresh();
   }, [router]);
 
@@ -112,11 +115,14 @@ export function LoginForm() {
       const response = await fetch("/api/auth/mock-session", {
         method: "POST",
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        registered?: boolean;
+      };
       if (!response.ok) {
         throw new Error(result.error ?? "モックログインに失敗しました");
       }
-      router.push("/");
+      router.push(result.registered ? "/" : "/register");
       router.refresh();
     } catch (caught) {
       setError(

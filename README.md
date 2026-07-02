@@ -5,7 +5,8 @@ Podcaster's DevLogのdev環境向け管理Webアプリです。Next.jsのUIとWe
 
 ## 機能
 
-- Firebase AuthenticationによるGoogleログイン
+- Firebase AuthenticationによるGoogleログインとユーザ登録
+- チャンネル（Podcast）の作成・一覧・切り替え
 - Cloud SQLのPodcast所有権確認
 - エピソード作成とGCS V4署名付きURL発行
 - ブラウザからGCSへの音声ファイル直接アップロード
@@ -41,9 +42,12 @@ npm run dev
 
 ## 認証
 
-`DEV_ALLOWED_EMAILS`に指定されたユーザーだけがログインできます。初回ログイン時に
-ユーザーをCloud SQLへ登録し、`DEFAULT_PODCAST_ID`のowner権限を付与します。
-この自動付与は単一Podcastのdev環境専用です。
+`DEV_ALLOWED_EMAILS`に指定されたユーザーだけがログインできます。初回ログイン後は
+`/register`で表示名を確認してユーザ登録します（暗黙の自動登録・owner自動付与は行いません）。
+
+登録後は`/channels`でチャンネル（Podcast）を作成・一覧・切り替えできます。作成者には
+owner権限が付与され、選択中チャンネルはCookie（`selected_podcast_id`）に保持されます。
+各画面・APIは選択中チャンネルを対象に動作します。
 
 ### ローカル開発時のモック認証
 
@@ -51,7 +55,7 @@ npm run dev
 
 1. `.env.local` に `NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH="true"` を設定します。
 2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
-3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）で自動的にデータベース登録および所有権付与が行われ、Firebase認証なしで即座にログインできます。
+3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）でFirebase認証なしで即座にログインできます。未登録の場合は通常のログインと同様に`/register`からユーザ登録します。
 
 VercelなどGoogle Cloud外で動かす場合、`FIREBASE_SERVICE_ACCOUNT_JSON`へ
 Firestore、Firebase Auth、GCS署名に使用するサービスアカウントJSONを設定します。

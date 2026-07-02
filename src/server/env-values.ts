@@ -108,14 +108,6 @@ export function isLocalMockAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 }
 
-export function getDefaultPodcastId(): number {
-  const value = Number(process.env.DEFAULT_PODCAST_ID ?? "1");
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error("DEFAULT_PODCAST_ID must be a positive integer");
-  }
-  return value;
-}
-
 export function getUploadBucket(): string {
   return required("GCS_UPLOAD_BUCKET");
 }
