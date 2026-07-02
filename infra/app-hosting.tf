@@ -76,7 +76,7 @@ resource "google_firebase_app_hosting_backend" "podcast_ui" {
   service_account  = google_service_account.app.email
 
   codebase {
-    repository     = google_developer_connect_git_repository_link.default.id
+    repository     = google_developer_connect_git_repository_link.podcast_ui.id
     root_directory = "/"
   }
 
