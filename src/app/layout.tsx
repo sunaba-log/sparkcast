@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
@@ -9,7 +10,7 @@ import { getSelectedPodcastId } from "@/server/podcasts/selection";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Podcast Automater",
+  title: "SparkCast",
   description: "ポッドキャスト自動化管理ツール",
 };
 
@@ -27,9 +28,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-app-bg text-gray-900 antialiased h-full flex flex-col font-sans">
         <header className="border-b border-brand/30 shrink-0 z-20">
           <div className="w-full px-5 h-14 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-1.5 text-xl font-bold tracking-tight text-brand hover:opacity-90 transition-opacity">
-              <span>SparkCast</span>
-              <span className="text-xs font-normal text-brand bg-brand-light px-2 py-0.5 rounded-full border border-brand/30">for everyone</span>
+            <Link href="/" className="flex items-center hover:opacity-90 transition-opacity shrink-0">
+              <Image
+                src="/sparkcast_logo.svg"
+                alt="SparkCast"
+                width={168}
+                height={32}
+                priority
+                unoptimized
+                className="hidden sm:block h-6 w-auto"
+              />
+              <Image
+                src="/sparkcast_logo_small.svg"
+                alt="SparkCast"
+                width={29}
+                height={32}
+                priority
+                unoptimized
+                className="block sm:hidden h-6 w-auto"
+              />
             </Link>
             {user && (
               <div className="flex items-center gap-3">
