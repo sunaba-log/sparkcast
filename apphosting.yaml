@@ -1,0 +1,64 @@
+# Firebase App Hosting の設定（dev backend / live branch: develop）。
+# 環境変数を追加・変更したら docs/runbooks/environment-variables.md も更新する。
+# FIREBASE_SERVICE_ACCOUNT_JSON は使わない（App Hosting 上は ADC で認証する）。
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+
+env:
+  # サーバー実行時設定（Cloud SQL / GCS / cron）
+  - variable: GOOGLE_CLOUD_PROJECT
+    value: sunabalog-dev
+    availability:
+      - RUNTIME
+  - variable: CLOUD_SQL_INSTANCE_CONNECTION_NAME
+    value: sunabalog-dev:asia-northeast1:podcast
+    availability:
+      - RUNTIME
+  - variable: DB_NAME
+    value: podcast
+    availability:
+      - RUNTIME
+  - variable: DB_USER
+    value: podcast
+    availability:
+      - RUNTIME
+  - variable: DB_PASSWORD
+    secret: DB_PASSWORD
+    availability:
+      - RUNTIME
+  - variable: GCS_UPLOAD_BUCKET
+    value: podcast-automator-audio-input-dev
+    availability:
+      - RUNTIME
+  - variable: GCS_SIGNED_URL_TTL_SECONDS
+    value: "900"
+    availability:
+      - RUNTIME
+  - variable: CRON_SECRET
+    secret: CRON_SECRET
+    availability:
+      - RUNTIME
+
+  # Firebase Web SDK（クライアント公開設定。ビルド時にバンドルへ埋め込まれる）
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: sunabalog-dev.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: sunabalog-dev
+    availability:
+      - BUILD
+      - RUNTIME
+  # next.config.ts の /__/auth/* rewrite が参照する
+  - variable: FIREBASE_AUTH_HELPER_DOMAIN
+    value: sunabalog-dev.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
