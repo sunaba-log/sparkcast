@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
-import { getSessionUser, requirePodcastAccess } from "@/server/auth";
-import { getDefaultPodcastId } from "@/server/env";
+import { getSessionUser } from "@/server/auth";
+import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import { streamChatReply } from "@/server/chat/chat-service";
 
 export const runtime = "nodejs";
@@ -22,8 +22,7 @@ const chatSchema = z.object({
 async function authorize() {
   const user = await getSessionUser();
   if (!user) return null;
-  const podcastId = getDefaultPodcastId();
-  await requirePodcastAccess(user.uid, podcastId);
+  const podcastId = await requireSelectedPodcastForApi(user);
   return { user, podcastId };
 }
 
@@ -63,6 +62,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
       return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
+    }
+    if (error instanceof Error && error.message === "NO_PODCAST_SELECTED") {
+      return NextResponse.json(
+        { error: "チャンネルが選択されていません" },
+        { status: 400 },
+      );
     }
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });

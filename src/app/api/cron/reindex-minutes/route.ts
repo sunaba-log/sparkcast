@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCronSecret, getDefaultPodcastId } from "@/server/env";
+import { getCronSecret } from "@/server/env";
 import { reindexPodcastMinutes } from "@/server/chat/reindex";
+import { listAllPodcastIds } from "@/server/podcasts/data-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,10 @@ export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${getCronSecret()}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await reindexPodcastMinutes(getDefaultPodcastId());
-  return NextResponse.json(result);
+  const podcastIds = await listAllPodcastIds();
+  const results = [];
+  for (const podcastId of podcastIds) {
+    results.push({ podcastId, ...(await reindexPodcastMinutes(podcastId)) });
+  }
+  return NextResponse.json({ results });
 }

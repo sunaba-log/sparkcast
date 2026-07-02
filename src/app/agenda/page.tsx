@@ -1,15 +1,14 @@
 import { TopicProposalEditor } from "@/components/TopicProposalEditor";
-import { requirePodcastAccess, requireSessionUser } from "@/server/auth";
-import { getDefaultPodcastId } from "@/server/env";
+import { requireRegisteredUser } from "@/server/auth";
+import { requireSelectedPodcast } from "@/server/podcasts/selection";
 import { listTopicProposals } from "@/server/topic-proposals/repository";
 import type { TopicProposal } from "@/types/episode";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgendaPage() {
-  const user = await requireSessionUser();
-  const podcastId = getDefaultPodcastId();
-  await requirePodcastAccess(user.uid, podcastId);
+  const user = await requireRegisteredUser();
+  const podcastId = await requireSelectedPodcast(user);
   const proposals = await listTopicProposals(podcastId);
 
   const fallbackProposal: TopicProposal = {

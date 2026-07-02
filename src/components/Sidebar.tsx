@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "エピソード", icon: Radio },
   { href: "/sns", label: "SNS投稿", icon: Share2 },
   { href: "/agenda", label: "次回議題", icon: Lightbulb },
+  { href: "/channels", label: "チャンネル", icon: Podcast },
   { href: "/settings", label: "番組設定", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -23,9 +24,13 @@ export function Sidebar() {
     >
       <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20">
         {!collapsed && (
-          <span className="font-bold text-gray-900 text-base tracking-tight truncate">
-            sunabalog
-          </span>
+          <Link
+            href="/channels"
+            title="チャンネルを切り替え"
+            className="font-bold text-gray-900 text-base tracking-tight truncate hover:text-brand transition-colors"
+          >
+            {channelTitle ?? "チャンネル未選択"}
+          </Link>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}

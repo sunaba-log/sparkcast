@@ -3,11 +3,8 @@ import Link from "next/link";
 import { getEpisodeById } from "@/lib/episodes";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EpisodeEditor } from "@/components/EpisodeEditor";
-import {
-  requirePodcastAccess,
-  requireSessionUser,
-} from "@/server/auth";
-import { getDefaultPodcastId } from "@/server/env";
+import { requireRegisteredUser } from "@/server/auth";
+import { requireSelectedPodcast } from "@/server/podcasts/selection";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +19,10 @@ function formatDate(dateStr: string) {
 }
 
 export default async function EpisodeDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireSessionUser();
-  await requirePodcastAccess(user.uid, getDefaultPodcastId());
+  const user = await requireRegisteredUser();
+  const podcastId = await requireSelectedPodcast(user);
   const { id } = await params;
-  const episode = await getEpisodeById(id);
+  const episode = await getEpisodeById(podcastId, id);
 
   if (!episode) {
     notFound();
