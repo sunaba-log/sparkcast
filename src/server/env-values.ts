@@ -98,10 +98,16 @@ export function getGoogleServiceAccountCredentials():
 }
 
 export function getAllowedDevEmails(): string[] {
-  return required("DEV_ALLOWED_EMAILS")
+  return (process.env.DEV_ALLOWED_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+}
+
+// 許可リストが未設定・空の場合は全アカウントを許可する
+export function isEmailAllowed(email: string): boolean {
+  const allowedEmails = getAllowedDevEmails();
+  return allowedEmails.length === 0 || allowedEmails.includes(email);
 }
 
 export function isLocalMockAuthEnabled(): boolean {

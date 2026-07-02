@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import { getAllowedDevEmails } from "@/server/env";
+import { isEmailAllowed } from "@/server/env";
 import { getAdminAuth } from "@/server/firebase-admin";
 import { SELECTED_PODCAST_COOKIE_NAME } from "@/server/podcasts/selection";
 
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { idToken } = requestSchema.parse(await request.json());
     const decoded = await getAdminAuth().verifyIdToken(idToken);
     const email = decoded.email?.toLowerCase();
-    if (!email || !getAllowedDevEmails().includes(email)) {
+    if (!email || !isEmailAllowed(email)) {
       return NextResponse.json(
         { error: "このdev環境へのアクセスは許可されていません" },
         { status: 403 },
