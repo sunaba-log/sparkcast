@@ -36,7 +36,7 @@ export async function requireSelectedPodcast(
 ): Promise<number> {
   const podcastId = await getSelectedPodcastId();
   if (!podcastId || !(await hasPodcastAccess(user.uid, podcastId))) {
-    redirect("/channels");
+    redirect("/");
   }
   return podcastId;
 }

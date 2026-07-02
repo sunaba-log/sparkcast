@@ -5,17 +5,24 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast } from "lucide-react";
 
-const NAV_ITEMS = [
-  { href: "/", label: "エピソード", icon: Radio },
-  { href: "/sns", label: "SNS投稿", icon: Share2 },
-  { href: "/agenda", label: "次回議題", icon: Lightbulb },
-  { href: "/channels", label: "チャンネル", icon: Podcast },
-  { href: "/settings", label: "番組設定", icon: Settings },
-];
-
 export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+
+  const isChannelPage = pathname === "/";
+  const hasChannel = channelTitle !== null;
+
+  const navItems = (isChannelPage || !hasChannel)
+    ? [
+      { href: "/", label: "チャンネル", icon: Podcast },
+      { href: "/settings", label: "ユーザ設定", icon: Settings },
+    ]
+    : [
+      { href: "/episodes", label: "エピソード", icon: Radio },
+      { href: "/sns", label: "SNS投稿", icon: Share2 },
+      { href: "/agenda", label: "次回議題", icon: Lightbulb },
+      { href: "/settings", label: "番組設定", icon: Settings },
+    ];
 
   return (
     <aside
@@ -25,9 +32,9 @@ export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
       <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20">
         {!collapsed && (
           <Link
-            href="/channels"
+            href="/"
             title="チャンネルを切り替え"
-            className="font-bold text-gray-900 text-base tracking-tight truncate hover:text-brand transition-colors"
+            className="font-semibold text-gray-900 text-sm tracking-tight truncate hover:text-brand transition-colors"
           >
             {channelTitle ?? "チャンネル未選択"}
           </Link>
@@ -46,12 +53,14 @@ export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
       </div>
 
       <nav className="p-3 space-y-1.5 flex-1">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
             item.href === "/"
-              ? pathname === "/" || pathname.startsWith("/episodes")
-              : pathname.startsWith(item.href);
+              ? pathname === "/"
+              : item.href === "/episodes"
+                ? pathname === "/episodes" || pathname.startsWith("/episodes")
+                : pathname.startsWith(item.href);
 
           return (
             <Link

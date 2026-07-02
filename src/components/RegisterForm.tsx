@@ -29,7 +29,7 @@ export function RegisterForm({
       if (!response.ok) {
         throw new Error(result.error ?? "ユーザ登録に失敗しました");
       }
-      router.push("/channels");
+      router.push("/");
       router.refresh();
     } catch (caught) {
       setError(

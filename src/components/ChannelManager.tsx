@@ -37,7 +37,7 @@ export function ChannelManager({
       if (!response.ok) {
         throw new Error(result.error ?? "チャンネルの切り替えに失敗しました");
       }
-      router.push("/");
+      router.push("/episodes");
       router.refresh();
     } catch (caught) {
       setError(
@@ -66,7 +66,7 @@ export function ChannelManager({
       if (!response.ok) {
         throw new Error(result.error ?? "チャンネルの作成に失敗しました");
       }
-      router.push("/");
+      router.push("/episodes");
       router.refresh();
     } catch (caught) {
       setError(
