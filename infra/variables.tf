@@ -26,8 +26,13 @@ variable "upload_bucket" {
   description = "音声アップロード用 GCS バケット（署名付きURLのPUT先）"
 }
 
-variable "app_hosting_url" {
+variable "app_hosting_location" {
   type        = string
-  description = "Firebase App Hosting backend のURL（例: https://podcast-ui--sunabalog-dev.<region>.hosted.app）。未設定の間は Cloud Scheduler ジョブを作成しない"
-  default     = ""
+  description = "Firebase App Hosting backend / Developer Connect のリージョン"
+  default     = "asia-east1"
+}
+
+variable "firebase_web_app_id" {
+  type        = string
+  description = "backend に関連付ける Firebase ウェブアプリの appId（podcast-ui-dev）"
 }

@@ -9,9 +9,10 @@ resource "google_project_service" "cloudscheduler" {
 }
 
 # アプリ側の検証と同じ Bearer トークンを Scheduler のヘッダに設定する。
+# 値のバージョンは gcloud で投入しておくこと（app-hosting.tf のコメント参照）。
 data "google_secret_manager_secret_version" "cron_secret" {
   project = var.project_id
-  secret  = "CRON_SECRET"
+  secret  = google_secret_manager_secret.app["CRON_SECRET"].secret_id
 }
 
 locals {
@@ -27,11 +28,13 @@ locals {
       description = "議事録RAGの埋め込みインデックスを全チャンネル分更新する"
     }
   }
+
+  # backend の uri はスキーム無しのホスト名で返るため補完する。
+  app_hosting_base_url = "https://${trimprefix(google_firebase_app_hosting_backend.podcast_ui.uri, "https://")}"
 }
 
 resource "google_cloud_scheduler_job" "cron" {
-  # backend 作成前は app_hosting_url が未設定のため、設定後に作成される。
-  for_each = var.app_hosting_url == "" ? {} : local.cron_jobs
+  for_each = local.cron_jobs
 
   project     = var.project_id
   region      = var.region
@@ -42,7 +45,7 @@ resource "google_cloud_scheduler_job" "cron" {
 
   http_target {
     http_method = "GET"
-    uri         = "${var.app_hosting_url}${each.value.path}"
+    uri         = "${local.app_hosting_base_url}${each.value.path}"
     headers = {
       Authorization = "Bearer ${data.google_secret_manager_secret_version.cron_secret.secret_data}"
     }

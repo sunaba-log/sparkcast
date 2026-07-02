@@ -33,9 +33,13 @@ CDN 統合を自作する必要がある。本アプリは Next.js 単体で、F
 
 - 環境変数は `apphosting.yaml`（公開値）と Secret Manager（`DB_PASSWORD` / `CRON_SECRET`）で
   管理する。`NEXT_PUBLIC_*` はビルド時埋め込みのため `availability: BUILD` が必要。
-- ランタイム SA は App Hosting が自動作成する `firebase-app-hosting-compute@…`。
-  必要な IAM binding は `infra/app-hosting.tf` で管理する。既存のアプリ用 SA
+- backend・GitHub 連携（Developer Connect）・ランタイム SA
+  （`firebase-app-hosting-compute@…`）・IAM・Cloud Scheduler は Terraform
+  （`infra/`）で管理する。Terraform 化できないのは GitHub App の初回認可・
+  シークレット値の投入・apply の認証のみ。既存のアプリ用 SA
   （`podcast-ui-dev@…`）は GCP 外実行（ローカル等）用に残す。
+- App Hosting は東京（asia-northeast1）未対応のため `asia-east1`（台湾）を使う。
+  Cloud SQL（東京）とはリージョンをまたぐが、dev 用途では許容する。
 - 鍵なし（ADC）での GCS V4 署名付き URL 発行には、ランタイム SA 自身への
   `roles/iam.serviceAccountTokenCreator`（signBlob）が必要。
 - Vercel の PR プレビュー環境は失われる。動作確認はローカルまたは dev 環境
