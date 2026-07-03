@@ -1,4 +1,4 @@
-# vercel.json の crons から移行した定期実行ジョブ（宛先は Cloud Run）。
+# 定期実行ジョブ（宛先は Cloud Run のアプリ）。
 resource "google_project_service" "cloudscheduler" {
   project            = var.project_id
   service            = "cloudscheduler.googleapis.com"
