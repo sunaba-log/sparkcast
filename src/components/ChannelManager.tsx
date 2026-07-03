@@ -327,9 +327,11 @@ export function ChannelManager({
                         <span className="font-semibold text-sm text-gray-900 truncate">
                           {podcast.title}
                         </span>
-                        <span className="text-[10px] text-gray-600 border border-gray-300 rounded-full px-2 py-0.5 shrink-0">
-                          {ROLE_LABELS[podcast.role]}
-                        </span>
+                        {podcast.role !== "owner" && (
+                          <span className="text-[10px] text-gray-600 border border-gray-300 rounded-full px-2 py-0.5 shrink-0">
+                            {ROLE_LABELS[podcast.role]}
+                          </span>
+                        )}
                         {isSelected && (
                           <span className="text-[10px] font-semibold text-brand border border-brand rounded-full px-2 py-0.5 shrink-0 flex items-center gap-1">
                             <Check className="w-3 h-3" /> 選択中
