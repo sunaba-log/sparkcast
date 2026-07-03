@@ -8,3 +8,4 @@ cloud_sql_instance_connection_name = "sunabalog-prod:asia-northeast1:podcast-aut
 # 本番の DB パスワードは automator と共有の既存シークレットを参照する
 db_password_secret_id = "podcast-automator-database-password-prod"
 cron_secret_id        = "cron-secret"
+custom_domain         = "sparkcast.sunabalog.com"
