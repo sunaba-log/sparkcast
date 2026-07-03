@@ -30,5 +30,8 @@ export function getFirebaseAuth() {
 }
 
 export function getGoogleAuthProvider() {
-  return new GoogleAuthProvider();
+  const provider = new GoogleAuthProvider();
+  // 常にアカウント選択を表示し、別アカウントでの登録・切り替えを可能にする
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
 }
