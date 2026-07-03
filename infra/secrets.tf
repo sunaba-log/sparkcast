@@ -6,18 +6,26 @@ resource "google_project_service" "secretmanager" {
   disable_on_destroy = false
 }
 
-data "google_secret_manager_secret" "app" {
-  for_each = toset(["db-password", "cron-secret", "firebase-api-key"])
-
+# Cloud Run が実行時に参照するシークレット（DB パスワードと cron トークン）。
+# NEXT_PUBLIC_FIREBASE_API_KEY はビルド時にワークフローで埋め込むためここには含めない。
+data "google_secret_manager_secret" "db_password" {
   project   = var.project_id
-  secret_id = each.value
+  secret_id = var.db_password_secret_id
+}
+
+data "google_secret_manager_secret" "cron_secret" {
+  project   = var.project_id
+  secret_id = var.cron_secret_id
 }
 
 resource "google_secret_manager_secret_iam_member" "app_secrets" {
-  for_each = data.google_secret_manager_secret.app
+  for_each = {
+    db_password = data.google_secret_manager_secret.db_password.secret_id
+    cron_secret = data.google_secret_manager_secret.cron_secret.secret_id
+  }
 
   project   = var.project_id
-  secret_id = each.value.secret_id
+  secret_id = each.value
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.app.email}"
 }

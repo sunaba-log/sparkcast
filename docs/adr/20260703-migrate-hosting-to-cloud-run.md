@@ -28,6 +28,15 @@ Vercel からの移行先として一度 Firebase App Hosting を選定し backe
 - サービス定義・Artifact Registry・WIF・Scheduler は Terraform（`infra/`）で管理。
   Cloud Run の image はデプロイ主体が Actions のため `ignore_changes` とする
 
+## マルチ環境（#35）
+
+- dev / prod をプロジェクト単位で分離（`sunabalog-dev` / `sunabalog-prod`）。
+  Terraform は `environments/<env>/{backend.conf,variables.tfvars}` で切り替え、
+  state バケットも環境ごとに分ける（`make terraform-{plan,apply} ENVIRONMENT=<env>`）。
+- デプロイ: dev=`develop` push、prod=`main` push、PR プレビュー=develop 宛 PR。
+- Cloud Run の image / revision / traffic は Actions が管理するため terraform は
+  `ignore_changes` とし、初期作成のみ担う。
+
 ## 帰結・制約
 
 - PR プレビューはタグ付きリビジョン方式のため、**DB 等のバックエンドは dev 環境と共有**

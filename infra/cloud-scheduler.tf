@@ -8,7 +8,7 @@ resource "google_project_service" "cloudscheduler" {
 # アプリ側の検証と同じ Bearer トークンを Scheduler のヘッダに設定する。
 data "google_secret_manager_secret_version" "cron_secret" {
   project = var.project_id
-  secret  = data.google_secret_manager_secret.app["cron-secret"].secret_id
+  secret  = data.google_secret_manager_secret.cron_secret.secret_id
 }
 
 locals {

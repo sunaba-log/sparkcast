@@ -1,44 +1,47 @@
 # infra (Terraform)
 
-podcast-ui が利用する GCP リソースを Terraform で管理する。state は共有の GCS
-バケット `sunabalog-tfstate-dev`（prefix `podcast-ui/infra`）でリモート管理する。
+podcast-ui が利用する GCP リソースを Terraform で管理する。**環境（dev / prod）は
+プロジェクト単位で分離**し、それぞれ別の state バケットでリモート管理する
+（dev=`sunabalog-tfstate-dev` / prod=`sunabalog-tfstate-prod`、prefix `podcast-ui/infra`）。
+環境固有の値は `environments/<env>/{backend.conf,variables.tfvars}` に置く。
 
 ## 管理対象（現在のスコープ）
 
 サービス単位で podcast-ui 固有のリソース（アプリの identity と権限）を管理する。
-将来 CD から `terraform apply` するだけで再現・収束できる状態にする。
+CD から `terraform apply` するだけで再現・収束できる状態にする。
 
-- アプリ実行用 SA `google_service_account.app`（`podcast-ui-dev@…`、GCP 外実行用に残置）
+- アプリ実行用 SA `google_service_account.app`（`podcast-ui-<env>@…`）
 - アプリ SA のプロジェクトロール `google_project_iam_member.app`
   - `roles/cloudsql.client` / `roles/datastore.user` / `roles/firebaseauth.admin` / `roles/aiplatform.user`
 - アプリ SA のアップロードバケット権限 `google_storage_bucket_iam_member.app_upload_object_creator`
   （`roles/storage.objectCreator`、binding のみ管理）
-- Cloud Run サービス `podcast-ui-dev`（`cloud-run.tf`。env / Secret Manager 参照 /
-  公開アクセス。イメージのデプロイは GitHub Actions が行うため `ignore_changes`）
+- Cloud Run サービス `podcast-ui-<env>`（`cloud-run.tf`。env / Secret Manager 参照 /
+  公開アクセス。イメージ・リビジョン・トラフィックのデプロイは GitHub Actions が
+  行うため `ignore_changes`）
 - Artifact Registry リポジトリ `podcast-ui`（`cloud-run.tf`）
 - GitHub Actions 用の Workload Identity Federation + デプロイ用 SA
   `podcast-ui-deployer@…`（`github-actions.tf`）
-- 既存シークレット `db-password` / `cron-secret` / `firebase-api-key` への
-  アクセス権付与（`secrets.tf`。シークレット本体・値は所有しない）
-- Cloud Scheduler の cron ジョブ（`cloud-scheduler.tf`。旧 vercel.json の移行、宛先は Cloud Run）
-- `aiplatform.googleapis.com` ほか各 API の有効化
+- 実行時シークレット（DB パスワード / cron トークン）への
+  アクセス権付与（`secrets.tf`。シークレット本体・値は所有しない。secret_id は
+  `db_password_secret_id` / `cron_secret_id` で環境ごとに指定）
+- Cloud Scheduler の cron ジョブ（`cloud-scheduler.tf`。宛先は Cloud Run）
+- `aiplatform.googleapis.com` ほか各 API の有効化 / ドメイン制限共有の解除（org policy）
 - 議事録 RAG 用 Firestore ベクトルインデックス（`minutes_index` / 768次元 / COSINE）
-- [残置] App Hosting 検討時・並行作業由来のリソース（`app-hosting.tf` /
-  `developer-connect.tf`。作業者と確認のうえ別途整理）
 
 プロジェクト全体で共有する基盤リソース（Cloud SQL インスタンス本体・GCS バケット本体・
 Firestore データベース等）はここでは所有しない（共有のため dev-platform 側での管理を想定）。
-SA 鍵（`FIREBASE_SERVICE_ACCOUNT_JSON`）とシークレットの値は秘匿情報のため Terraform では管理しない。
+SA 鍵とシークレットの値は秘匿情報のため Terraform では管理しない。
 
 ## 使い方
 
 リポジトリルートの `make` から実行する。terraform は Docker コンテナ
-（`infra/Dockerfile`）上で動く。
+（`infra/Dockerfile`）上で動く。**`ENVIRONMENT`（dev / prod、既定 dev）で対象環境を
+切り替える**（backend と変数ファイルが切り替わる）。
 
 ```bash
-make terraform-plan
-make terraform-apply
-make terraform-validate  # fmt チェック + validate
+make terraform-plan ENVIRONMENT=dev
+make terraform-apply ENVIRONMENT=prod
+make terraform-validate            # fmt チェック + validate
 ```
 
 認証は Application Default Credentials（`~/.config/gcloud` をコンテナへ
@@ -47,6 +50,15 @@ read-only マウント）を使う。未設定なら次を実行する。
 ```bash
 gcloud auth application-default login
 ```
+
+### prod の初回構築（手動の前提）
+
+apply 前に prod 側で次を用意する（値はチャットや docs に貼らない）。
+
+- Secret Manager: `cron-secret`（新規生成）。DB パスワードは既存の
+  `podcast-automator-database-password-prod` を参照するため作成不要
+- Firebase Auth の承認済みドメインへ prod の Cloud Run URL を追加
+- OAuth 同意画面の公開設定（外部 / 本番）を確認
 
 ### デプロイの仕組み
 
