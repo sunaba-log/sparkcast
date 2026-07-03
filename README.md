@@ -58,17 +58,23 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
 3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）でFirebase認証なしで即座にログインできます。未登録の場合は通常のログインと同様に`/register`からユーザ登録します。
 
-## デプロイ（Firebase App Hosting）
+## デプロイ（Cloud Run + GitHub Actions）
 
-dev環境はFirebase App Hostingでホスティングします（live branch: `develop`）。
-`develop`へのpushで自動的にビルド・デプロイされます。
+dev環境はCloud Run（`podcast-ui-dev` / asia-northeast1）でホスティングします。
 
-- 環境変数は`apphosting.yaml`で管理します（`DB_PASSWORD`と`CRON_SECRET`は
-  Secret Manager参照）。
+- `develop`へのpushでGitHub Actions（`.github/workflows/deploy-dev.yml`）が
+  イメージをビルドしデプロイします。
+- **PRを作成すると`pr-<番号>`のタグ付きリビジョンがデプロイされ、プレビューURLが
+  PRに自動コメントされます**（本番トラフィックには乗りません。DB等のバックエンドは
+  dev環境と共有な点に注意）。
+- 環境変数はCloud Runサービス定義（`infra/cloud-run.tf`）で管理します
+  （`DB_PASSWORD`と`CRON_SECRET`はSecret Manager参照、`NEXT_PUBLIC_*`は
+  ワークフローでビルド時に注入）。
 - GCPへの認証はランタイムSA + ADCで行うため、`FIREBASE_SERVICE_ACCOUNT_JSON`は
   不要です（ローカル等のGoogle Cloud外で動かす場合のみ設定します）。
-- ランタイムSAのIAMやCloud Schedulerのcronジョブは`infra/`のTerraformで管理します。
-- 設計判断は`docs/adr/20260702-migrate-hosting-to-firebase-app-hosting.md`を参照。
+- サービス定義・Artifact Registry・GitHub Actionsの認証（WIF）・Cloud Schedulerは
+  `infra/`のTerraformで管理します。
+- 設計判断は`docs/adr/20260703-migrate-hosting-to-cloud-run.md`を参照。
 
 ## GCS ID契約
 

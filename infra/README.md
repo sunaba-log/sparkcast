@@ -13,15 +13,18 @@ podcast-ui が利用する GCP リソースを Terraform で管理する。state
   - `roles/cloudsql.client` / `roles/datastore.user` / `roles/firebaseauth.admin` / `roles/aiplatform.user`
 - アプリ SA のアップロードバケット権限 `google_storage_bucket_iam_member.app_upload_object_creator`
   （`roles/storage.objectCreator`、binding のみ管理）
-- Firebase App Hosting（`app-hosting.tf`）
-  - backend `podcast-ui`（GitHub 連携 / develop ブランチ自動ロールアウト）と
-    ランタイム SA `firebase-app-hosting-compute@…` + IAM 一式
-  - 既存シークレット `db-password` / `cron-secret` / `firebase-api-key` への
-    アクセス権付与（シークレット本体・値は所有しない）
-- GitHub 連携（`developer-connect.tf`。初回のみ GitHub App の手動認可が必要）
-- Cloud Scheduler の cron ジョブ（`cloud-scheduler.tf`。旧 vercel.json の移行）
+- Cloud Run サービス `podcast-ui-dev`（`cloud-run.tf`。env / Secret Manager 参照 /
+  公開アクセス。イメージのデプロイは GitHub Actions が行うため `ignore_changes`）
+- Artifact Registry リポジトリ `podcast-ui`（`cloud-run.tf`）
+- GitHub Actions 用の Workload Identity Federation + デプロイ用 SA
+  `podcast-ui-deployer@…`（`github-actions.tf`）
+- 既存シークレット `db-password` / `cron-secret` / `firebase-api-key` への
+  アクセス権付与（`secrets.tf`。シークレット本体・値は所有しない）
+- Cloud Scheduler の cron ジョブ（`cloud-scheduler.tf`。旧 vercel.json の移行、宛先は Cloud Run）
 - `aiplatform.googleapis.com` ほか各 API の有効化
 - 議事録 RAG 用 Firestore ベクトルインデックス（`minutes_index` / 768次元 / COSINE）
+- [残置] App Hosting 検討時・並行作業由来のリソース（`app-hosting.tf` /
+  `developer-connect.tf`。作業者と確認のうえ別途整理）
 
 プロジェクト全体で共有する基盤リソース（Cloud SQL インスタンス本体・GCS バケット本体・
 Firestore データベース等）はここでは所有しない（共有のため dev-platform 側での管理を想定）。
@@ -45,28 +48,13 @@ read-only マウント）を使う。未設定なら次を実行する。
 gcloud auth application-default login
 ```
 
-### App Hosting の初回構築（2 段階 apply）
+### デプロイの仕組み
 
-GitHub App の認可は Terraform 外の手作業のため、初回のみ次の順で進める。
-シークレット（`db-password` / `cron-secret` / `firebase-api-key`）は既存の値を
-参照する（Terraform では所有しない）。backend が使えるのは
-**Firebase GitHub App 製の接続のみ**（`DEVELOPER_CONNECT` App 製は不可）。
-
-```bash
-# 1. GitHub connection を先行作成
-make terraform-init
-DEPLOY_COMMAND_EXTENSION='-target=google_developer_connect_connection.firebase_github' make terraform-apply
-
-# 2. 出力された URL をブラウザで開き、GitHub App を sunaba-log org に認可する
-make terraform-output
-
-# 3. 残り（repository link / backend / traffic / IAM / Scheduler）を apply
-make terraform-apply
-```
-
-App Hosting のリージョンは東京（asia-northeast1）未対応のため、最寄りの
-`asia-east1`（台湾）を使う（`app_hosting_location`）。Firebase Auth の
-承認済みドメインへの backend ドメイン追加は Console での手作業。
+アプリのビルド・デプロイは GitHub Actions（`.github/workflows/`）が行う。
+Terraform はサービス定義と CI 用の認証（WIF）だけを管理し、初回 apply では
+プレースホルダイメージで Cloud Run サービスを作成する（最初の develop push で
+実イメージに置き換わる）。Firebase Auth の承認済みドメインへの Cloud Run URL
+追加は Console での手作業。
 
 ## 変数
 

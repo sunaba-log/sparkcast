@@ -1,6 +1,6 @@
 ---
 date: 2026-07-02
-status: accepted
+status: superseded by 20260703-migrate-hosting-to-cloud-run.md
 issue: https://github.com/sunaba-log/podcast-ui/issues/29
 ---
 

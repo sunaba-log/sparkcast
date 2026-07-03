@@ -1,5 +1,4 @@
-# vercel.json の crons から移行した定期実行ジョブ。
-# 配信先はカスタムドメイン（DNS・ドメイン接続は別途管理）。
+# vercel.json の crons から移行した定期実行ジョブ（宛先は Cloud Run）。
 resource "google_project_service" "cloudscheduler" {
   project            = var.project_id
   service            = "cloudscheduler.googleapis.com"
@@ -13,7 +12,7 @@ data "google_secret_manager_secret_version" "cron_secret" {
 }
 
 locals {
-  app_base_url = "https://podcast-ui-dev.web.sunabalog.com"
+  app_base_url = google_cloud_run_v2_service.podcast_ui.uri
 }
 
 resource "google_cloud_scheduler_job" "cleanup_uploads" {

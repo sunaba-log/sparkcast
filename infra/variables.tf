@@ -28,11 +28,6 @@ variable "upload_bucket" {
 
 variable "app_hosting_location" {
   type        = string
-  description = "Firebase App Hosting backend / Developer Connect のリージョン"
+  description = "[残置] Developer Connect（旧 App Hosting 検討時）のリージョン"
   default     = "asia-east1"
-}
-
-variable "firebase_web_app_id" {
-  type        = string
-  description = "backend に関連付ける Firebase ウェブアプリの appId（podcast-ui-dev）"
 }
