@@ -57,7 +57,7 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
       }
       env {
         name  = "CLOUD_SQL_INSTANCE_CONNECTION_NAME"
-        value = "sunabalog-dev:asia-northeast1:podcast"
+        value = "sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
       }
       env {
         name  = "DB_NAME"
@@ -65,7 +65,7 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
       }
       env {
         name  = "DB_USER"
-        value = "podcast"
+        value = "podcast_app"
       }
       env {
         name = "DB_PASSWORD"
