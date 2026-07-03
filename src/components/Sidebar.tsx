@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast } from "lucide-react";
+import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check, Plus } from "lucide-react";
+import type { PodcastSummary } from "@/types/podcast";
 
 const NAV_ITEMS = [
   { href: "/", label: "エピソード", icon: Radio },
@@ -13,24 +14,57 @@ const NAV_ITEMS = [
   { href: "/settings", label: "番組設定", icon: Settings },
 ];
 
-export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
+export function Sidebar({
+  channelTitle,
+  podcasts,
+  selectedPodcastId,
+}: {
+  channelTitle: string | null;
+  podcasts: PodcastSummary[];
+  selectedPodcastId: number | null;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  async function switchChannel(podcastId: number) {
+    if (podcastId === selectedPodcastId) {
+      setSwitcherOpen(false);
+      return;
+    }
+    try {
+      setSwitching(true);
+      const response = await fetch("/api/podcasts/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ podcastId }),
+      });
+      if (!response.ok) return;
+      setSwitcherOpen(false);
+      router.refresh();
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   return (
     <aside
       className={`bg-app-bg border-r border-brand/20 transition-all duration-300 flex flex-col shrink-0 ${collapsed ? "w-16" : "w-56"
         }`}
     >
-      <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20 relative">
         {!collapsed && (
-          <Link
-            href="/channels"
+          <button
+            type="button"
+            onClick={() => setSwitcherOpen((open) => !open)}
             title="チャンネルを切り替え"
-            className="font-bold text-gray-900 text-base tracking-tight truncate hover:text-brand transition-colors"
+            className="flex items-center gap-1 min-w-0 font-bold text-gray-900 text-base tracking-tight hover:text-brand transition-colors"
           >
-            {channelTitle ?? "チャンネル未選択"}
-          </Link>
+            <span className="truncate">{channelTitle ?? "チャンネル未選択"}</span>
+            <ChevronDown className="w-4 h-4 shrink-0 text-brand" />
+          </button>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -43,6 +77,52 @@ export function Sidebar({ channelTitle }: { channelTitle: string | null }) {
             <ChevronsLeft className="w-4 h-4 text-brand" />
           )}
         </button>
+
+        {!collapsed && switcherOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setSwitcherOpen(false)}
+            />
+            <div className="absolute left-3 top-14 z-20 w-52 bg-app-bg border border-brand/30 rounded-xs shadow-lg py-1">
+              {podcasts.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-gray-500">
+                  チャンネルがありません
+                </p>
+              ) : (
+                <ul className="max-h-64 overflow-y-auto">
+                  {podcasts.map((podcast) => {
+                    const isSelected = podcast.id === selectedPodcastId;
+                    return (
+                      <li key={podcast.id}>
+                        <button
+                          type="button"
+                          onClick={() => switchChannel(podcast.id)}
+                          disabled={switching}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-brand-subtle/40 disabled:opacity-50 ${isSelected ? "text-brand font-semibold" : "text-gray-700"
+                            }`}
+                        >
+                          <Check
+                            className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-brand" : "text-transparent"
+                              }`}
+                          />
+                          <span className="truncate">{podcast.title}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <Link
+                href="/channels"
+                onClick={() => setSwitcherOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-brand border-t border-brand/20 hover:bg-brand-subtle/40"
+              >
+                <Plus className="w-3.5 h-3.5" /> チャンネルを管理
+              </Link>
+            </div>
+          </>
+        )}
       </div>
 
       <nav className="p-3 space-y-1.5 flex-1">

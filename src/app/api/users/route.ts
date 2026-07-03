@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser, SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import { SELECTED_PODCAST_COOKIE_NAME } from "@/server/podcasts/selection";
+import { ensureDefaultChannel } from "@/server/podcasts/data-repository";
+import {
+  SELECTED_PODCAST_COOKIE_NAME,
+  selectedPodcastCookieOptions,
+} from "@/server/podcasts/selection";
 
 const displayNameSchema = z.object({
   displayName: z.string().trim().min(1).max(100),
@@ -22,7 +26,18 @@ export async function POST(request: Request) {
        DO UPDATE SET display_name = EXCLUDED.display_name`,
       [user.uid, user.email, displayName],
     );
-    return NextResponse.json({ ok: true }, { status: 201 });
+    // 登録直後から使えるよう、チャンネルが無ければデフォルトを作成し選択する
+    const podcastId = await ensureDefaultChannel({
+      userId: user.uid,
+      title: `${displayName}のチャンネル`,
+    });
+    const response = NextResponse.json({ ok: true, podcastId }, { status: 201 });
+    response.cookies.set(
+      SELECTED_PODCAST_COOKIE_NAME,
+      String(podcastId),
+      selectedPodcastCookieOptions(),
+    );
+    return response;
   } catch (error) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
       return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });

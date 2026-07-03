@@ -29,7 +29,8 @@ export function RegisterForm({
       if (!response.ok) {
         throw new Error(result.error ?? "ユーザ登録に失敗しました");
       }
-      router.push("/channels");
+      // 登録時にデフォルトチャンネルが作成され選択済みのためトップへ
+      router.push("/");
       router.refresh();
     } catch (caught) {
       setError(

@@ -5,8 +5,9 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser, hasPodcastAccess } from "@/server/auth";
-import { getPodcast } from "@/server/podcasts/data-repository";
+import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
 import { getSelectedPodcastId } from "@/server/podcasts/selection";
+import type { PodcastSummary } from "@/types/podcast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,9 +18,13 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   let channelTitle: string | null = null;
+  let podcasts: PodcastSummary[] = [];
+  let selectedPodcastId: number | null = null;
   if (user?.registered) {
+    podcasts = await listPodcastsForUser(user.uid);
     const podcastId = await getSelectedPodcastId();
     if (podcastId && (await hasPodcastAccess(user.uid, podcastId))) {
+      selectedPodcastId = podcastId;
       channelTitle = (await getPodcast(podcastId))?.title ?? null;
     }
   }
@@ -72,7 +77,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         <div className="flex-1 flex overflow-hidden min-h-0">
-          {user && <Sidebar channelTitle={channelTitle} />}
+          {user && (
+            <Sidebar
+              channelTitle={channelTitle}
+              podcasts={podcasts}
+              selectedPodcastId={selectedPodcastId}
+            />
+          )}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>
         </div>
       </body>
