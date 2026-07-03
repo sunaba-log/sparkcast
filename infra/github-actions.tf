@@ -41,6 +41,7 @@ locals {
   deployer_project_roles = [
     "roles/run.developer",           # Cloud Run へのデプロイ・トラフィック更新
     "roles/artifactregistry.writer", # イメージの push
+    "roles/cloudsql.client",         # デプロイ前のマイグレーション実行（Cloud SQL 接続）
   ]
 }
 
@@ -52,11 +53,19 @@ resource "google_project_iam_member" "deployer" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# デプロイ時にランタイム SA（podcast-ui-dev）を割り当てるための権限。
+# デプロイ時にランタイム SA（podcast-ui-<env>）を割り当てるための権限。
 resource "google_service_account_iam_member" "deployer_act_as_app" {
   service_account_id = google_service_account.app.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+
+# マイグレーション実行時に DB パスワードを読むための権限。
+resource "google_secret_manager_secret_iam_member" "deployer_db_password" {
+  project   = var.project_id
+  secret_id = data.google_secret_manager_secret.db_password.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.deployer.email}"
 }
 
 output "workload_identity_provider" {

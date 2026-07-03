@@ -2,11 +2,8 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  hasPodcastAccess,
-  requirePodcastAccess,
-  type SessionUser,
-} from "@/server/auth";
+import { hasPodcastAccess, type SessionUser } from "@/server/auth";
+import { getUserDefaultPodcastId } from "@/server/podcasts/data-repository";
 
 export const SELECTED_PODCAST_COOKIE_NAME = "selected_podcast_id";
 
@@ -30,23 +27,39 @@ export async function getSelectedPodcastId(): Promise<number | null> {
   return value;
 }
 
-// ページ用。未選択・アクセス権なしはチャンネル一覧へ誘導する
+// 選択 Cookie が有効ならそれを、無効ならデフォルトチャンネルを、それも無ければ
+// null を返す。Server Component からは Cookie を書き換えられないため、
+// フォールバック時は Cookie を更新せず既定値を返すだけにする（明示切替は API 経由）。
+async function resolveEffectivePodcastId(
+  user: SessionUser,
+): Promise<number | null> {
+  const selected = await getSelectedPodcastId();
+  if (selected && (await hasPodcastAccess(user.uid, selected))) {
+    return selected;
+  }
+  const fallback = await getUserDefaultPodcastId(user.uid);
+  if (fallback && (await hasPodcastAccess(user.uid, fallback))) {
+    return fallback;
+  }
+  return null;
+}
+
+// ページ用。選択もデフォルトも無ければチャンネル一覧へ誘導する。
 export async function requireSelectedPodcast(
   user: SessionUser,
 ): Promise<number> {
-  const podcastId = await getSelectedPodcastId();
-  if (!podcastId || !(await hasPodcastAccess(user.uid, podcastId))) {
+  const podcastId = await resolveEffectivePodcastId(user);
+  if (!podcastId) {
     redirect("/channels");
   }
   return podcastId;
 }
 
-// API用。未選択は NO_PODCAST_SELECTED、アクセス権なしは FORBIDDEN を投げる
+// API用。選択もデフォルトも無ければ NO_PODCAST_SELECTED を投げる。
 export async function requireSelectedPodcastForApi(
   user: SessionUser,
 ): Promise<number> {
-  const podcastId = await getSelectedPodcastId();
+  const podcastId = await resolveEffectivePodcastId(user);
   if (!podcastId) throw new Error("NO_PODCAST_SELECTED");
-  await requirePodcastAccess(user.uid, podcastId);
   return podcastId;
 }
