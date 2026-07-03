@@ -34,6 +34,8 @@ jobs:
               echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-prod/podcast-ui/podcast-ui"
               echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
               echo "DEPLOYER_SA=podcast-ui-deployer@sunabalog-prod.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-prod:asia-northeast1:podcast-automator-postgres-prod"
+              echo "DB_PASSWORD_SECRET=podcast-automator-database-password-prod"
               echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCOe16OGUrP1qWtJTKlatf5gbuKRdiLDg8"
               echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-prod.firebaseapp.com"
               echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-prod"
@@ -46,6 +48,8 @@ jobs:
               echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-dev/podcast-ui/podcast-ui"
               echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
               echo "DEPLOYER_SA=podcast-ui-deployer@sunabalog-dev.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
+              echo "DB_PASSWORD_SECRET=db-password"
               echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI"
               echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-dev.firebaseapp.com"
               echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-dev"
@@ -64,6 +68,19 @@ jobs:
 
       - name: Configure docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # 新しいコードを配信する前に DB スキーマを収束させる（Cloud SQL Connector 経由）。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run migrations
+        run: |
+          npm ci
+          export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
+          export DB_NAME=podcast
+          export DB_USER=podcast_app
+          export DB_PASSWORD="$(gcloud secrets versions access latest --secret="$DB_PASSWORD_SECRET" --project="$PROJECT_ID")"
+          npm run db:migrate
 
       - name: Build image
         run: |
