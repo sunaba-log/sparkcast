@@ -50,6 +50,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
             {user && (
               <div className="flex items-center gap-3">
+                {user.registered && user.displayName && (
+                  <Link
+                    href="/account"
+                    title="アカウント設定"
+                    className="text-xs font-medium text-gray-700 hover:text-brand transition-colors max-w-[10rem] truncate"
+                  >
+                    {user.displayName}
+                  </Link>
+                )}
                 <LogoutButton />
                 <Link
                   href="/upload"
