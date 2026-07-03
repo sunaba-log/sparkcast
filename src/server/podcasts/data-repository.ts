@@ -94,3 +94,62 @@ export async function createPodcast(input: {
     client.release();
   }
 }
+
+// 登録直後の利用開始用に、所属チャンネルが無ければデフォルトチャンネルを作成する。
+// 選択すべき podcast_id（新規または既存の先頭）を返す。
+export async function ensureDefaultChannel(input: {
+  userId: string;
+  title: string;
+}): Promise<number> {
+  const existing = await listPodcastsForUser(input.userId);
+  if (existing.length > 0) return existing[0].id;
+  const podcast = await createPodcast({
+    title: input.title,
+    description: null,
+    ownerUserId: input.userId,
+  });
+  return podcast.id;
+}
+
+export async function isPodcastOwner(
+  userId: string,
+  podcastId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `SELECT 1 FROM podcast_ownerships
+     WHERE user_id = $1 AND podcast_id = $2 AND role = 'owner'`,
+    [userId, podcastId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function updatePodcast(input: {
+  podcastId: number;
+  title: string;
+  description: string | null;
+}): Promise<void> {
+  await (await getDbPool()).query(
+    `UPDATE podcasts SET title = $2, description = $3 WHERE podcast_id = $1`,
+    [input.podcastId, input.title, input.description],
+  );
+}
+
+// チャンネルを削除する。エピソードと所有権も併せて削除する
+// （Firestore 側の議事録等は別途整理が必要）。
+export async function deletePodcast(podcastId: number): Promise<void> {
+  const client = await (await getDbPool()).connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM episodes WHERE podcast_id = $1", [podcastId]);
+    await client.query("DELETE FROM podcast_ownerships WHERE podcast_id = $1", [
+      podcastId,
+    ]);
+    await client.query("DELETE FROM podcasts WHERE podcast_id = $1", [podcastId]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
