@@ -46,8 +46,8 @@ export function ChannelManager({
       if (!response.ok) {
         throw new Error(result.error ?? "チャンネルの切り替えに失敗しました");
       }
-      router.push("/");
-      router.refresh();
+      // 全画面を切り替えるため完全リロードする
+      window.location.assign("/");
     } catch (caught) {
       setError(
         caught instanceof Error

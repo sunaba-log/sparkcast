@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
@@ -23,7 +23,6 @@ export function Sidebar({
   selectedPodcastId: number | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -40,10 +39,13 @@ export function Sidebar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ podcastId }),
       });
-      if (!response.ok) return;
-      setSwitcherOpen(false);
-      router.refresh();
-    } finally {
+      if (!response.ok) {
+        setSwitching(false);
+        return;
+      }
+      // 全画面を選択中チャンネルの内容へ確実に切り替えるため完全リロードする
+      window.location.assign("/");
+    } catch {
       setSwitching(false);
     }
   }

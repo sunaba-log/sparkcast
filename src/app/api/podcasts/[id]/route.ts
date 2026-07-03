@@ -5,6 +5,7 @@ import {
   deletePodcast,
   isPodcastOwner,
   updatePodcast,
+  userHasChannelWithTitle,
 } from "@/server/podcasts/data-repository";
 import {
   getSelectedPodcastId,
@@ -14,6 +15,7 @@ import {
 const updateSchema = z.object({
   title: z.string().trim().min(1).max(255),
   description: z.string().trim().max(2000).optional(),
+  rssFeedPath: z.string().trim().max(2000).optional(),
 });
 
 function parsePodcastId(raw: string): number | null {
@@ -39,10 +41,18 @@ export async function PATCH(
       return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });
     }
     const input = updateSchema.parse(await request.json());
+    if (await userHasChannelWithTitle(user.uid, input.title, podcastId)) {
+      return NextResponse.json(
+        { error: "同じ名前のチャンネルが既に存在します" },
+        { status: 409 },
+      );
+    }
     await updatePodcast({
       podcastId,
       title: input.title,
       description: input.description || null,
+      rssFeedPath:
+        input.rssFeedPath === undefined ? undefined : input.rssFeedPath || null,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
