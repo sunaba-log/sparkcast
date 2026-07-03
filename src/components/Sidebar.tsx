@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check, Plus } from "lucide-react";
+import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
 
 const NAV_ITEMS = [
   { href: "/", label: "エピソード", icon: Radio },
   { href: "/sns", label: "SNS投稿", icon: Share2 },
   { href: "/agenda", label: "次回議題", icon: Lightbulb },
-  { href: "/channels", label: "チャンネル", icon: Podcast },
   { href: "/settings", label: "番組設定", icon: Settings },
 ];
 
@@ -118,7 +117,7 @@ export function Sidebar({
                 onClick={() => setSwitcherOpen(false)}
                 className="flex items-center gap-2 px-3 py-2 text-xs text-brand border-t border-brand/20 hover:bg-brand-subtle/40"
               >
-                <Plus className="w-3.5 h-3.5" /> チャンネルを管理
+                <Podcast className="w-3.5 h-3.5" /> チャンネル管理
               </Link>
             </div>
           </>

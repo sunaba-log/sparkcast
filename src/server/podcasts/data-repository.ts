@@ -96,6 +96,7 @@ export async function createPodcast(input: {
 }
 
 // 登録直後の利用開始用に、所属チャンネルが無ければデフォルトチャンネルを作成する。
+// 作成時はそのチャンネルをユーザーのデフォルトにも設定する。
 // 選択すべき podcast_id（新規または既存の先頭）を返す。
 export async function ensureDefaultChannel(input: {
   userId: string;
@@ -108,7 +109,30 @@ export async function ensureDefaultChannel(input: {
     description: null,
     ownerUserId: input.userId,
   });
+  await setUserDefaultPodcast(input.userId, podcast.id);
   return podcast.id;
+}
+
+// ユーザーのデフォルトチャンネル（未選択時のフォールバック先）。
+export async function getUserDefaultPodcastId(
+  userId: string,
+): Promise<number | null> {
+  const result = await (await getDbPool()).query<{ default_podcast_id: number | null }>(
+    "SELECT default_podcast_id FROM users WHERE user_id = $1",
+    [userId],
+  );
+  return result.rows[0]?.default_podcast_id ?? null;
+}
+
+// アクセス権は呼び出し側で確認する。
+export async function setUserDefaultPodcast(
+  userId: string,
+  podcastId: number,
+): Promise<void> {
+  await (await getDbPool()).query(
+    "UPDATE users SET default_podcast_id = $2 WHERE user_id = $1",
+    [userId, podcastId],
+  );
 }
 
 export async function isPodcastOwner(
