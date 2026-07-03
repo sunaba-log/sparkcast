@@ -114,14 +114,40 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
 
 # 管理画面はアプリ側の Firebase Auth で保護するため、HTTP は公開する。
 resource "google_cloud_run_v2_service_iam_member" "public" {
-  project  = var.project_id
+  project = var.project_id
+  # ドメイン制限共有の解除（下記 org policy）が先に必要
   location = google_cloud_run_v2_service.podcast_ui.location
   name     = google_cloud_run_v2_service.podcast_ui.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+
+  depends_on = [google_org_policy_policy.allowed_policy_member_domains]
 }
 
 output "cloud_run_uri" {
   description = "Cloud Run サービスの URL"
   value       = google_cloud_run_v2_service.podcast_ui.uri
+}
+
+# 組織のドメイン制限共有ポリシーの下では allUsers への権限付与ができないため、
+# この dev プロジェクトに限り制限を解除する（公開 Web アプリの要件）。
+resource "google_project_service" "orgpolicy" {
+  project            = var.project_id
+  service            = "orgpolicy.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_org_policy_policy" "allowed_policy_member_domains" {
+  name   = "projects/${var.project_id}/policies/iam.allowedPolicyMemberDomains"
+  parent = "projects/${var.project_id}"
+
+  spec {
+    inherit_from_parent = false
+
+    rules {
+      allow_all = "TRUE"
+    }
+  }
+
+  depends_on = [google_project_service.orgpolicy]
 }
