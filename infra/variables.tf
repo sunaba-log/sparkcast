@@ -25,3 +25,9 @@ variable "upload_bucket" {
   type        = string
   description = "音声アップロード用 GCS バケット（署名付きURLのPUT先）"
 }
+
+variable "app_hosting_location" {
+  type        = string
+  description = "[残置] Developer Connect（旧 App Hosting 検討時）のリージョン"
+  default     = "asia-east1"
+}

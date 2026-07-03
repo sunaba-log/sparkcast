@@ -58,8 +58,23 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
 3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）でFirebase認証なしで即座にログインできます。未登録の場合は通常のログインと同様に`/register`からユーザ登録します。
 
-VercelなどGoogle Cloud外で動かす場合、`FIREBASE_SERVICE_ACCOUNT_JSON`へ
-Firestore、Firebase Auth、GCS署名に使用するサービスアカウントJSONを設定します。
+## デプロイ（Cloud Run + GitHub Actions）
+
+dev環境はCloud Run（`podcast-ui-dev` / asia-northeast1）でホスティングします。
+
+- `develop`へのpushでGitHub Actions（`.github/workflows/deploy-dev.yml`）が
+  イメージをビルドしデプロイします。
+- **PRを作成すると`pr-<番号>`のタグ付きリビジョンがデプロイされ、プレビューURLが
+  PRに自動コメントされます**（本番トラフィックには乗りません。DB等のバックエンドは
+  dev環境と共有な点に注意）。
+- 環境変数はCloud Runサービス定義（`infra/cloud-run.tf`）で管理します
+  （`DB_PASSWORD`と`CRON_SECRET`はSecret Manager参照、`NEXT_PUBLIC_*`は
+  ワークフローでビルド時に注入）。
+- GCPへの認証はランタイムSA + ADCで行うため、`FIREBASE_SERVICE_ACCOUNT_JSON`は
+  不要です（ローカル等のGoogle Cloud外で動かす場合のみ設定します）。
+- サービス定義・Artifact Registry・GitHub Actionsの認証（WIF）・Cloud Schedulerは
+  `infra/`のTerraformで管理します。
+- 設計判断は`docs/adr/20260703-migrate-hosting-to-cloud-run.md`を参照。
 
 ## GCS ID契約
 
@@ -77,8 +92,8 @@ upload_pending -> uploaded -> processing -> completed
                                       \-> failed
 ```
 
-ブラウザから結果通知が届かない`upload_pending`レコードは、Vercel Cronによって
-24時間後に`failed`へ更新されます。HobbyプランのCron制約に合わせ、1日1回実行します。
+ブラウザから結果通知が届かない`upload_pending`レコードは、Cloud Schedulerによって
+24時間後に`failed`へ更新されます（1日1回実行）。
 
 ## 議事録チャット（RAG）
 
@@ -96,7 +111,7 @@ gcloud firestore indexes composite create \
   --field-config=field-path=embedding,vector-config='{"dimension":768,"flat":{}}'
 ```
 
-議事録のベクトル化は**Vercel Cronで日次自動実行**する（`/api/cron/reindex-minutes`）。
+議事録のベクトル化は**Cloud Schedulerで日次自動実行**する（`/api/cron/reindex-minutes`）。
 冪等で、未変更のエピソードはスキップするため新規・変更分のみ埋め込む。即時に反映したい
 場合はチャットウィンドウの「再インデックス」（`POST /api/chat/reindex`）を手動実行する。
 インデックス未構築でも全文コンテキストへ自動フォールバックして回答する。設計詳細は

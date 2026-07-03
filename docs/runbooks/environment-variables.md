@@ -3,40 +3,44 @@
 ## Purpose
 
 This document explains how to prepare `podcast-ui/.env.local` without sharing
-real secret values. Share this runbook and `.env.example`, not `.env.local`.
+real secret values, and where each value lives in the deployed environment.
+Share this runbook and `.env.example`, not `.env.local`.
 
 ## Source of Truth
 
-| Variable | Required | Local source | Production/Preview source | Notes |
+Deployed (Cloud Run) configuration lives in `infra/cloud-run.tf`. Secrets are
+referenced from GCP Secret Manager, and `NEXT_PUBLIC_*` build-time values are
+injected by the GitHub Actions workflows (`.github/workflows/`).
+
+| Variable | Required | Local source | Deployed source | Notes |
 | --- | --- | --- | --- | --- |
-| `DATABASE_URL` | Optional | Local PostgreSQL connection string | Usually unset on Vercel | Use for a local DB or direct PostgreSQL connection. |
-| `CLOUD_SQL_INSTANCE_CONNECTION_NAME` | Required without `DATABASE_URL` | Vercel env or GCP Cloud SQL instance name | Vercel Environment Variables | Format: `project:region:instance`. |
-| `DB_NAME` | Required without `DATABASE_URL` | Vercel env | Vercel Environment Variables | Cloud SQL database name. |
-| `DB_USER` | Required without `DATABASE_URL` | Vercel env | Vercel Environment Variables | Cloud SQL database user. |
-| `DB_PASSWORD` | Required without `DATABASE_URL` | Vercel env or GCP Secret Manager | Vercel Environment Variables | Do not paste into docs or chat. |
-| `GOOGLE_CLOUD_PROJECT` | Required | Vercel env or GCP project ID | Vercel Environment Variables | `sunabalog-dev` or `sunabalog-prod`. |
-| `DEV_ALLOWED_EMAILS` | Optional | Vercel env / team allowlist | Vercel Environment Variables | Comma-separated login allowlist. Unset or empty allows all accounts. |
-| `GCS_UPLOAD_BUCKET` | Required | Vercel env or GCS bucket name | Vercel Environment Variables | Dev and prod buckets must not be mixed. |
-| `GCS_SIGNED_URL_TTL_SECONDS` | Optional | `.env.example` default | Vercel Environment Variables | Defaults to `900` seconds. |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Required outside GCP | Vercel env | Vercel Environment Variables | JSON for server-side Firebase/GCS signing credentials. |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Public Firebase Web SDK config. |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Dev/Preview can use `sunabalog-dev.firebaseapp.com`. Production on Vercel should use the UI host, for example `podcast-ui-kentakashimas-projects.vercel.app`, so mobile redirect sign-in can restore the Firebase result. |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Required | Firebase Console or Vercel env | Vercel Environment Variables | Must match the Firebase project used for auth. |
-| `FIREBASE_AUTH_HELPER_DOMAIN` | Optional | Firebase project auth helper domain | Vercel Environment Variables | Defaults to `${NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`. Used by Next.js rewrites for `/__/auth/*`. |
-| `CRON_SECRET` | Required | Vercel env or generated local value | Vercel Environment Variables | Used by scheduled upload cleanup endpoint. |
+| `DATABASE_URL` | Optional | Local PostgreSQL connection string | Unset on Cloud Run | Use for a local DB or direct PostgreSQL connection. |
+| `CLOUD_SQL_INSTANCE_CONNECTION_NAME` | Required without `DATABASE_URL` | GCP Cloud SQL instance name | `infra/cloud-run.tf` | Format: `project:region:instance`. |
+| `DB_NAME` | Required without `DATABASE_URL` | `infra/cloud-run.tf` | `infra/cloud-run.tf` | Cloud SQL database name. |
+| `DB_USER` | Required without `DATABASE_URL` | `infra/cloud-run.tf` | `infra/cloud-run.tf` | Cloud SQL database user. |
+| `DB_PASSWORD` | Required without `DATABASE_URL` | GCP Secret Manager | Secret Manager (`db-password`) | Do not paste into docs or chat. |
+| `GOOGLE_CLOUD_PROJECT` | Required | GCP project ID | `infra/cloud-run.tf` | `sunabalog-dev` or `sunabalog-prod`. |
+| `DEV_ALLOWED_EMAILS` | Optional | team allowlist | `infra/cloud-run.tf`（現在は未設定＝全アカウント許可） | Comma-separated login allowlist. Unset or empty allows all accounts. |
+| `GCS_UPLOAD_BUCKET` | Required | GCS bucket name | `infra/cloud-run.tf` | Dev and prod buckets must not be mixed. |
+| `GCS_SIGNED_URL_TTL_SECONDS` | Optional | `.env.example` default | `infra/cloud-run.tf` | Defaults to `900` seconds. |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Required outside GCP only | SA key for local use | 不要（Cloud Run は ADC で認証） | JSON for server-side Firebase/GCS signing credentials when running outside GCP. |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Required | Firebase Console | `.github/workflows/`（build arg） | Public Firebase Web SDK config（ビルド時に埋め込み）. |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Required | Firebase Console | `.github/workflows/`（build arg） | Dev は `sunabalog-dev.firebaseapp.com`。モバイルのリダイレクトログインを使う本番は UI ホストを指定する（下記参照）. |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Required | Firebase Console | `.github/workflows/`（build arg） | Must match the Firebase project used for auth. |
+| `FIREBASE_AUTH_HELPER_DOMAIN` | Optional | Firebase project auth helper domain | `.github/workflows/`（build arg） | Defaults to `${NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`. Used by Next.js rewrites for `/__/auth/*`. |
+| `CRON_SECRET` | Required | generated local value | Secret Manager (`cron-secret`) | Cloud Scheduler ジョブが `Authorization: Bearer` で送る値と一致させる。 |
 
 ## Current Secret Stores
 
-- Vercel Environment Variables: runtime configuration for `podcast-ui`.
-- GCP Secret Manager: shared backend secrets used mainly by `podcast-automator`
-  and infrastructure, such as Cloud SQL, Cloudflare R2, Discord, and X API
-  credentials.
+- `infra/cloud-run.tf` / `.github/workflows/`: non-secret runtime/build configuration for the deployed app.
+- GCP Secret Manager: `podcast-ui` の `DB_PASSWORD` / `CRON_SECRET`。ほかに
+  `podcast-automator` やインフラ共有のシークレット（Cloud SQL, Cloudflare R2,
+  Discord, X API など）もここにある。
 - GitHub Secrets: GitHub Actions secrets, mainly Discord notifications and
   deployment credentials.
 
-`podcast-ui` local development should usually copy values from Vercel
-Environment Variables. If a value also exists in GCP Secret Manager, prefer the
-team-agreed source for that environment and do not duplicate it in docs.
+`podcast-ui` local development should copy non-secret values from
+`infra/cloud-run.tf` / the workflows, and secret values from GCP Secret Manager.
 
 ## How to Create `.env.local`
 
@@ -46,29 +50,31 @@ team-agreed source for that environment and do not duplicate it in docs.
    cp .env.example .env.local
    ```
 
-2. Fill non-secret values from the target environment:
+2. Fill non-secret values from `infra/cloud-run.tf` / Firebase Console:
 
    ```text
    GOOGLE_CLOUD_PROJECT
    GCS_UPLOAD_BUCKET
+   NEXT_PUBLIC_FIREBASE_API_KEY
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
    NEXT_PUBLIC_FIREBASE_PROJECT_ID
    FIREBASE_AUTH_HELPER_DOMAIN
    ```
 
-3. Fill secret values from the appropriate secret store:
+3. Fill secret values from GCP Secret Manager:
 
    ```text
    DB_PASSWORD
-   FIREBASE_SERVICE_ACCOUNT_JSON
-   NEXT_PUBLIC_FIREBASE_API_KEY
    CRON_SECRET
    ```
+
+   ローカルから Firestore / GCS 署名を使う場合のみ、SA 鍵を
+   `FIREBASE_SERVICE_ACCOUNT_JSON` に設定する（Cloud Run では不要）。
 
 4. Use either `DATABASE_URL` or the Cloud SQL Connector variables.
 
    For local PostgreSQL, `DATABASE_URL` is usually simpler. For parity with
-   Vercel, use:
+   the deployed environment, use:
 
    ```text
    CLOUD_SQL_INSTANCE_CONNECTION_NAME
@@ -93,25 +99,21 @@ For upload testing, use the target environment's matching Cloud SQL database,
 GCS bucket, Firebase project, and service account. Mixing dev and prod values
 can create signed URLs that fail with GCS `AccessDenied`.
 
-## Firebase Redirect Sign-In on Vercel
+## Firebase Redirect Sign-In on a Custom Host
 
 Mobile browsers may block the cross-origin storage access used by Firebase
-`signInWithRedirect()` when the app is served from Vercel but `authDomain`
-points at `<project>.firebaseapp.com`. In that state, Google sign-in appears to
+`signInWithRedirect()` when the app is served from a host other than
+`<project>.firebaseapp.com` while `authDomain` points at
+`<project>.firebaseapp.com`. In that state, Google sign-in appears to
 complete, but the app returns to `/login` because `getRedirectResult()` is empty
 and `/api/auth/session` is never called.
 
-Production Vercel should therefore use:
+If mobile redirect sign-in is needed, set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to
+the serving host (Cloud Run domain) and keep `FIREBASE_AUTH_HELPER_DOMAIN` at
+the Firebase helper host. The Next.js rewrite proxies `/__/auth/*` to the
+Firebase helper domain. Also make sure Firebase Auth authorized domains include
+the serving host, and the Google OAuth client allows this redirect URI:
 
 ```text
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=podcast-ui-kentakashimas-projects.vercel.app
-FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-prod.firebaseapp.com
-```
-
-The Next.js rewrite proxies `/__/auth/*` to the Firebase helper domain. Also
-make sure Firebase Auth authorized domains includes the UI host, and the Google
-OAuth client allows this redirect URI:
-
-```text
-https://podcast-ui-kentakashimas-projects.vercel.app/__/auth/handler
+https://<cloud-run-domain>/__/auth/handler
 ```

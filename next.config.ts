@@ -7,6 +7,8 @@ const firebaseAuthHelperDomain =
     : undefined);
 
 const nextConfig: NextConfig = {
+  // Cloud Run 用コンテナで動かすため、self-contained な出力にする
+  output: "standalone",
   async rewrites() {
     if (!firebaseAuthHelperDomain) return [];
     return [
