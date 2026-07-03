@@ -135,6 +135,26 @@ export async function setUserDefaultPodcast(
   );
 }
 
+// 同一ユーザーが所有するチャンネル内で同名が既に存在するか（自分自身は除外可）。
+export async function userHasChannelWithTitle(
+  userId: string,
+  title: string,
+  excludePodcastId?: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `SELECT 1
+     FROM podcasts p
+     JOIN podcast_ownerships o ON o.podcast_id = p.podcast_id
+     WHERE o.user_id = $1
+       AND o.role = 'owner'
+       AND lower(p.title) = lower($2)
+       AND ($3::int IS NULL OR p.podcast_id <> $3)
+     LIMIT 1`,
+    [userId, title, excludePodcastId ?? null],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function isPodcastOwner(
   userId: string,
   podcastId: number,
@@ -151,10 +171,20 @@ export async function updatePodcast(input: {
   podcastId: number;
   title: string;
   description: string | null;
+  // undefined のときは rss_feed_path を変更しない
+  rssFeedPath?: string | null;
 }): Promise<void> {
+  if (input.rssFeedPath === undefined) {
+    await (await getDbPool()).query(
+      `UPDATE podcasts SET title = $2, description = $3 WHERE podcast_id = $1`,
+      [input.podcastId, input.title, input.description],
+    );
+    return;
+  }
   await (await getDbPool()).query(
-    `UPDATE podcasts SET title = $2, description = $3 WHERE podcast_id = $1`,
-    [input.podcastId, input.title, input.description],
+    `UPDATE podcasts SET title = $2, description = $3, rss_feed_path = $4
+     WHERE podcast_id = $1`,
+    [input.podcastId, input.title, input.description, input.rssFeedPath],
   );
 }
 

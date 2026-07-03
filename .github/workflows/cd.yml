@@ -29,6 +29,7 @@ jobs:
         run: |
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             {
+              echo "ENVIRONMENT=prod"
               echo "PROJECT_ID=sunabalog-prod"
               echo "SERVICE=podcast-ui-prod"
               echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-prod/podcast-ui/podcast-ui"
@@ -43,6 +44,7 @@ jobs:
             } >> "$GITHUB_ENV"
           else
             {
+              echo "ENVIRONMENT=dev"
               echo "PROJECT_ID=sunabalog-dev"
               echo "SERVICE=podcast-ui-dev"
               echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-dev/podcast-ui/podcast-ui"
@@ -109,3 +111,14 @@ jobs:
             --project "$PROJECT_ID" \
             --region "$REGION" \
             --to-revisions "${SERVICE}-${SUFFIX}=100"
+          URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          echo "SERVICE_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          title: "podcast-ui deploy (${{ env.ENVIRONMENT }})"
+          description: "${{ env.SERVICE_URL }}"
+          username: GitHub Actions

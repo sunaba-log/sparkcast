@@ -4,6 +4,7 @@ import { getSessionUser } from "@/server/auth";
 import {
   createPodcast,
   listPodcastsForUser,
+  userHasChannelWithTitle,
 } from "@/server/podcasts/data-repository";
 import {
   SELECTED_PODCAST_COOKIE_NAME,
@@ -42,6 +43,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ユーザ登録が必要です" }, { status: 403 });
     }
     const input = createSchema.parse(await request.json());
+    if (await userHasChannelWithTitle(user.uid, input.title)) {
+      return NextResponse.json(
+        { error: "同じ名前のチャンネルが既に存在します" },
+        { status: 409 },
+      );
+    }
     const podcast = await createPodcast({
       title: input.title,
       description: input.description || null,
