@@ -63,3 +63,8 @@ variable "cron_secret_id" {
   description = "cron エンドポイント保護用トークンの Secret Manager シークレット ID"
   default     = "cron-secret"
 }
+
+variable "custom_domain" {
+  type        = string
+  description = "Cloud Run に割り当てるカスタムドメイン（例: dev.sparkcast.sunabalog.com）"
+}
