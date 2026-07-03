@@ -56,9 +56,19 @@ jobs:
       - name: Push image
         run: docker push "$IMAGE:${{ github.sha }}"
 
+      # プレビューの --no-traffic 運用でサービスのトラフィックが特定リビジョンに
+      # 固定されると、通常の deploy では最新へ移らない。develop デプロイでは
+      # 自分がビルドしたリビジョンへ明示的に 100% を振る。
       - name: Deploy to Cloud Run
         run: |
+          SUFFIX="sha-${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
           gcloud run deploy "$SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
-            --image "$IMAGE:${{ github.sha }}"
+            --image "$IMAGE:${{ github.sha }}" \
+            --revision-suffix "$SUFFIX" \
+            --no-traffic
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${SERVICE}-${SUFFIX}=100"
