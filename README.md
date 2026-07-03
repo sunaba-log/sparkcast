@@ -60,20 +60,21 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 
 ## デプロイ（Cloud Run + GitHub Actions）
 
-dev環境はCloud Run（`podcast-ui-dev` / asia-northeast1）でホスティングします。
+Cloud Run（asia-northeast1）でホスティングします。環境はプロジェクト単位で分離
+しています（dev=`sunabalog-dev` / prod=`sunabalog-prod`）。
 
-- `develop`へのpushでGitHub Actions（`.github/workflows/deploy-dev.yml`）が
-  イメージをビルドしデプロイします。
-- **PRを作成すると`pr-<番号>`のタグ付きリビジョンがデプロイされ、プレビューURLが
-  PRに自動コメントされます**（本番トラフィックには乗りません。DB等のバックエンドは
-  dev環境と共有な点に注意）。
+- **dev**: `develop`へのpushで`deploy-dev.yml`が`podcast-ui-dev`へデプロイ。
+- **prod**: `main`へのpushで`deploy-prod.yml`が`sunabalog-prod`の`podcast-ui-prod`へデプロイ。
+- **PRプレビュー**: `develop`宛のPRで`pr-<番号>`のタグ付きリビジョンをデプロイし、
+  プレビューURLをPRに自動コメント（本番トラフィックには乗りません。DB等の
+  バックエンドはdev環境と共有な点に注意）。
 - 環境変数はCloud Runサービス定義（`infra/cloud-run.tf`）で管理します
   （`DB_PASSWORD`と`CRON_SECRET`はSecret Manager参照、`NEXT_PUBLIC_*`は
   ワークフローでビルド時に注入）。
 - GCPへの認証はランタイムSA + ADCで行うため、`FIREBASE_SERVICE_ACCOUNT_JSON`は
   不要です（ローカル等のGoogle Cloud外で動かす場合のみ設定します）。
 - サービス定義・Artifact Registry・GitHub Actionsの認証（WIF）・Cloud Schedulerは
-  `infra/`のTerraformで管理します。
+  `infra/`のTerraformで環境別に管理します（`make terraform-plan ENVIRONMENT=dev|prod`）。
 - 設計判断は`docs/adr/20260703-migrate-hosting-to-cloud-run.md`を参照。
 
 ## GCS ID契約

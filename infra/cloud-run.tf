@@ -32,7 +32,7 @@ resource "google_artifact_registry_repository" "podcast_ui" {
 resource "google_cloud_run_v2_service" "podcast_ui" {
   project  = var.project_id
   location = var.region
-  name     = "podcast-ui-dev"
+  name     = "podcast-ui-${var.environment}"
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
@@ -57,21 +57,21 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
       }
       env {
         name  = "CLOUD_SQL_INSTANCE_CONNECTION_NAME"
-        value = "sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
+        value = var.cloud_sql_instance_connection_name
       }
       env {
         name  = "DB_NAME"
-        value = "podcast"
+        value = var.db_name
       }
       env {
         name  = "DB_USER"
-        value = "podcast_app"
+        value = var.db_user
       }
       env {
         name = "DB_PASSWORD"
         value_source {
           secret_key_ref {
-            secret  = data.google_secret_manager_secret.app["db-password"].secret_id
+            secret  = data.google_secret_manager_secret.db_password.secret_id
             version = "latest"
           }
         }
@@ -88,7 +88,7 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
         name = "CRON_SECRET"
         value_source {
           secret_key_ref {
-            secret  = data.google_secret_manager_secret.app["cron-secret"].secret_id
+            secret  = data.google_secret_manager_secret.cron_secret.secret_id
             version = "latest"
           }
         }
@@ -96,11 +96,14 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
     }
   }
 
-  # デプロイ（イメージ更新・タグ付きリビジョン）は GitHub Actions が行うため無視する
+  # デプロイ（イメージ更新・リビジョン名・タグ付きプレビュー・トラフィック）は
+  # GitHub Actions が行うため、terraform は初期作成のみ担い以降は無視する。
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      template[0].revision,
       template[0].labels,
+      traffic,
       client,
       client_version,
     ]
