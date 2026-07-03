@@ -63,8 +63,8 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 Cloud Run（asia-northeast1）でホスティングします。環境はプロジェクト単位で分離
 しています（dev=`sunabalog-dev` / prod=`sunabalog-prod`）。
 
-- **dev**: `develop`へのpushで`deploy-dev.yml`が`podcast-ui-dev`へデプロイ。
-- **prod**: `main`へのpushで`deploy-prod.yml`が`sunabalog-prod`の`podcast-ui-prod`へデプロイ。
+- **dev / prod**: `cd.yml` がブランチで環境を切り替えてデプロイします
+  （`develop`→`podcast-ui-dev` / `main`→`sunabalog-prod`の`podcast-ui-prod`）。
 - **PRプレビュー**: `develop`宛のPRで`pr-<番号>`のタグ付きリビジョンをデプロイし、
   プレビューURLをPRに自動コメント（本番トラフィックには乗りません。DB等の
   バックエンドはdev環境と共有な点に注意）。
