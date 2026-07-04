@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -61,16 +62,23 @@ const markdownComponents: Components = {
     </pre>
   ),
   hr: () => <hr className="my-3 border-gray-200" />,
-  // 外部リンクは新規タブ + noopener、内部リンク（/episodes/... 等）は同タブで開く。
+  // 内部リンク（/?episode=... 等）はクライアント遷移にして、レイアウト常駐の
+  // チャットを開いたまま画面だけ切り替える。外部リンクは新規タブ + noopener。
   a: ({ href, children }) => {
     const isInternal = typeof href === "string" && href.startsWith("/");
+    if (isInternal) {
+      return (
+        <Link href={href} className="text-blue-600 underline">
+          {children}
+        </Link>
+      );
+    }
     return (
       <a
         href={href}
         className="text-blue-600 underline"
-        {...(isInternal
-          ? {}
-          : { target: "_blank", rel: "noopener noreferrer" })}
+        target="_blank"
+        rel="noopener noreferrer"
       >
         {children}
       </a>

@@ -27,10 +27,19 @@ export async function listMinutesKnowledge(
   }));
 }
 
-/** 次回議題の提案（topic_proposals）を知識ドキュメントとして取得する。 */
+const AGENDA_KNOWLEDGE_LIMIT = 5;
+
+// Google 検索グラウンディングのリダイレクト URL は短期間で失効しリンク切れになるため、
+// コンテキストへ載せない（LLM がリンクとして引用してしまう）。
+function isEphemeralUrl(url: string): boolean {
+  return url.includes("vertexaisearch.cloud.google.com");
+}
+
+/** 次回議題の提案（topic_proposals）を知識ドキュメントとして取得する（新しい順に最大5件）。 */
 async function listAgendaKnowledge(podcastId: number): Promise<KnowledgeDoc[]> {
   const proposals = await listTopicProposals(podcastId);
   return proposals
+    .slice(0, AGENDA_KNOWLEDGE_LIMIT)
     .map((proposal) => {
       const parts: string[] = [];
       if (proposal.targetPeriod) {
@@ -49,7 +58,8 @@ async function listAgendaKnowledge(podcastId: number): Promise<KnowledgeDoc[]> {
       }
       if (proposal.relatedNews.length > 0) {
         const news = proposal.relatedNews.map((item) => {
-          const lines = [`- ${item.title}${item.url ? `（${item.url}）` : ""}`];
+          const url = item.url && !isEphemeralUrl(item.url) ? `（${item.url}）` : "";
+          const lines = [`- ${item.title}${url}`];
           if (item.summary) lines.push(`  ${item.summary}`);
           return lines.join("\n");
         });

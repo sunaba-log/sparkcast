@@ -50,6 +50,20 @@ export function EpisodeMasterDetail({
     }
     return initialEpisodes.length > 0 ? initialEpisodes[0].id : "";
   });
+
+  // クライアント遷移（チャットのリンク等）では再マウントされないため、
+  // ディープリンク先の変化に合わせてレンダー中に選択を調整する。
+  const [prevInitialSelectedId, setPrevInitialSelectedId] =
+    useState(initialSelectedId);
+  if (initialSelectedId !== prevInitialSelectedId) {
+    setPrevInitialSelectedId(initialSelectedId);
+    if (
+      initialSelectedId &&
+      episodes.some((e) => e.id === initialSelectedId)
+    ) {
+      setSelectedId(initialSelectedId);
+    }
+  }
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [minutesTab, setMinutesTab] = useState<"preview" | "edit">("preview");
 

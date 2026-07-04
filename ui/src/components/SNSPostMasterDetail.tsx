@@ -37,6 +37,24 @@ export function SNSPostMasterDetail({
     return initialPosts.length > 0 ? initialPosts[0].id : "";
   });
 
+  // クライアント遷移（チャットのリンク等）では再マウントされないため、
+  // ディープリンク先の変化に合わせてレンダー中に選択を調整する。
+  // 対象の投稿が読み込み済みリストに無い場合はサーバーがマージ済みの
+  // initialPosts から補う。
+  const [prevInitialSelectedId, setPrevInitialSelectedId] =
+    useState(initialSelectedId);
+  if (initialSelectedId !== prevInitialSelectedId) {
+    setPrevInitialSelectedId(initialSelectedId);
+    if (initialSelectedId) {
+      setPosts((prev) => {
+        const existing = new Set(prev.map((p) => p.id));
+        const added = initialPosts.filter((p) => !existing.has(p.id));
+        return added.length > 0 ? [...prev, ...added] : prev;
+      });
+      setSelectedId(initialSelectedId);
+    }
+  }
+
   const selectedPost = posts.find((p) => p.id === selectedId) || posts[0];
 
   // Inspector form state

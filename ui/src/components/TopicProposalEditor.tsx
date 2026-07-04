@@ -29,6 +29,20 @@ export function TopicProposalEditor({
     return latestProposal?.id || "";
   });
 
+  // クライアント遷移（チャットのリンク等）では再マウントされないため、
+  // ディープリンク先の変化に合わせてレンダー中に選択を調整する。
+  const [prevInitialProposalId, setPrevInitialProposalId] =
+    useState(initialProposalId);
+  if (initialProposalId !== prevInitialProposalId) {
+    setPrevInitialProposalId(initialProposalId);
+    if (
+      initialProposalId &&
+      sortedProposals.some((p) => p.id === initialProposalId)
+    ) {
+      setSelectedProposalId(initialProposalId);
+    }
+  }
+
   const selectedProposal = sortedProposals.find((p) => p.id === selectedProposalId) || latestProposal;
 
   if (!selectedProposal) {
