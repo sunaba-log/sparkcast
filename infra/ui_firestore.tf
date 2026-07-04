@@ -1,5 +1,6 @@
 # 議事録 RAG の横断検索（findNearest / KNN）に使うベクトルインデックス。
 # podcasts/{podcastId}/minutes_index コレクションの embedding フィールドを対象とする。
+# （Firestore データベース本体・sns_promotions フィールドは firestore.tf 側で管理）
 resource "google_firestore_index" "minutes_index" {
   project     = var.project_id
   database    = "(default)"

@@ -22,13 +22,12 @@ Cloud Run Jobs で実行される Python アプリを含みます。
 │   ├── tests/                   # pytest
 │   ├── pyproject.toml           # Python 3.12 / ruff / pytest 設定
 │   └── Dockerfile               # Cloud Run Job 用イメージ
-├── infrastructure/              # Terraform (GCP リソース)
-│   ├── *.tf                     # バケット, Eventarc, Workflows, IAM 等
-│   ├── environments/            # dev/prod の backend/variables
-│   └── modules/                 # Artifact Registry / Cloud Run Job modules
-├── .github/workflows/           # CI/CD
 ├── .devcontainer/               # Dev Container 設定 (注意事項あり)
+└── README.md
 ```
+
+> Terraform は リポジトリルートの `infra/` に一元化されています（ui + automator の GCP
+> リソースを env 毎に 1 state で管理）。CI/CD もリポジトリ直下の `.github/workflows/` です。
 
 ## 現状のアプリ挙動
 
@@ -68,26 +67,23 @@ make docker-build
 
 ## インフラ (Terraform)
 
-Terraform は Docker コンテナで実行する前提です。`Makefile` が用意されています。
-`.env.sample` に `GOOGLE_APPLICATION_CREDENTIALS` と Cloudflare 認証情報の例があります。
-ローカルからデプロイする場合は、サービスアカウントの JSON を配置し、そのパスを `.env` の `GOOGLE_APPLICATION_CREDENTIALS` に設定してください。
-あわせて Cloudflare の認証情報（`CLOUDFLARE_ACCESS_KEY_ID` / `CLOUDFLARE_SECRET_ACCESS_KEY` / `CLOUDFLARE_API_TOKEN`）も `.env` に設定してください。
+Terraform はリポジトリルートの `infra/`（ui + automator を統合した単一 state）に集約しました。
+実行はリポジトリルートの `Makefile` から行います（Docker コンテナ実行が前提）。
+ルートの `.env.sample` に `GOOGLE_APPLICATION_CREDENTIALS` と Cloudflare 認証情報の例があります。
 
 ### デプロイ手段
 
 - GitHub Actions の CD (`.github/workflows/cd.yml`) からデプロイ
-  - `develop` / `main` への push で自動実行
+  - `develop` / `main` への push（`infra/**` または `automator/**` 変更時）で自動実行
   - `workflow_dispatch` でブランチ指定デプロイ
-- ローカルから `make terraform-deploy-{dev,prod}` でデプロイ
-  - ローカル実行時は、サービスアカウントの JSON を配置し、そのパスを `.env` の `GOOGLE_APPLICATION_CREDENTIALS` に設定してください
-  - あわせて Cloudflare の認証情報も `.env` に設定してください
+- ローカルからは **リポジトリルートで** `make terraform-deploy-{dev,prod}` を実行
 
 ```bash
-# 例: dev 環境のデプロイ
+# 例: dev 環境のデプロイ（リポジトリルートで実行）
 make terraform-deploy-dev DEPLOY_COMMAND_EXTENSION="-auto-approve"
 ```
 
-環境別設定は `infrastructure/environments/{dev,prod}` にあります。
+環境別設定は `infra/environments/{dev,prod}` にあります。
 
 ## GitHub Actions
 

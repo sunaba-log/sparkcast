@@ -15,6 +15,9 @@ locals {
     "workflows.googleapis.com",
     "firestore.googleapis.com",
     "identitytoolkit.googleapis.com",
+    # podcast-ui（旧 ui/infra）由来。WIF の access token 発行・組織ポリシー操作に必要。
+    "iamcredentials.googleapis.com",
+    "orgpolicy.googleapis.com",
   ]
 
   default_compute_service_account = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"

@@ -13,6 +13,7 @@ jobs:
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
       automator: ${{ steps.filter.outputs.automator }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -24,6 +25,9 @@ jobs:
               - '.github/workflows/ci.yml'
             automator:
               - 'automator/**'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'infra/**'
               - '.github/workflows/ci.yml'
 
   ui:
@@ -69,24 +73,31 @@ jobs:
       - name: Test
         working-directory: automator/app
         run: make test
+
+  # Terraform（統合後の infra/）の整形チェック + validate。
+  # 認証不要（-backend=false）。docker で terraform イメージを使う。
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Prepare .env
-        working-directory: automator
         run: cp .env.sample .env
       - name: Terraform validate
-        working-directory: automator
         run: make terraform-validate
 
   # パスフィルタでスキップされたジョブが必須チェックをブロックしないよう、
   # ここを唯一の必須チェックにする（skip は許容、failure/cancelled のみ失敗）。
   ci-ok:
-    needs: [ui, automator]
+    needs: [ui, automator, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate results
         run: |
-          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }}"
-          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}"; do
+          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }} infra=${{ needs.infra.result }}"
+          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}" "${{ needs.infra.result }}"; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
               echo "required job failed"; exit 1
             fi
@@ -95,7 +106,7 @@ jobs:
 
   # 失敗時のみ Discord に通知する（成功時はノイズになるため送らない）。
   report:
-    needs: [ui, automator]
+    needs: [ui, automator, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:

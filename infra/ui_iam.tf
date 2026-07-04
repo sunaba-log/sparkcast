@@ -1,5 +1,7 @@
-# アプリ SA に付与するプロジェクトロール一式。
+# podcast-ui アプリ SA に付与するプロジェクトロール一式。
 # CD では Terraform がこの集合を真として権限を収束させる。
+# （旧 automator/podcast_ui.tf の datastore.user / firebaseauth.admin / cloudsql.client と
+#  旧 ui/infra/iam.tf の集合を統合。SA 実体・binding は ui 側定義を正とする）
 locals {
   app_project_roles = [
     "roles/cloudsql.client",    # Cloud SQL 接続（Cloud SQL Connector）
@@ -18,9 +20,9 @@ resource "google_project_iam_member" "app" {
 }
 
 # 署名付きURLでのアップロード（PUT）に必要なオブジェクト作成権限。
-# バケット本体は共有リソースのため、ここでは付与（binding）のみを管理する。
+# バケットは同一 state の google_storage_bucket.input を直接参照する。
 resource "google_storage_bucket_iam_member" "app_upload_object_creator" {
-  bucket = var.upload_bucket
+  bucket = google_storage_bucket.input.name
   role   = "roles/storage.objectCreator"
   member = "serviceAccount:${google_service_account.app.email}"
 }

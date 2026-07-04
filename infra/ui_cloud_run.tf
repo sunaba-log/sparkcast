@@ -1,23 +1,7 @@
-# Cloud Run で動く podcast-ui 本体（dev 環境）と、そのデプロイ基盤。
+# Cloud Run で動く podcast-ui 本体と、そのデプロイ基盤。
 # イメージのビルド・デプロイは GitHub Actions（.github/workflows/）が行い、
-# ここではサービス定義・レジストリ・CI 用の認証（WIF）を管理する。
-resource "google_project_service" "run" {
-  project            = var.project_id
-  service            = "run.googleapis.com"
-  disable_on_destroy = false
-}
-
-resource "google_project_service" "artifactregistry" {
-  project            = var.project_id
-  service            = "artifactregistry.googleapis.com"
-  disable_on_destroy = false
-}
-
-resource "google_project_service" "iamcredentials" {
-  project            = var.project_id
-  service            = "iamcredentials.googleapis.com"
-  disable_on_destroy = false
-}
+# ここではサービス定義・レジストリを管理する。API 有効化は
+# google_project_service.required（locals.required_services）に集約している。
 
 resource "google_artifact_registry_repository" "podcast_ui" {
   project       = var.project_id
@@ -26,7 +10,7 @@ resource "google_artifact_registry_repository" "podcast_ui" {
   format        = "DOCKER"
   description   = "podcast-ui のアプリイメージ"
 
-  depends_on = [google_project_service.artifactregistry]
+  depends_on = [google_project_service.required]
 }
 
 resource "google_cloud_run_v2_service" "podcast_ui" {
@@ -57,28 +41,28 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
       }
       env {
         name  = "CLOUD_SQL_INSTANCE_CONNECTION_NAME"
-        value = var.cloud_sql_instance_connection_name
+        value = google_sql_database_instance.podcast.connection_name
       }
       env {
         name  = "DB_NAME"
-        value = var.db_name
+        value = google_sql_database.podcast.name
       }
       env {
         name  = "DB_USER"
-        value = var.db_user
+        value = google_sql_user.podcast.name
       }
       env {
         name = "DB_PASSWORD"
         value_source {
           secret_key_ref {
-            secret  = data.google_secret_manager_secret.db_password.secret_id
+            secret  = google_secret_manager_secret.database_password.secret_id
             version = "latest"
           }
         }
       }
       env {
         name  = "GCS_UPLOAD_BUCKET"
-        value = var.upload_bucket
+        value = google_storage_bucket.input.name
       }
       env {
         name  = "GCS_SIGNED_URL_TTL_SECONDS"
@@ -110,7 +94,7 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
   }
 
   depends_on = [
-    google_project_service.run,
+    google_project_service.required,
     google_secret_manager_secret_iam_member.app_secrets,
   ]
 }
@@ -133,13 +117,7 @@ output "cloud_run_uri" {
 }
 
 # 組織のドメイン制限共有ポリシーの下では allUsers への権限付与ができないため、
-# この dev プロジェクトに限り制限を解除する（公開 Web アプリの要件）。
-resource "google_project_service" "orgpolicy" {
-  project            = var.project_id
-  service            = "orgpolicy.googleapis.com"
-  disable_on_destroy = false
-}
-
+# この プロジェクトに限り制限を解除する（公開 Web アプリの要件）。
 resource "google_org_policy_policy" "allowed_policy_member_domains" {
   name   = "projects/${var.project_id}/policies/iam.allowedPolicyMemberDomains"
   parent = "projects/${var.project_id}"
@@ -152,5 +130,5 @@ resource "google_org_policy_policy" "allowed_policy_member_domains" {
     }
   }
 
-  depends_on = [google_project_service.orgpolicy]
+  depends_on = [google_project_service.required]
 }
