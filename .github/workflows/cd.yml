@@ -11,8 +11,9 @@ on:
       - main
     paths:
       - "ui/**"
+      - "automator/**"
       - ".github/workflows/cd.yml"
-  # automator の Terraform デプロイは手動実行（WIF/secrets 整備までは push 自動化を休止）
+  # automator の手動 plan/apply 用（push でも automator/** 変更時に自動デプロイする）
   workflow_dispatch:
     inputs:
       target_branch:
@@ -41,9 +42,28 @@ env:
   REGION: asia-northeast1
 
 jobs:
-  # ui のビルド・デプロイ（push 時のみ）
+  # 変更パスに応じて ui / automator を出し分ける
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+      automator: ${{ steps.filter.outputs.automator }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'ui/**'
+              - '.github/workflows/cd.yml'
+            automator:
+              - 'automator/**'
+
+  # ui のビルド・デプロイ（push 時・ui 変更時のみ）
   ui:
-    if: github.event_name == 'push'
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve environment
@@ -148,49 +168,73 @@ jobs:
 
   # automator の Terraform デプロイ（手動 dispatch 時のみ）。
   # TODO(Phase 2): 認証を WIF へ移行し、push トリガーで自動化する。
+  # automator の Terraform デプロイ（push で automator/** 変更時、または手動 dispatch）。
+  # 認証は WIF（キーレス）。共有 SA github-actions-deployer を impersonate する。
   automator:
-    if: github.event_name == 'workflow_dispatch'
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.automator == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Set target ref
-        run: echo "TARGET_REF=refs/heads/${{ inputs.target_branch }}" >> "$GITHUB_ENV"
+      - name: Resolve environment
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REF="refs/heads/${{ inputs.target_branch }}"
+          else
+            REF="${GITHUB_REF}"
+          fi
+          echo "TARGET_REF=$REF" >> "$GITHUB_ENV"
+          if [[ "$REF" == "refs/heads/main" ]]; then
+            {
+              echo "ENVIRONMENT=prod"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-prod.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "ENVIRONMENT=dev"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          fi
 
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_REF }}
 
-      - name: Set env vars
-        run: |
-          if [[ "${TARGET_REF}" == "refs/heads/main" ]]; then
-            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
-          else
-            echo "ENVIRONMENT=dev" >> "$GITHUB_ENV"
-          fi
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+          token_format: access_token
 
-      - name: Set Cloudflare credentials
-        run: |
-          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}" >> "$GITHUB_ENV"
-          echo "CLOUDFLARE_ACCESS_KEY_ID=${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}" >> "$GITHUB_ENV"
-          echo "CLOUDFLARE_SECRET_ACCESS_KEY=${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}" >> "$GITHUB_ENV"
+      - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Set Google Cloud credentials
-        run: |
-          mkdir -p "$HOME/.config/gcloud/credentials"
-          if [[ "${TARGET_REF}" == "refs/heads/main" ]]; then
-            echo "${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_BASE64_PROD }}" | base64 --decode > "$HOME/.config/gcloud/credentials/service-account.json"
-          else
-            echo "${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT_KEY_BASE64_DEV }}" | base64 --decode > "$HOME/.config/gcloud/credentials/service-account.json"
-          fi
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/credentials/service-account.json" >> "$GITHUB_ENV"
+      # Terraform の local-exec が行う app イメージの push（Artifact Registry）用に、
+      # ホスト側 docker の認証を通す（automator の terraform はホスト docker ソケットを使う）。
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Prepare .env
         working-directory: automator
-        run: cp .env.sample .env
+        run: |
+          cat > .env <<EOF
+          CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCESS_KEY_ID=${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          CLOUDFLARE_SECRET_ACCESS_KEY=${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          EOF
 
+      # WIF の access_token を渡す。GCS backend / google provider とも env を直接読む。
       - name: Deploy
         working-directory: automator
+        env:
+          GOOGLE_OAUTH_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
-          if [[ "${{ inputs.deploy_mode }}" == "plan" ]]; then
+          MODE="apply"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            MODE="${{ inputs.deploy_mode }}"
+          fi
+          if [[ "$MODE" == "plan" ]]; then
             make terraform-base ENVIRONMENT="${ENVIRONMENT}" COMMAND="plan -no-color"
           else
             make terraform-base ENVIRONMENT="${ENVIRONMENT}" COMMAND="apply -auto-approve"
