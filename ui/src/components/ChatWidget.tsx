@@ -9,6 +9,7 @@ import type {
   ChatSessionDetail,
   ChatSessionSummary,
 } from "@/types/chat";
+import { normalizeChatHref } from "@/lib/chat-href";
 
 const GREETING =
   "ポッドキャスト運営を手伝うアシスタントです。過去回の議事録・次回議題・SNS投稿の内容はリンク付きで答えます。アイデア出しや文章の相談など、それ以外の質問もどうぞ。";
@@ -62,20 +63,23 @@ const markdownComponents: Components = {
     </pre>
   ),
   hr: () => <hr className="my-3 border-gray-200" />,
-  // 内部リンク（/?episode=... 等）はクライアント遷移にして、レイアウト常駐の
-  // チャットを開いたまま画面だけ切り替える。外部リンクは新規タブ + noopener。
+  // LLM が崩した href（スラッシュ欠け・余計な ? 等）を正規化してから描画する。
+  // 内部リンクはクライアント遷移にして、レイアウト常駐のチャットを開いたまま
+  // 画面だけ切り替える。外部リンクは新規タブ + noopener。
   a: ({ href, children }) => {
-    const isInternal = typeof href === "string" && href.startsWith("/");
-    if (isInternal) {
+    const normalized = normalizeChatHref(
+      typeof href === "string" ? href : undefined,
+    );
+    if (normalized.isInternal) {
       return (
-        <Link href={href} className="text-blue-600 underline">
+        <Link href={normalized.href} className="text-blue-600 underline">
           {children}
         </Link>
       );
     }
     return (
       <a
-        href={href}
+        href={normalized.href || undefined}
         className="text-blue-600 underline"
         target="_blank"
         rel="noopener noreferrer"
