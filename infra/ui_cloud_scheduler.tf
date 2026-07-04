@@ -1,9 +1,5 @@
-# 定期実行ジョブ（宛先は Cloud Run のアプリ）。
-resource "google_project_service" "cloudscheduler" {
-  project            = var.project_id
-  service            = "cloudscheduler.googleapis.com"
-  disable_on_destroy = false
-}
+# podcast-ui の定期実行ジョブ（宛先は Cloud Run のアプリ）。
+# cloudscheduler.googleapis.com は google_project_service.required に集約。
 
 # アプリ側の検証と同じ Bearer トークンを Scheduler のヘッダに設定する。
 data "google_secret_manager_secret_version" "cron_secret" {
@@ -32,7 +28,7 @@ resource "google_cloud_scheduler_job" "cleanup_uploads" {
     }
   }
 
-  depends_on = [google_project_service.cloudscheduler]
+  depends_on = [google_project_service.required]
 }
 
 resource "google_cloud_scheduler_job" "reindex_minutes" {
@@ -52,5 +48,5 @@ resource "google_cloud_scheduler_job" "reindex_minutes" {
     }
   }
 
-  depends_on = [google_project_service.cloudscheduler]
+  depends_on = [google_project_service.required]
 }

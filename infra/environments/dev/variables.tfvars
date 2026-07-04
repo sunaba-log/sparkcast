@@ -6,10 +6,7 @@ gcs_retention_days = 3
 gcs_cors_origins = [
   "http://localhost:3000",
   "http://localhost:3002",
-  "https://podcast-ui-kentakashimas-projects.vercel.app",
-  "https://podcast-ui-red.vercel.app",
-  "https://podcast-ui-git-main-kentakashimas-projects.vercel.app",
-  "https://podcast-ui-git-feature-16-episode-6d23e0-kentakashimas-projects.vercel.app",
+  "https://dev.sparkcast.sunabalog.com",
 ]
 discord_webhook_info_secret_name   = "discord-webhook-url-dev-info"
 discord_webhook_error_secret_name  = "discord-webhook-url-dev-error"
@@ -24,3 +21,8 @@ r2_bucket_name                     = "podcast-dev"
 r2_subdomain                       = "dev.podcast"
 enable_promoter                    = false
 manage_firestore_database          = false
+
+# podcast-ui（Cloud Run Service）
+app_service_account_id           = "podcast-ui-dev"
+app_service_account_display_name = "Podcast UI dev"
+custom_domain                    = "dev.sparkcast.sunabalog.com"

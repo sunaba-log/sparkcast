@@ -18,11 +18,15 @@ resource "google_cloud_run_domain_mapping" "app" {
 
   # 手動作成分を import したため、証明書モード（既定 AUTOMATIC で ForceNew になる）と
   # サーバー付与のメタデータは無視し、不要な再作成・差分を防ぐ。
+  # provider の default_labels（org/environment/system）はドメインマッピングでは
+  # effective_labels/terraform_labels 経由で ForceNew になり再作成＝一時断を招くため無視する。
   lifecycle {
     ignore_changes = [
       spec[0].certificate_mode,
       metadata[0].annotations,
       metadata[0].labels,
+      metadata[0].effective_labels,
+      metadata[0].terraform_labels,
     ]
   }
 }

@@ -193,3 +193,29 @@ variable "promoter_scheduler_cron" {
   description = "Execution frequency of the promoter (cron format)."
   default     = "0 * * * *"
 }
+
+# ---------------------------------------------------------------------------
+# podcast-ui（旧 ui/infra）由来の変数。Cloud Run Service まわり。
+# upload_bucket / cloud_sql_instance_connection_name / db_password_secret_id /
+# db_name / db_user は同一 state 内のリソース直接参照に置換したため変数から削除した。
+# ---------------------------------------------------------------------------
+variable "app_service_account_id" {
+  type        = string
+  description = "podcast-ui アプリ実行用サービスアカウントの account_id"
+}
+
+variable "app_service_account_display_name" {
+  type        = string
+  description = "アプリ実行用サービスアカウントの表示名"
+}
+
+variable "cron_secret_id" {
+  type        = string
+  description = "cron エンドポイント保護用トークンの Secret Manager シークレット ID"
+  default     = "cron-secret"
+}
+
+variable "custom_domain" {
+  type        = string
+  description = "Cloud Run に割り当てるカスタムドメイン（例: dev.sparkcast.sunabalog.com）"
+}

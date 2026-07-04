@@ -1,0 +1,15 @@
+# ルートの Makefile / CD が生成する環境変数ファイル
+.env
+
+# Terraform（infra/ 一元管理）。.terraform.lock.hcl は追跡する。
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

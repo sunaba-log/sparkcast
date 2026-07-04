@@ -4,9 +4,7 @@ project_id         = "sunabalog-prod"
 gcs_force_destroy  = false
 gcs_retention_days = 30
 gcs_cors_origins = [
-  "https://podcast-ui-kentakashimas-projects.vercel.app",
-  "https://podcast-ui-red.vercel.app",
-  "https://podcast-ui-git-main-kentakashimas-projects.vercel.app",
+  "https://sparkcast.sunabalog.com",
 ]
 discord_webhook_info_secret_name   = "discord-webhook-url-prod-info"
 discord_webhook_error_secret_name  = "discord-webhook-url-prod-error"
@@ -20,3 +18,8 @@ database_url_secret_name           = "podcast-database-url-prod"
 cloud_sql_tier                     = "db-custom-1-3840"
 enable_promoter                    = true
 manage_firestore_database          = true
+
+# podcast-ui（Cloud Run Service）
+app_service_account_id           = "podcast-ui-prod"
+app_service_account_display_name = "Podcast UI prod"
+custom_domain                    = "sparkcast.sunabalog.com"
