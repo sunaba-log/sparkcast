@@ -47,7 +47,14 @@ DOCKER_SOCKET_SETTINGS := $(shell if [ -S /run/user/${LOCAL_HOST_UID}/docker.soc
 GOOGLE_APPLICATION_CREDENTIALS_ABS := $(shell if [ -n "$(GOOGLE_APPLICATION_CREDENTIALS)" ]; then echo $(GOOGLE_APPLICATION_CREDENTIALS); fi)
 GOOGLE_APPLICATION_CREDENTIALS_CONTAINER := /root/google-credentials.json
 GOOGLE_SETTINGS := $(shell if [ -n "$(GOOGLE_APPLICATION_CREDENTIALS_ABS)" ]; then echo "-e GOOGLE_APPLICATION_CREDENTIALS=$(GOOGLE_APPLICATION_CREDENTIALS_CONTAINER) -v $(GOOGLE_APPLICATION_CREDENTIALS_ABS):$(GOOGLE_APPLICATION_CREDENTIALS_CONTAINER):ro"; fi)
-TERRAFORM_BASE_COMMAND=docker run --rm ${INTERACTIVE_FLAG} --env-file .env -v $(PWD):/work -w /work/infrastructure ${DOCKER_SOCKET_SETTINGS} ${SSH_SETTINGS} ${GOOGLE_SETTINGS} terraform:latest
+# GCP 認証の優先順位（docker はどのケースでも維持）:
+#   1. GOOGLE_OAUTH_ACCESS_TOKEN … CI/WIF（google-github-actions/auth の access_token）。
+#      GCS backend / google provider とも env を直接読むため -e で渡すだけでよい。
+#   2. GOOGLE_APPLICATION_CREDENTIALS … 明示的な鍵ファイル（上の GOOGLE_SETTINGS）。
+#   3. ~/.config/gcloud の ADC … ローカル（gcloud auth application-default login）。
+GOOGLE_TOKEN_SETTINGS := $(shell if [ -n "$(GOOGLE_OAUTH_ACCESS_TOKEN)" ]; then echo "-e GOOGLE_OAUTH_ACCESS_TOKEN"; fi)
+GCLOUD_ADC_SETTINGS := $(shell if [ -z "$(GOOGLE_OAUTH_ACCESS_TOKEN)" ] && [ -z "$(GOOGLE_APPLICATION_CREDENTIALS_ABS)" ] && [ -d "$(HOME)/.config/gcloud" ]; then echo "-v $(HOME)/.config/gcloud:/root/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json"; fi)
+TERRAFORM_BASE_COMMAND=docker run --rm ${INTERACTIVE_FLAG} --env-file .env -v $(PWD):/work -w /work/infrastructure ${DOCKER_SOCKET_SETTINGS} ${SSH_SETTINGS} ${GOOGLE_SETTINGS} ${GOOGLE_TOKEN_SETTINGS} ${GCLOUD_ADC_SETTINGS} terraform:latest
 
 define SYSTEM_TARGET
 $1: $2
