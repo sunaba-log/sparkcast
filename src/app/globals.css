@@ -11,3 +11,23 @@
 body {
   background-color: var(--color-app-bg);
 }
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-play-state: paused;
+}
+
+.group:hover .animate-marquee {
+  animation-name: marquee;
+  animation-play-state: running;
+}

@@ -98,9 +98,9 @@ export function SNSPostMasterDetail({
     if (!hasMore || isLoading) return;
     const observer = new IntersectionObserver(
       (entries) => {
-         if (entries[0].isIntersecting) {
-           loadMore();
-         }
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
       },
       {
         root: containerRef.current,
@@ -167,12 +167,12 @@ export function SNSPostMasterDetail({
         prev.map((p) =>
           p.id === selectedPost.id
             ? {
-                ...p,
-                scheduledDate,
-                message,
-                platformUrls,
-                hashtags,
-              }
+              ...p,
+              scheduledDate,
+              message,
+              platformUrls,
+              hashtags,
+            }
             : p
         )
       );
@@ -256,11 +256,10 @@ export function SNSPostMasterDetail({
                 {/* Post Preview Card */}
                 <div
                   onClick={() => handleSelect(post)}
-                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white ${
-                    isSelected
-                      ? "border-2 border-brand shadow-sm"
-                      : "border-gray-200 hover:border-brand/50 shadow-sm"
-                  }`}
+                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
+                    ? "border-2 border-brand shadow-sm"
+                    : "border-gray-200 hover:border-brand/50 shadow-sm"
+                    }`}
                 >
                   {/* Mock Twitter Header */}
                   <div className="flex items-center justify-between mb-2">
@@ -323,9 +322,8 @@ export function SNSPostMasterDetail({
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
-                className={`px-3 py-1 rounded-xs text-xs font-semibold ${
-                  selectedPost.status === "pending" ? "bg-brand text-white" : "bg-emerald-600 text-white"
-                }`}
+                className={`px-3 py-1 rounded-xs text-xs font-semibold ${selectedPost.status === "pending" ? "bg-brand text-white" : "bg-emerald-600 text-white"
+                  }`}
               >
                 {selectedPost.status === "pending" ? "投稿予定" : "投稿済み"}
               </span>

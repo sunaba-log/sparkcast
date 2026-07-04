@@ -98,22 +98,20 @@ export function getGoogleServiceAccountCredentials():
 }
 
 export function getAllowedDevEmails(): string[] {
-  return required("DEV_ALLOWED_EMAILS")
+  return (process.env.DEV_ALLOWED_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
 }
 
-export function isLocalMockAuthEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
+// 許可リストが未設定・空の場合は全アカウントを許可する
+export function isEmailAllowed(email: string): boolean {
+  const allowedEmails = getAllowedDevEmails();
+  return allowedEmails.length === 0 || allowedEmails.includes(email);
 }
 
-export function getDefaultPodcastId(): number {
-  const value = Number(process.env.DEFAULT_PODCAST_ID ?? "1");
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error("DEFAULT_PODCAST_ID must be a positive integer");
-  }
-  return value;
+export function isLocalMockAuthEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 }
 
 export function getUploadBucket(): string {

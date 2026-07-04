@@ -1,0 +1,8 @@
+project_id                         = "sunabalog-dev"
+environment                        = "dev"
+region                             = "asia-northeast1"
+app_service_account_id             = "podcast-ui-dev"
+app_service_account_display_name   = "Podcast UI dev"
+upload_bucket                      = "podcast-automator-audio-input-dev"
+cloud_sql_instance_connection_name = "sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
+custom_domain                      = "dev.sparkcast.sunabalog.com"

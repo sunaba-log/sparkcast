@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { TopicProposal } from "@/types/episode";
 import { ChevronUp, ChevronDown, Plus, X, ArrowLeft, ArrowRight } from "lucide-react";
 
@@ -44,18 +44,44 @@ export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] 
     return dateTimeStr.split(" ")[0].split("T")[0];
   };
 
+  // Calculate pagination pages with ellipses
+  const pages: (number | string)[] = [];
+  const N = sortedProposals.length;
+  if (N > 0) {
+    const corePages = new Set<number>();
+    corePages.add(0);
+    corePages.add(N - 1);
+    corePages.add(currentIndex);
+    if (currentIndex - 1 >= 0) corePages.add(currentIndex - 1);
+    if (currentIndex + 1 < N) corePages.add(currentIndex + 1);
+
+    const sortedPages = Array.from(corePages).sort((a, b) => a - b);
+    for (let idx = 0; idx < sortedPages.length; idx++) {
+      const curr = sortedPages[idx];
+      if (idx > 0) {
+        const prev = sortedPages[idx - 1];
+        if (curr - prev === 2) {
+          pages.push(prev + 1);
+        } else if (curr - prev > 2) {
+          pages.push(`ellipsis-${prev}-${curr}`);
+        }
+      }
+      pages.push(curr);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Header Bar with Breadcrumbs and Date Pagination */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center text-xs text-gray-500 gap-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start text-xs text-gray-500 gap-2">
           <span>ホーム</span>
           <span>&gt;</span>
           <span className="font-medium text-gray-800">次回議題</span>
         </div>
 
         {/* Date Switcher Bar */}
-        <div className="flex items-center space-x-2 text-xs overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center flex-wrap gap-2 text-xs justify-center">
           <button
             onClick={handlePrev}
             disabled={currentIndex <= 0}
@@ -63,18 +89,25 @@ export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] 
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
-          
-          {sortedProposals.map((p) => {
+
+          {pages.map((item) => {
+            if (typeof item === "string") {
+              return (
+                <span key={item} className="px-1.5 py-1 text-gray-400 select-none shrink-0">
+                  ...
+                </span>
+              );
+            }
+            const p = sortedProposals[item];
             const isSelected = p.id === selectedProposal.id;
             return (
               <button
                 key={p.id}
                 onClick={() => setSelectedProposalId(p.id)}
-                className={`px-2.5 py-1 rounded transition-colors shrink-0 ${
-                  isSelected
-                    ? "bg-brand text-white font-medium"
-                    : "border border-brand/30 text-gray-700 hover:bg-gray-50"
-                }`}
+                className={`px-2.5 py-1 rounded transition-colors shrink-0 ${isSelected
+                  ? "bg-brand text-white font-medium"
+                  : "border border-brand/30 text-gray-700 hover:bg-gray-50"
+                  }`}
               >
                 {getOnlyDate(p.generatedAt)}
               </button>
@@ -102,6 +135,7 @@ function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // First card open by default
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [editingPoint, setEditingPoint] = useState<{ topicIdx: number; ptIdx: number } | null>(null);
 
   async function handleSave() {
     try {
@@ -245,29 +279,53 @@ function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
                     提案ポイント
                   </label>
                   <div className="space-y-2 mb-2">
-                    {topic.suggestedPoints.map((point, ptIdx) => (
-                      <input
-                        key={ptIdx}
-                        type="text"
-                        value={point}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setTopics((prev) =>
-                            prev.map((t, i) =>
-                              i === index
-                                ? {
-                                  ...t,
-                                  suggestedPoints: t.suggestedPoints.map((p, pI) =>
-                                    pI === ptIdx ? val : p
-                                  ),
-                                }
-                                : t
-                            )
-                          );
-                        }}
-                        className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900"
-                      />
-                    ))}
+                    {topic.suggestedPoints.map((point, ptIdx) => {
+                      const isEditing =
+                        editingPoint?.topicIdx === index && editingPoint?.ptIdx === ptIdx;
+
+                      if (isEditing) {
+                        return (
+                          <input
+                            key={ptIdx}
+                            type="text"
+                            value={point}
+                            autoFocus
+                            onBlur={() => setEditingPoint(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setTopics((prev) =>
+                                prev.map((t, i) =>
+                                  i === index
+                                    ? {
+                                      ...t,
+                                      suggestedPoints: t.suggestedPoints.map((p, pI) =>
+                                        pI === ptIdx ? val : p
+                                      ),
+                                    }
+                                    : t
+                                )
+                              );
+                            }}
+                            className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-brand"
+                          />
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={ptIdx}
+                          onClick={() => setEditingPoint({ topicIdx: index, ptIdx })}
+                          className="group w-full h-[38px] px-3.5 py-2 rounded-xs border border-brand/50 text-sm text-gray-900 flex items-center overflow-hidden cursor-pointer hover:border-brand transition-colors"
+                        >
+                          <MarqueeText text={point} />
+                        </div>
+                      );
+                    })}
                   </div>
                   <button
                     type="button"
@@ -335,6 +393,54 @@ function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function MarqueeText({ text }: { text: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [shouldScroll, setShouldScroll] = useState(false);
+
+  useEffect(() => {
+    if (!containerRef.current || !textRef.current) return;
+
+    const container = containerRef.current;
+    const textEl = textRef.current;
+
+    const checkOverflow = () => {
+      const containerWidth = container.clientWidth;
+      const textWidth = textEl.scrollWidth;
+      if (containerWidth === 0) return;
+      setShouldScroll(textWidth > containerWidth);
+    };
+
+    checkOverflow();
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkOverflow();
+    });
+    resizeObserver.observe(container);
+    resizeObserver.observe(textEl);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [text]);
+
+  const duration = Math.max(6, Math.min(25, text.length * 0.25));
+
+  return (
+    <div ref={containerRef} className="w-full overflow-hidden whitespace-nowrap relative flex">
+      <div
+        className={`${shouldScroll ? "animate-marquee" : ""} whitespace-nowrap flex shrink-0`}
+        style={shouldScroll ? { animationDuration: `${duration}s` } : undefined}
+      >
+        <span ref={textRef} className={shouldScroll ? "pr-12" : ""}>
+          {text}
+        </span>
+        {shouldScroll && <span className="pr-12">{text}</span>}
+      </div>
     </div>
   );
 }

@@ -1,0 +1,124 @@
+# アプリのビルド・デプロイ（Cloud Run）。ブランチで環境を切り替える。
+#   develop → dev（sunabalog-dev） / main → prod（sunabalog-prod）
+# インフラ（Terraform）は CI では回さず、`make terraform-apply ENVIRONMENT=<env>`
+# で手動デプロイする。PR プレビューは pr-preview.yml が担当する。
+name: cd
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: cd-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: asia-northeast1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve environment
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            {
+              echo "ENVIRONMENT=prod"
+              echo "PROJECT_ID=sunabalog-prod"
+              echo "SERVICE=podcast-ui-prod"
+              echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-prod/podcast-ui/podcast-ui"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=podcast-ui-deployer@sunabalog-prod.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-prod:asia-northeast1:podcast-automator-postgres-prod"
+              echo "DB_PASSWORD_SECRET=podcast-automator-database-password-prod"
+              echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCOe16OGUrP1qWtJTKlatf5gbuKRdiLDg8"
+              echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-prod.firebaseapp.com"
+              echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-prod"
+              echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-prod.firebaseapp.com"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "ENVIRONMENT=dev"
+              echo "PROJECT_ID=sunabalog-dev"
+              echo "SERVICE=podcast-ui-dev"
+              echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-dev/podcast-ui/podcast-ui"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=podcast-ui-deployer@sunabalog-dev.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
+              echo "DB_PASSWORD_SECRET=db-password"
+              echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI"
+              echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-dev.firebaseapp.com"
+              echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-dev"
+              echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-dev.firebaseapp.com"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # 新しいコードを配信する前に DB スキーマを収束させる（Cloud SQL Connector 経由）。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run migrations
+        run: |
+          npm ci
+          export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
+          export DB_NAME=podcast
+          export DB_USER=podcast_app
+          export DB_PASSWORD="$(gcloud secrets versions access latest --secret="$DB_PASSWORD_SECRET" --project="$PROJECT_ID")"
+          npm run db:migrate
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$NEXT_PUBLIC_FIREBASE_API_KEY" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$NEXT_PUBLIC_FIREBASE_PROJECT_ID" \
+            --build-arg FIREBASE_AUTH_HELPER_DOMAIN="$FIREBASE_AUTH_HELPER_DOMAIN" \
+            -t "$IMAGE:${{ github.sha }}" .
+
+      - name: Push image
+        run: docker push "$IMAGE:${{ github.sha }}"
+
+      # プレビューの --no-traffic 運用でトラフィックが特定リビジョンに固定されると
+      # 通常の deploy では最新へ移らないため、自リビジョンへ明示的に 100% を振る。
+      - name: Deploy to Cloud Run
+        run: |
+          SUFFIX="sha-${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMAGE:${{ github.sha }}" \
+            --revision-suffix "$SUFFIX" \
+            --no-traffic
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${SERVICE}-${SUFFIX}=100"
+          URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+          echo "SERVICE_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          title: "podcast-ui deploy (${{ env.ENVIRONMENT }})"
+          description: "${{ env.SERVICE_URL }}"
+          username: GitHub Actions

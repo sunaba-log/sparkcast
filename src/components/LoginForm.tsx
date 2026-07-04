@@ -42,11 +42,14 @@ export function LoginForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
     });
-    const result = (await response.json()) as { error?: string };
+    const result = (await response.json()) as {
+      error?: string;
+      registered?: boolean;
+    };
     if (!response.ok) {
       throw new Error(result.error ?? "ログインに失敗しました");
     }
-    router.push("/");
+    router.push(result.registered ? "/" : "/register");
     router.refresh();
   }, [router]);
 
@@ -112,11 +115,14 @@ export function LoginForm() {
       const response = await fetch("/api/auth/mock-session", {
         method: "POST",
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await response.json()) as {
+        error?: string;
+        registered?: boolean;
+      };
       if (!response.ok) {
         throw new Error(result.error ?? "モックログインに失敗しました");
       }
-      router.push("/");
+      router.push(result.registered ? "/" : "/register");
       router.refresh();
     } catch (caught) {
       setError(
@@ -128,7 +134,7 @@ export function LoginForm() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-8 max-w-md mx-auto">
+    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
       <h1 className="text-xl font-bold text-gray-900">管理画面へログイン</h1>
       <p className="mt-2 text-sm text-gray-500">
         Podcaster&apos;s DevLogのメンバー用画面です。

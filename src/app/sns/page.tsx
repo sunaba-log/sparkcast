@@ -1,15 +1,14 @@
 import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
-import { requirePodcastAccess, requireSessionUser } from "@/server/auth";
-import { getDefaultPodcastId } from "@/server/env";
+import { requireRegisteredUser } from "@/server/auth";
+import { requireSelectedPodcast } from "@/server/podcasts/selection";
 import { listEpisodesAndPromotionsPaginated } from "@/server/episodes/data-repository";
 import { mapToSNSPostItem } from "@/app/api/sns/route";
 
 export const dynamic = "force-dynamic";
 
 export default async function SNSPostPage() {
-  const user = await requireSessionUser();
-  const podcastId = getDefaultPodcastId();
-  await requirePodcastAccess(user.uid, podcastId);
+  const user = await requireRegisteredUser();
+  const podcastId = await requireSelectedPodcast(user);
 
   // Load the initial 5 episodes and their promotions
   const { episodes, hasMore } = await listEpisodesAndPromotionsPaginated(podcastId, 5, 0);
