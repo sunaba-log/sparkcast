@@ -2,12 +2,10 @@
 # 単一の必須チェックは ci-ok（スキップは許容、失敗のみブロック）。
 name: ci
 
+# develop/main へのマージは fast-forward（PR で検証済みのコミットと同一）なので、
+# push トリガでの再実行は冗長。CI は PR 上でのみ走らせる。
 on:
   pull_request:
-  push:
-    branches:
-      - develop
-      - main
 
 jobs:
   changes:
