@@ -1,62 +1,88 @@
-.PHONY: terraform-docker-build  # build the terraform docker image
-.PHONY: terraform-init  # initialize terraform for ENVIRONMENT (remote state)
-.PHONY: terraform-upgrade  # initialize terraform with provider upgrades
-.PHONY: terraform-reconfigure  # terraform init -reconfigure for ENVIRONMENT
+.PHONY: terraform-docker-build  # build infrastructure docker image
+.PHONY: terraform-setup  # terraform init for ENVIRONMENT (remote state)
+.PHONY: terraform-reconfigure # terraform init -reconfigure
+.PHONY: terraform-upgrade # initializes terraform with the latest versions
 .PHONY: terraform-format  # format terraform code
-.PHONY: terraform-validate  # check formatting and validate terraform code
+.PHONY: terraform-validate  # validate terraform code
 .PHONY: terraform-all  # format and validate terraform code
-.PHONY: terraform-plan  # show planned infrastructure changes for ENVIRONMENT
-.PHONY: terraform-apply  # apply infrastructure changes for ENVIRONMENT
-.PHONY: terraform-output  # show terraform outputs for ENVIRONMENT
+.PHONY: terraform-base  # run an arbitrary terraform COMMAND for ENVIRONMENT
+.PHONY: terraform-deploy-dev  # deploy to develop environment
+.PHONY: terraform-destroy-dev  # destroy the develop environment
+.PHONY: terraform-deploy-prod  # deploy to production environment
+.PHONY: terraform-destroy-prod  # destroy the production environment
+.PHONY: terraform-clean # removes local created terraform resources
+
+# 統合後の Terraform は単一の infra/（env 毎に 1 state）で管理する。
+# app（Python）まわりの install/lint/test/docker-build は automator/Makefile 側。
+-include .env
+export
 
 SHELL := /bin/bash
 
-# 対象環境（dev / prod）。環境ごとに backend と変数ファイルを切り替える。
 ENVIRONMENT ?= dev
 
-TERRAFORM_DOCKER_IMAGE := podcast-ui-terraform:latest
-GCLOUD_CONFIG_DIR := $(HOME)/.config/gcloud
 INTERACTIVE_FLAG := $(shell [ -t 0 ] && echo "-it")
-
-BACKEND_CONFIG := environments/$(ENVIRONMENT)/backend.conf
-VAR_FILE := environments/$(ENVIRONMENT)/variables.tfvars
-
-# Application Default Credentials（gcloud auth application-default login）を
-# コンテナへ read-only でマウントして認証する。
-TERRAFORM_BASE_COMMAND = docker run --rm $(INTERACTIVE_FLAG) \
-	-v $(PWD):/work -w /work/infra \
-	-v $(GCLOUD_CONFIG_DIR):/root/.config/gcloud:ro \
-	-e GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json \
-	$(TERRAFORM_DOCKER_IMAGE)
+SSH_SETTINGS=-v ~/.ssh:/root/.ssh:ro -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro
+LOCAL_HOST_UID := $(shell id -u)
+DOCKER_SOCKET_SETTINGS := $(shell if [ -S /run/user/${LOCAL_HOST_UID}/docker.sock ]; then echo "-v /run/user/${LOCAL_HOST_UID}/docker.sock:/var/run/docker.sock:ro"; else echo "-v /var/run/docker.sock:/var/run/docker.sock"; fi)
+GOOGLE_APPLICATION_CREDENTIALS_ABS := $(shell if [ -n "$(GOOGLE_APPLICATION_CREDENTIALS)" ]; then echo $(GOOGLE_APPLICATION_CREDENTIALS); fi)
+GOOGLE_APPLICATION_CREDENTIALS_CONTAINER := /root/google-credentials.json
+GOOGLE_SETTINGS := $(shell if [ -n "$(GOOGLE_APPLICATION_CREDENTIALS_ABS)" ]; then echo "-e GOOGLE_APPLICATION_CREDENTIALS=$(GOOGLE_APPLICATION_CREDENTIALS_CONTAINER) -v $(GOOGLE_APPLICATION_CREDENTIALS_ABS):$(GOOGLE_APPLICATION_CREDENTIALS_CONTAINER):ro"; fi)
+# GCP 認証の優先順位（docker はどのケースでも維持）:
+#   1. GOOGLE_OAUTH_ACCESS_TOKEN … CI/WIF（google-github-actions/auth の access_token）。
+#      GCS backend / google provider とも env を直接読むため -e で渡すだけでよい。
+#   2. GOOGLE_APPLICATION_CREDENTIALS … 明示的な鍵ファイル（上の GOOGLE_SETTINGS）。
+#   3. ~/.config/gcloud の ADC … ローカル（gcloud auth application-default login）。
+GOOGLE_TOKEN_SETTINGS := $(shell if [ -n "$(GOOGLE_OAUTH_ACCESS_TOKEN)" ]; then echo "-e GOOGLE_OAUTH_ACCESS_TOKEN"; fi)
+GCLOUD_ADC_SETTINGS := $(shell if [ -z "$(GOOGLE_OAUTH_ACCESS_TOKEN)" ] && [ -z "$(GOOGLE_APPLICATION_CREDENTIALS_ABS)" ] && [ -d "$(HOME)/.config/gcloud" ]; then echo "-v $(HOME)/.config/gcloud:/root/.config/gcloud:ro -e GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json"; fi)
+# リポジトリルートを /work にマウントし、Terraform の作業ディレクトリは /work/infra。
+# app イメージビルドの local-exec が参照する ${path.module}/../automator/app（= /work/automator/app）も
+# 同じマウント内に含める。
+TERRAFORM_BASE_COMMAND=docker run --rm ${INTERACTIVE_FLAG} --env-file .env -v $(PWD):/work -w /work/infra ${DOCKER_SOCKET_SETTINGS} ${SSH_SETTINGS} ${GOOGLE_SETTINGS} ${GOOGLE_TOKEN_SETTINGS} ${GCLOUD_ADC_SETTINGS} terraform:latest
 
 terraform-docker-build:
-	DOCKER_BUILDKIT=1 docker build --pull infra -t $(TERRAFORM_DOCKER_IMAGE)
+	DOCKER_BUILDKIT=1 docker build --pull infra -t terraform:latest
 
-# 環境ごとに state バケットが異なるため、init は必ず -reconfigure して
-# 対象環境の backend に切り替える。
-terraform-init: terraform-docker-build
-	$(TERRAFORM_BASE_COMMAND) init -reconfigure -backend-config=$(BACKEND_CONFIG)
-
-terraform-upgrade: terraform-docker-build
-	$(TERRAFORM_BASE_COMMAND) init -reconfigure -upgrade -backend-config=$(BACKEND_CONFIG)
+terraform-setup: terraform-docker-build
+	$(TERRAFORM_BASE_COMMAND) init -backend-config=environments/${ENVIRONMENT}/backend.conf
 
 terraform-reconfigure: terraform-docker-build
-	$(TERRAFORM_BASE_COMMAND) init -reconfigure -backend-config=$(BACKEND_CONFIG)
+	$(TERRAFORM_BASE_COMMAND) init -backend-config=environments/${ENVIRONMENT}/backend.conf -reconfigure
 
-terraform-format: terraform-docker-build
+terraform-upgrade: terraform-docker-build
+	$(TERRAFORM_BASE_COMMAND) init -upgrade -backend-config=environments/${ENVIRONMENT}/backend.conf
+
+terraform-format:
+	$(MAKE) terraform-setup ENVIRONMENT=$(ENVIRONMENT)
 	$(TERRAFORM_BASE_COMMAND) fmt -recursive
 
-terraform-validate: terraform-init
+terraform-validate: terraform-docker-build
+	# validate はバックエンド（GCS state）＝GCP 認証を必要としない。
+	# CI で認証情報なしに実行できるよう -backend=false で init する。
+	$(TERRAFORM_BASE_COMMAND) init -backend=false
 	$(TERRAFORM_BASE_COMMAND) fmt -check -recursive -diff
 	$(TERRAFORM_BASE_COMMAND) validate
 
-terraform-all: terraform-format terraform-validate
+terraform-all:
+	$(MAKE) terraform-format ENVIRONMENT=$(ENVIRONMENT)
+	$(MAKE) terraform-validate ENVIRONMENT=$(ENVIRONMENT)
 
-terraform-plan: terraform-init
-	$(TERRAFORM_BASE_COMMAND) plan -var-file=$(VAR_FILE) $(PLAN_COMMAND_EXTENSION)
+terraform-base:
+	$(MAKE) terraform-setup ENVIRONMENT=$(ENVIRONMENT)
+	$(TERRAFORM_BASE_COMMAND) ${COMMAND} -var-file=environments/${ENVIRONMENT}/variables.tfvars
 
-terraform-apply: terraform-init
-	$(TERRAFORM_BASE_COMMAND) apply -var-file=$(VAR_FILE) $(DEPLOY_COMMAND_EXTENSION)
+terraform-deploy-dev:
+	$(MAKE) terraform-base ENVIRONMENT=dev COMMAND="apply ${DEPLOY_COMMAND_EXTENSION}"
 
-terraform-output:
-	$(TERRAFORM_BASE_COMMAND) output
+terraform-destroy-dev:
+	$(MAKE) terraform-base ENVIRONMENT=dev COMMAND="destroy"
+
+terraform-deploy-prod:
+	$(MAKE) terraform-base ENVIRONMENT=prod COMMAND="apply ${DEPLOY_COMMAND_EXTENSION}"
+
+terraform-destroy-prod:
+	$(MAKE) terraform-base ENVIRONMENT=prod COMMAND="destroy"
+
+terraform-clean:
+	find infra -type d -name '.terraform' -exec rm -rf {} +
+	find infra -type f -name '.terraform.lock.hcl' -delete
