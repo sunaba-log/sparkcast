@@ -200,6 +200,6 @@ jobs:
         uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
           title: "automator deploy (${{ env.ENVIRONMENT }})"
           username: GitHub Actions
