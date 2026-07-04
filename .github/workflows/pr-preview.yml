@@ -22,7 +22,7 @@ env:
   SERVICE: podcast-ui-dev
   IMAGE: asia-northeast1-docker.pkg.dev/sunabalog-dev/podcast-ui/podcast-ui
   WORKLOAD_IDENTITY_PROVIDER: projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc
-  DEPLOYER_SA: podcast-ui-deployer@sunabalog-dev.iam.gserviceaccount.com
+  DEPLOYER_SA: github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com
   TAG: pr-${{ github.event.pull_request.number }}
   # Firebase Web SDK の公開設定値（ビルド時にバンドルへ埋め込まれる）
   NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI
