@@ -23,7 +23,12 @@ resource "null_resource" "docker_push" {
   provisioner "local-exec" {
     command = <<EOF
         set -e
-        cat "$GOOGLE_APPLICATION_CREDENTIALS" | docker login -u _json_key --password-stdin https://${var.region}-docker.pkg.dev
+        # CI(WIF) は access token、ローカルは SA キー(_json_key) で AR にログインする。
+        if [ -n "$GOOGLE_OAUTH_ACCESS_TOKEN" ]; then
+          echo "$GOOGLE_OAUTH_ACCESS_TOKEN" | docker login -u oauth2accesstoken --password-stdin https://${var.region}-docker.pkg.dev
+        else
+          cat "$GOOGLE_APPLICATION_CREDENTIALS" | docker login -u _json_key --password-stdin https://${var.region}-docker.pkg.dev
+        fi
         docker tag ${local.docker_image_latest} ${local.docker_image}
         docker push ${local.docker_image}
     EOF
