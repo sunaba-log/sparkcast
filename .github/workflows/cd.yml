@@ -83,6 +83,7 @@ jobs:
               echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-prod.firebaseapp.com"
               echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-prod"
               echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-prod.firebaseapp.com"
+              echo "APP_URL=https://sparkcast.sunabalog.com"
             } >> "$GITHUB_ENV"
           else
             {
@@ -98,6 +99,7 @@ jobs:
               echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-dev.firebaseapp.com"
               echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-dev"
               echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-dev.firebaseapp.com"
+              echo "APP_URL=https://dev.sparkcast.sunabalog.com"
             } >> "$GITHUB_ENV"
           fi
 
@@ -155,8 +157,6 @@ jobs:
             --project "$PROJECT_ID" \
             --region "$REGION" \
             --to-revisions "${SERVICE}-${SUFFIX}=100"
-          URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
-          echo "SERVICE_URL=$URL" >> "$GITHUB_ENV"
 
       - name: Notify Discord
         uses: sarisia/actions-status-discord@v1
@@ -164,7 +164,7 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
           title: "podcast-ui deploy (${{ env.ENVIRONMENT }})"
-          description: "${{ env.SERVICE_URL }}"
+          description: "${{ env.APP_URL }}"
           username: GitHub Actions
 
   # Terraform デプロイ（push で infra/** または automator/** 変更時、または手動 dispatch）。
