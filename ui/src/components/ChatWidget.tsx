@@ -10,12 +10,13 @@ import type {
 } from "@/types/chat";
 
 const GREETING =
-  "配信済みエピソードの議事録・書き起こしに加えて、次回議題の提案やSNS投稿についても質問できます。回答には該当ページへのリンクが付きます。";
+  "ポッドキャスト運営を手伝うアシスタントです。過去回の議事録・次回議題・SNS投稿の内容はリンク付きで答えます。アイデア出しや文章の相談など、それ以外の質問もどうぞ。";
 
 const SUGGESTED_QUESTIONS = [
   "最近のエピソードの要点をまとめて",
   "次回の議題候補には何がある？",
   "最新エピソードのSNS投稿は何を予定してる？",
+  "次回に向けたトークテーマのアイデアを出して",
 ];
 
 const SCROLL_THRESHOLD = 80;
@@ -560,7 +561,7 @@ export function ChatWidget() {
               <textarea
                 id="chat-input"
                 name="chat-input"
-                aria-label="議事録・次回議題・SNS投稿について質問する"
+                aria-label="アシスタントに質問・相談する"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
@@ -575,7 +576,7 @@ export function ChatWidget() {
                   }
                 }}
                 rows={2}
-                placeholder="議事録・次回議題・SNS投稿について質問…"
+                placeholder="質問や相談を入力…"
                 className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
               />
               <div className="mt-2 flex items-center justify-between">
