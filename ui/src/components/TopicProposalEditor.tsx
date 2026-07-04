@@ -4,17 +4,47 @@ import { useState, useRef, useEffect } from "react";
 import type { TopicProposal } from "@/types/episode";
 import { ChevronUp, ChevronDown, Plus, X, ArrowLeft, ArrowRight } from "lucide-react";
 
-export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] }) {
+export function TopicProposalEditor({
+  proposals,
+  initialProposalId,
+  initialTopicIndex,
+}: {
+  proposals: TopicProposal[];
+  /** ディープリンク（/agenda?proposal=...）で初期選択する提案 ID。 */
+  initialProposalId?: string;
+  /** ディープリンク（&topic=N）でスクロール表示する議題のインデックス。 */
+  initialTopicIndex?: number;
+}) {
   // Sort proposals by generatedAt in ascending chronological order
   const sortedProposals = [...proposals].sort((a, b) => {
     return new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime();
   });
 
-  // Select the latest proposal by default
+  // Select the deep-linked proposal if present, otherwise the latest one
   const latestProposal = sortedProposals[sortedProposals.length - 1];
-  const [selectedProposalId, setSelectedProposalId] = useState<string>(
-    latestProposal?.id || ""
-  );
+  const [selectedProposalId, setSelectedProposalId] = useState<string>(() => {
+    if (
+      initialProposalId &&
+      sortedProposals.some((p) => p.id === initialProposalId)
+    ) {
+      return initialProposalId;
+    }
+    return latestProposal?.id || "";
+  });
+
+  // クライアント遷移（チャットのリンク等）では再マウントされないため、
+  // ディープリンク先の変化に合わせてレンダー中に選択を調整する。
+  const [prevInitialProposalId, setPrevInitialProposalId] =
+    useState(initialProposalId);
+  if (initialProposalId !== prevInitialProposalId) {
+    setPrevInitialProposalId(initialProposalId);
+    if (
+      initialProposalId &&
+      sortedProposals.some((p) => p.id === initialProposalId)
+    ) {
+      setSelectedProposalId(initialProposalId);
+    }
+  }
 
   const selectedProposal = sortedProposals.find((p) => p.id === selectedProposalId) || latestProposal;
 
@@ -125,17 +155,53 @@ export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] 
       </div>
 
       {/* Accordion Topics List keyed by selectedProposal.id to reset state on change */}
-      <TopicProposalInnerEditor key={selectedProposal.id} proposal={selectedProposal} />
+      <TopicProposalInnerEditor
+        key={selectedProposal.id}
+        proposal={selectedProposal}
+        focusTopicIndex={initialTopicIndex}
+      />
     </div>
   );
 }
 
-function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
+function TopicProposalInnerEditor({
+  proposal,
+  focusTopicIndex,
+}: {
+  proposal: TopicProposal;
+  /** ディープリンクでスクロール表示する議題のインデックス。 */
+  focusTopicIndex?: number;
+}) {
   const [topics, setTopics] = useState(proposal.suggestedTopics);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // First card open by default
+  // 全議題を展開した状態で表示する（個別に閉じられる）。
+  const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(
+    () => new Set(proposal.suggestedTopics.map((_, index) => index)),
+  );
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [editingPoint, setEditingPoint] = useState<{ topicIdx: number; ptIdx: number } | null>(null);
+  const topicRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  // クライアント遷移で focusTopicIndex が変わったとき、閉じられていれば展開し直す
+  //（レンダー中の prop 変化調整パターン）。
+  const [prevFocusTopicIndex, setPrevFocusTopicIndex] = useState(focusTopicIndex);
+  if (focusTopicIndex !== prevFocusTopicIndex) {
+    setPrevFocusTopicIndex(focusTopicIndex);
+    if (focusTopicIndex !== undefined && !expandedIndexes.has(focusTopicIndex)) {
+      const next = new Set(expandedIndexes);
+      next.add(focusTopicIndex);
+      setExpandedIndexes(next);
+    }
+  }
+
+  // ディープリンク先の議題をスクロール表示する（クライアント遷移にも追従）。
+  useEffect(() => {
+    if (focusTopicIndex === undefined) return;
+    topicRefs.current[focusTopicIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [focusTopicIndex]);
 
   async function handleSave() {
     try {
@@ -160,7 +226,15 @@ function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
   }
 
   const toggleAccordion = (index: number) => {
-    setExpandedIndex(expandedIndex === index ? null : index);
+    setExpandedIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
   };
 
   const handleAddPoint = (topicIndex: number) => {
@@ -189,12 +263,15 @@ function TopicProposalInnerEditor({ proposal }: { proposal: TopicProposal }) {
   return (
     <div className="space-y-4">
       {topics.map((topic, index) => {
-        const isExpanded = expandedIndex === index;
+        const isExpanded = expandedIndexes.has(index);
         const relatedNewsItem = proposal.relatedNews[index] || proposal.relatedNews[0];
 
         return (
           <div
             key={index}
+            ref={(el) => {
+              topicRefs.current[index] = el;
+            }}
             className="border border-brand/30 rounded-xs overflow-hidden transition-all duration-200"
           >
             {/* Header Bar / Collapsed view */}

@@ -6,11 +6,24 @@ import { requireSelectedPodcast } from "@/server/podcasts/selection";
 
 export const dynamic = "force-dynamic";
 
-export default async function EpisodeListPage() {
+export default async function EpisodeListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ episode?: string }>;
+}) {
   const user = await requireRegisteredUser();
   const podcastId = await requireSelectedPodcast(user);
-  const episodes = await getEpisodes(podcastId);
-  const podcast = await getPodcast(podcastId);
+  const [episodes, podcast, { episode }] = await Promise.all([
+    getEpisodes(podcastId),
+    getPodcast(podcastId),
+    searchParams,
+  ]);
 
-  return <EpisodeMasterDetail initialEpisodes={episodes} podcast={podcast} />;
+  return (
+    <EpisodeMasterDetail
+      initialEpisodes={episodes}
+      podcast={podcast}
+      initialSelectedId={episode}
+    />
+  );
 }

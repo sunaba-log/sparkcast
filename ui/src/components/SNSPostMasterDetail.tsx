@@ -19,14 +19,51 @@ export type SNSPostItem = {
 export function SNSPostMasterDetail({
   initialPosts = [],
   initialHasMore = false,
+  initialSelectedId,
 }: {
   initialPosts?: SNSPostItem[];
   initialHasMore?: boolean;
+  /** ディープリンク（/sns?post=...）で初期選択する投稿 ID。 */
+  initialSelectedId?: string;
 }) {
   const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
-  const [selectedId, setSelectedId] = useState<string>(
-    initialPosts.length > 0 ? initialPosts[0].id : ""
-  );
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    if (
+      initialSelectedId &&
+      initialPosts.some((p) => p.id === initialSelectedId)
+    ) {
+      return initialSelectedId;
+    }
+    return initialPosts.length > 0 ? initialPosts[0].id : "";
+  });
+
+  // クライアント遷移（チャットのリンク等）では再マウントされないため、
+  // ディープリンク先の変化に合わせてレンダー中に選択を調整する。
+  // 対象の投稿が読み込み済みリストに無い場合はサーバーがマージ済みの
+  // initialPosts から補う。
+  const [prevInitialSelectedId, setPrevInitialSelectedId] =
+    useState(initialSelectedId);
+  if (initialSelectedId !== prevInitialSelectedId) {
+    setPrevInitialSelectedId(initialSelectedId);
+    if (initialSelectedId) {
+      setPosts((prev) => {
+        const existing = new Set(prev.map((p) => p.id));
+        const added = initialPosts.filter((p) => !existing.has(p.id));
+        return added.length > 0 ? [...prev, ...added] : prev;
+      });
+      setSelectedId(initialSelectedId);
+    }
+  }
+
+  // ディープリンクで選択した投稿を一覧内にスクロール表示する。
+  const listItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (!initialSelectedId) return;
+    listItemRefs.current[initialSelectedId]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [initialSelectedId]);
 
   const selectedPost = posts.find((p) => p.id === selectedId) || posts[0];
 
@@ -237,7 +274,13 @@ export function SNSPostMasterDetail({
           {posts.map((post) => {
             const isSelected = selectedPost && post.id === selectedPost.id;
             return (
-              <div key={post.id} className="flex items-start gap-4 relative z-10">
+              <div
+                key={post.id}
+                ref={(el) => {
+                  listItemRefs.current[post.id] = el;
+                }}
+                className="flex items-start gap-4 relative z-10"
+              >
                 {/* Timeline Icon Node */}
                 <div className="mt-1 shrink-0 bg-app-bg p-1 rounded-full">
                   {post.status === "pending" ? (
