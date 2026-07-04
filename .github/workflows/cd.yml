@@ -9,6 +9,9 @@ on:
     branches:
       - develop
       - main
+    paths:
+      - "ui/**"
+      - ".github/workflows/cd.yml"
 
 concurrency:
   group: cd-${{ github.ref_name }}
@@ -76,6 +79,7 @@ jobs:
         with:
           node-version: "22"
       - name: Run migrations
+        working-directory: ui
         run: |
           npm ci
           export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
@@ -85,6 +89,7 @@ jobs:
           npm run db:migrate
 
       - name: Build image
+        working-directory: ui
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$NEXT_PUBLIC_FIREBASE_API_KEY" \

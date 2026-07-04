@@ -42,6 +42,7 @@ locals {
     "roles/run.developer",           # Cloud Run へのデプロイ・トラフィック更新
     "roles/artifactregistry.writer", # イメージの push
     "roles/cloudsql.client",         # デプロイ前のマイグレーション実行（Cloud SQL 接続）
+    "roles/firebaseauth.admin",      # PR プレビュードメインを認可ドメインへ自動登録/削除
   ]
 }
 
