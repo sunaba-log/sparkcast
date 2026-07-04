@@ -46,12 +46,6 @@ variable "db_user" {
   default     = "podcast_app"
 }
 
-variable "github_repository" {
-  type        = string
-  description = "GitHub Actions を許可するリポジトリ（owner/repo）"
-  default     = "sunaba-log/podcast-ui"
-}
-
 variable "db_password_secret_id" {
   type        = string
   description = "DB 接続パスワードを保持する Secret Manager シークレット ID"
