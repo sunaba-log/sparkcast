@@ -1,4 +1,4 @@
-name: CD
+name: cd-automator
 
 on:
   workflow_dispatch:
@@ -20,6 +20,9 @@ on:
     branches:
       - main
       - develop
+    paths:
+      - "automator/**"
+      - ".github/workflows/cd-automator.yml"
 
 jobs:
 
@@ -63,6 +66,7 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/credentials/service-account.json" >> "$GITHUB_ENV"
 
       - name: Prepare .env
+        working-directory: automator
         run: |
           if [ -f .env.sample ]; then
             awk -F= '
@@ -81,6 +85,7 @@ jobs:
           fi
 
       - name: Deploy
+        working-directory: automator
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.deploy_mode }}" == "plan" ]]; then
             echo "Planning ${ENVIRONMENT}..."

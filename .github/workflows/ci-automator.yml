@@ -1,12 +1,18 @@
-name: CI
+name: ci-automator
 
 on:
   workflow_call:
   workflow_dispatch:
   pull_request:
+    paths:
+      - "automator/**"
+      - ".github/workflows/ci-automator.yml"
   push:
     branches:
       - main
+    paths:
+      - "automator/**"
+      - ".github/workflows/ci-automator.yml"
 
 jobs:
   app:
@@ -40,7 +46,7 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/credentials/service-account.json" >> "$GITHUB_ENV"
 
       - name: Prepare .env
-        working-directory: app
+        working-directory: automator/app
         run: |
           if [ -f .env.sample ]; then
             awk -F= '
@@ -59,15 +65,15 @@ jobs:
           fi
 
       - name: Install dependencies
-        working-directory: app
+        working-directory: automator/app
         run: make install
 
       - name: Lint
-        working-directory: app
+        working-directory: automator/app
         run: make lint
 
       - name: Tests
-        working-directory: app
+        working-directory: automator/app
         run: make test
 
   infrastructure:
@@ -101,6 +107,7 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/.config/gcloud/credentials/service-account.json" >> "$GITHUB_ENV"
 
       - name: Prepare .env
+        working-directory: automator
         run: |
           if [ -f .env.sample ]; then
             awk -F= '
@@ -119,6 +126,7 @@ jobs:
           fi
 
       - name: Terraform validate
+        working-directory: automator
         run: make terraform-validate
 
   report:
