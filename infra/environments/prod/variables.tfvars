@@ -23,3 +23,5 @@ manage_firestore_database          = true
 app_service_account_id           = "podcast-ui-prod"
 app_service_account_display_name = "Podcast UI prod"
 custom_domain                    = "sparkcast.sunabalog.com"
+# prod の live サービスは automator と共有の既存シークレットを参照している
+db_password_secret_id = "podcast-automator-database-password-prod"

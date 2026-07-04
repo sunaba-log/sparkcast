@@ -1,7 +1,11 @@
 # podcast-ui アプリが参照するシークレットの権限付与。
-# DB パスワードは同一 state の automator 管理シークレット
-# （google_secret_manager_secret.database_password）を直接参照する。
-# cron トークンは手動管理シークレットのため data source で参照する。
+# DB パスワード・cron トークンとも手動 or 別管理のシークレットを data source で参照する
+# （DB パスワードを直接参照化しない理由は variables.tf の db_password_secret_id を参照）。
+
+data "google_secret_manager_secret" "db_password" {
+  project   = var.project_id
+  secret_id = var.db_password_secret_id
+}
 
 data "google_secret_manager_secret" "cron_secret" {
   project   = var.project_id
@@ -10,7 +14,7 @@ data "google_secret_manager_secret" "cron_secret" {
 
 resource "google_secret_manager_secret_iam_member" "app_secrets" {
   for_each = {
-    db_password = google_secret_manager_secret.database_password.secret_id
+    db_password = data.google_secret_manager_secret.db_password.secret_id
     cron_secret = data.google_secret_manager_secret.cron_secret.secret_id
   }
 

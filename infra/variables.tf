@@ -215,6 +215,16 @@ variable "cron_secret_id" {
   default     = "cron-secret"
 }
 
+# Cloud Run サービスは gcloud（cd の ui デプロイ）がリビジョンを管理するため、
+# TF が template（env）を変更するとリビジョン名衝突で失敗する。DB パスワードの
+# 参照シークレットは live と一致させる必要があるため直接参照化せず変数で保持する
+# （dev=db-password / prod=automator 管理シークレット）。
+variable "db_password_secret_id" {
+  type        = string
+  description = "DB 接続パスワードを保持する Secret Manager シークレット ID"
+  default     = "db-password"
+}
+
 variable "custom_domain" {
   type        = string
   description = "Cloud Run に割り当てるカスタムドメイン（例: dev.sparkcast.sunabalog.com）"

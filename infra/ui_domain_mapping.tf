@@ -25,6 +25,8 @@ resource "google_cloud_run_domain_mapping" "app" {
       spec[0].certificate_mode,
       metadata[0].annotations,
       metadata[0].labels,
+      # default_labels が effective_labels/terraform_labels 経由で ForceNew を起こすため、
+      # 「redundant」警告が出ても両者を明示的に無視する必要がある（labels だけでは不十分）。
       metadata[0].effective_labels,
       metadata[0].terraform_labels,
     ]
