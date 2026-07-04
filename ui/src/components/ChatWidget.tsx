@@ -10,7 +10,13 @@ import type {
 } from "@/types/chat";
 
 const GREETING =
-  "配信済みエピソードの議事録について質問できます。気になるテーマや過去回の内容を聞いてみてください。";
+  "配信済みエピソードの議事録・書き起こしに加えて、次回議題の提案やSNS投稿についても質問できます。回答には該当ページへのリンクが付きます。";
+
+const SUGGESTED_QUESTIONS = [
+  "最近のエピソードの要点をまとめて",
+  "次回の議題候補には何がある？",
+  "最新エピソードのSNS投稿は何を予定してる？",
+];
 
 const SCROLL_THRESHOLD = 80;
 
@@ -304,6 +310,11 @@ export function ChatWidget() {
     await generate([...messages, { role: "user", content: text }]);
   }
 
+  async function sendSuggestion(text: string) {
+    if (isStreaming) return;
+    await generate([...messages, { role: "user", content: text }]);
+  }
+
   async function retry() {
     if (isStreaming) return;
     if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
@@ -461,10 +472,10 @@ export function ChatWidget() {
                 className="w-full rounded-md px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 disabled:opacity-50"
               >
                 {reindexState === "running"
-                  ? "議事録を更新中…"
+                  ? "ナレッジを更新中…"
                   : reindexState === "done"
-                    ? "議事録を更新しました"
-                    : "議事録インデックスを更新"}
+                    ? "ナレッジを更新しました"
+                    : "ナレッジ（議事録・議題・SNS）を更新"}
               </button>
             </div>
           </>
@@ -481,7 +492,21 @@ export function ChatWidget() {
               className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
             >
               {messages.length === 0 ? (
-                <p className="text-sm leading-relaxed text-gray-500">{GREETING}</p>
+                <div className="space-y-3">
+                  <p className="text-sm leading-relaxed text-gray-500">{GREETING}</p>
+                  <div className="flex flex-col items-start gap-2">
+                    {SUGGESTED_QUESTIONS.map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        onClick={() => void sendSuggestion(question)}
+                        className="rounded-full border border-gray-300 px-3 py-1.5 text-left text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 messages.map((message, index) => (
                   <div
@@ -535,7 +560,7 @@ export function ChatWidget() {
               <textarea
                 id="chat-input"
                 name="chat-input"
-                aria-label="議事録について質問する"
+                aria-label="議事録・次回議題・SNS投稿について質問する"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
@@ -550,7 +575,7 @@ export function ChatWidget() {
                   }
                 }}
                 rows={2}
-                placeholder="議事録について質問する…"
+                placeholder="議事録・次回議題・SNS投稿について質問…"
                 className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
               />
               <div className="mt-2 flex items-center justify-between">

@@ -19,14 +19,23 @@ export type SNSPostItem = {
 export function SNSPostMasterDetail({
   initialPosts = [],
   initialHasMore = false,
+  initialSelectedId,
 }: {
   initialPosts?: SNSPostItem[];
   initialHasMore?: boolean;
+  /** ディープリンク（/sns?post=...）で初期選択する投稿 ID。 */
+  initialSelectedId?: string;
 }) {
   const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
-  const [selectedId, setSelectedId] = useState<string>(
-    initialPosts.length > 0 ? initialPosts[0].id : ""
-  );
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    if (
+      initialSelectedId &&
+      initialPosts.some((p) => p.id === initialSelectedId)
+    ) {
+      return initialSelectedId;
+    }
+    return initialPosts.length > 0 ? initialPosts[0].id : "";
+  });
 
   const selectedPost = posts.find((p) => p.id === selectedId) || posts[0];
 

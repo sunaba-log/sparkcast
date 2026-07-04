@@ -4,11 +4,11 @@ import type { Content } from "@google/genai";
 import { getVertexAiModel } from "@/server/env";
 import type { ChatMessage } from "@/types/chat";
 import { embedQuery } from "@/server/chat/embeddings";
+import { listAllKnowledge } from "@/server/chat/knowledge";
 import {
-  buildMinutesContext,
+  buildKnowledgeContext,
   buildRetrievedContext,
 } from "@/server/chat/minutes-context";
-import { listEpisodeKnowledge } from "@/server/chat/minutes-repository";
 import { searchSimilarChunks } from "@/server/chat/vector-index";
 import { getVertexAi } from "@/server/chat/vertex-client";
 
@@ -16,24 +16,28 @@ const RETRIEVAL_LIMIT = 12;
 const CONDENSE_HISTORY_TURNS = 6;
 
 function buildSystemInstruction(context: string): string {
-  const knowledge = context || "（配信済みの議事録はまだありません）";
+  const knowledge = context || "（参照できるナレッジはまだありません）";
   return [
-    "あなたはポッドキャスト「Podcaster's DevLog」の議事録アシスタントです。",
-    "以下に与えられた『配信済みエピソードの議事録・書き起こし』だけを根拠に、日本語で回答してください。",
+    "あなたはポッドキャスト「Podcaster's DevLog」のアシスタントです。",
+    "以下に与えられたナレッジ（配信済みエピソードの議事録・書き起こし／次回議題の提案／SNS 投稿）だけを根拠に、日本語で回答してください。",
+    "ナレッジは『## 【種別】タイトル』の見出しと、その直下の『URL: ...』行を持つブロックに分かれています。",
     "",
     "# 回答の中身（重要）",
-    "- 表面的な要約で終わらせず、具体的に答える。誰が何を述べたか、挙がった例・論点・結論・課題まで、議事録/書き起こしにある具体を拾って説明する。",
-    "- 質問に対して十分な情報量で答える（短すぎる一言回答にしない）。ただし議事録に無いことは補わない。",
+    "- 表面的な要約で終わらせず、具体的に答える。誰が何を述べたか、挙がった例・論点・結論・課題まで、ナレッジにある具体を拾って説明する。",
+    "- 質問に対して十分な情報量で答える（短すぎる一言回答にしない）。ただしナレッジに無いことは補わない。",
     "- 関連する複数の論点があれば整理して網羅する。",
+    "",
+    "# リンクの付け方（必ず守る）",
+    "- 参照したブロックは必ず Markdown リンク `[タイトル](URL)` で示す。",
+    "- リンクの URL には、そのブロックの『URL: ...』行に書かれた URL を**一字一句そのまま**使う。URL を自分で組み立てたり変更したりしない。",
+    "- リンク文にはそのブロックのタイトルを使う。回答の根拠にしたブロックへのリンクを文中または末尾に必ず含める。",
     "",
     "# 回答スタイル（必ず守る）",
     "- 必ず読みやすい Markdown で構成し、長い一段落のベタ書きにしない。",
     "- 要点は箇条書き（`-`）にし、重要語は **太字** にする。話題の区切りには見出し（`##`）を使う。",
-    "- 参照したエピソードは必ず Markdown リンク `[タイトル](/episodes/エピソードID)` で示す。",
-    "  リンク文には議事録のタイトルを使い、URL の ID は見出し『## エピソード ID: タイトル』の ID を使う。",
-    "- 議事録に記載が無い内容は答えず、その旨を伝える。推測しない。",
+    "- ナレッジに記載が無い内容は答えず、その旨を伝える。推測しない。",
     "",
-    "# 配信済みエピソードの議事録・書き起こし",
+    "# ナレッジ（議事録・次回議題・SNS 投稿）",
     knowledge,
   ].join("\n");
 }
@@ -77,7 +81,7 @@ async function buildSearchQuery(messages: ChatMessage[]): Promise<string> {
           parts: [
             {
               text: [
-                "次の会話の最後のフォローアップ質問を、議事録検索に使えるよう文脈を補った独立した日本語の質問1文に書き換えてください。",
+                "次の会話の最後のフォローアップ質問を、ポッドキャストのナレッジ（議事録・次回議題・SNS投稿）検索に使えるよう文脈を補った独立した日本語の質問1文に書き換えてください。",
                 "質問文のみを出力してください。",
                 "",
                 "会話:",
@@ -100,8 +104,8 @@ async function buildSearchQuery(messages: ChatMessage[]): Promise<string> {
 }
 
 /**
- * RAG（ベクトル検索）で関連議事録を集めて文脈を作る。
- * 検索が使えない / ヒット無しの場合は全エピソードの全文コンテキストにフォールバックする。
+ * RAG（ベクトル検索）で関連ナレッジを集めて文脈を作る。
+ * 検索が使えない / ヒット無しの場合は全ナレッジの全文コンテキストにフォールバックする。
  */
 async function buildContext(
   podcastId: number,
@@ -120,17 +124,17 @@ async function buildContext(
       if (retrieved) return retrieved;
     } catch (error) {
       console.warn(
-        "Vector search unavailable; falling back to full minutes",
+        "Vector search unavailable; falling back to full knowledge",
         error,
       );
     }
   }
-  const knowledge = await listEpisodeKnowledge(podcastId);
-  return buildMinutesContext(knowledge);
+  const docs = await listAllKnowledge(podcastId);
+  return buildKnowledgeContext(docs);
 }
 
 /**
- * 配信済みエピソードの議事録を文脈に、会話への回答をストリーミングで生成する。
+ * ナレッジ（議事録・次回議題・SNS 投稿）を文脈に、会話への回答をストリーミングで生成する。
  */
 export async function* streamChatReply(input: {
   podcastId: number;

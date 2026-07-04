@@ -3,16 +3,19 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { chunkText } from "@/server/chat/chunking";
 import { embedTexts } from "@/server/chat/embeddings";
-import { listEpisodeKnowledge } from "@/server/chat/minutes-repository";
+import { listAllKnowledge } from "@/server/chat/knowledge";
 import {
-  getIndexedEpisodeHash,
-  replaceEpisodeChunks,
+  deleteSourceChunks,
+  getIndexedSourceHash,
+  listIndexedSourceKeys,
+  replaceSourceChunks,
 } from "@/server/chat/vector-index";
 
 export type ReindexResult = {
-  episodes: number;
-  indexedEpisodes: number;
-  skippedEpisodes: number;
+  sources: number;
+  indexedSources: number;
+  skippedSources: number;
+  removedSources: number;
   indexedChunks: number;
 };
 
@@ -21,31 +24,33 @@ function hashContent(content: string): string {
 }
 
 /**
- * 配信済みエピソードの議事録をチャンク分割・埋め込みし、Firestore ベクトルインデックスへ反映する。
- * 議事録が前回から変わっていないエピソードはスキップする（冪等）。
+ * チャットの知識源（議事録・次回議題・SNS 投稿）をチャンク分割・埋め込みし、
+ * Firestore ベクトルインデックスへ反映する。前回から変わっていないソースはスキップし（冪等）、
+ * 現存しなくなったソース（旧形式の残骸を含む）はインデックスから削除する。
  */
-export async function reindexPodcastMinutes(
+export async function reindexPodcastKnowledge(
   podcastId: number,
 ): Promise<ReindexResult> {
-  const episodes = await listEpisodeKnowledge(podcastId);
+  const docs = await listAllKnowledge(podcastId);
   const result: ReindexResult = {
-    episodes: episodes.length,
-    indexedEpisodes: 0,
-    skippedEpisodes: 0,
+    sources: docs.length,
+    indexedSources: 0,
+    skippedSources: 0,
+    removedSources: 0,
     indexedChunks: 0,
   };
 
-  for (const episode of episodes) {
-    const contentHash = hashContent(episode.content);
-    const indexedHash = await getIndexedEpisodeHash(podcastId, episode.episodeId);
+  for (const doc of docs) {
+    const contentHash = hashContent(doc.content);
+    const indexedHash = await getIndexedSourceHash(podcastId, doc.sourceKey);
     if (indexedHash === contentHash) {
-      result.skippedEpisodes += 1;
+      result.skippedSources += 1;
       continue;
     }
 
-    const chunks = chunkText(episode.content);
+    const chunks = chunkText(doc.content);
     if (chunks.length === 0) {
-      result.skippedEpisodes += 1;
+      result.skippedSources += 1;
       continue;
     }
 
@@ -54,10 +59,12 @@ export async function reindexPodcastMinutes(
       "RETRIEVAL_DOCUMENT",
     );
 
-    await replaceEpisodeChunks({
+    await replaceSourceChunks({
       podcastId,
-      episodeId: episode.episodeId,
-      episodeTitle: episode.title,
+      sourceType: doc.sourceType,
+      sourceKey: doc.sourceKey,
+      title: doc.title,
+      url: doc.url,
       contentHash,
       chunks: chunks.map((chunk) => ({
         chunkIndex: chunk.index,
@@ -66,8 +73,17 @@ export async function reindexPodcastMinutes(
       embeddings,
     });
 
-    result.indexedEpisodes += 1;
+    result.indexedSources += 1;
     result.indexedChunks += chunks.length;
+  }
+
+  // 現存しないソース（削除された議題・SNS 投稿や旧形式の meta）を掃除する。
+  const currentKeys = new Set(docs.map((doc) => doc.sourceKey));
+  const indexedKeys = await listIndexedSourceKeys(podcastId);
+  for (const key of indexedKeys) {
+    if (currentKeys.has(key)) continue;
+    await deleteSourceChunks(podcastId, key);
+    result.removedSources += 1;
   }
 
   return result;

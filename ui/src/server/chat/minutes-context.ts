@@ -1,15 +1,19 @@
-import type { EpisodeKnowledge } from "@/server/chat/minutes-repository";
+import {
+  SOURCE_TYPE_LABELS,
+  type KnowledgeDoc,
+  type KnowledgeSourceType,
+} from "@/server/chat/knowledge-types";
 import type { RetrievedChunk } from "@/server/chat/vector-index";
 
-export type BuildMinutesContextOptions = {
+export type BuildKnowledgeContextOptions = {
   /** コンテキスト全体の最大文字数。 */
   maxTotalChars?: number;
-  /** 1 エピソードあたりの最大文字数。 */
-  maxPerEpisodeChars?: number;
+  /** 1 ソースあたりの最大文字数。 */
+  maxPerSourceChars?: number;
 };
 
 const DEFAULT_MAX_TOTAL_CHARS = 120_000;
-const DEFAULT_MAX_PER_EPISODE_CHARS = 6_000;
+const DEFAULT_MAX_PER_SOURCE_CHARS = 6_000;
 
 function truncate(text: string, max: number): string {
   const trimmed = text.trim();
@@ -17,24 +21,33 @@ function truncate(text: string, max: number): string {
   return `${trimmed.slice(0, max)}…（以下省略）`;
 }
 
+// LLM が回答リンクをそのまま転記できるよう、各ブロックに種別・タイトル・URL を明示する。
+function blockHeader(
+  sourceType: KnowledgeSourceType,
+  title: string,
+  url: string,
+): string {
+  return `## 【${SOURCE_TYPE_LABELS[sourceType]}】${title}\nURL: ${url}`;
+}
+
 /**
- * 配信済みエピソードの議事録を LLM へ渡すコンテキスト文字列に整形する。
- * 新しい順に詰め、全体予算を超えた時点で打ち切る（純粋関数）。
+ * ナレッジドキュメント（議事録・次回議題・SNS 投稿）を LLM へ渡す
+ * コンテキスト文字列に整形する。全体予算を超えた時点で打ち切る（純粋関数）。
  */
-export function buildMinutesContext(
-  items: EpisodeKnowledge[],
-  options: BuildMinutesContextOptions = {},
+export function buildKnowledgeContext(
+  docs: KnowledgeDoc[],
+  options: BuildKnowledgeContextOptions = {},
 ): string {
   const maxTotal = options.maxTotalChars ?? DEFAULT_MAX_TOTAL_CHARS;
-  const maxPerEpisode = options.maxPerEpisodeChars ?? DEFAULT_MAX_PER_EPISODE_CHARS;
+  const maxPerSource = options.maxPerSourceChars ?? DEFAULT_MAX_PER_SOURCE_CHARS;
 
   const blocks: string[] = [];
   let used = 0;
 
-  for (const item of items) {
-    const body = truncate(item.content, maxPerEpisode);
+  for (const doc of docs) {
+    const body = truncate(doc.content, maxPerSource);
     if (!body) continue;
-    const block = `## エピソード ${item.episodeId}: ${item.title}\n${body}`;
+    const block = `${blockHeader(doc.sourceType, doc.title, doc.url)}\n${body}`;
     if (used + block.length > maxTotal) break;
     blocks.push(block);
     used += block.length;
@@ -45,7 +58,7 @@ export function buildMinutesContext(
 
 /**
  * ベクトル検索で取得したチャンクを LLM へ渡すコンテキスト文字列に整形する。
- * 同一エピソードのチャンクはまとめ、全体予算を超えた時点で打ち切る（純粋関数）。
+ * 同一ソースのチャンクはまとめ、全体予算を超えた時点で打ち切る（純粋関数）。
  */
 export function buildRetrievedContext(
   chunks: RetrievedChunk[],
@@ -53,16 +66,21 @@ export function buildRetrievedContext(
 ): string {
   const maxTotal = options.maxTotalChars ?? DEFAULT_MAX_TOTAL_CHARS;
 
-  const byEpisode = new Map<number, { title: string; texts: string[] }>();
+  const bySource = new Map<
+    string,
+    { sourceType: KnowledgeSourceType; title: string; url: string; texts: string[] }
+  >();
   for (const chunk of chunks) {
     const text = chunk.text.trim();
     if (!text) continue;
-    const entry = byEpisode.get(chunk.episodeId);
+    const entry = bySource.get(chunk.sourceKey);
     if (entry) {
       entry.texts.push(text);
     } else {
-      byEpisode.set(chunk.episodeId, {
-        title: chunk.episodeTitle,
+      bySource.set(chunk.sourceKey, {
+        sourceType: chunk.sourceType,
+        title: chunk.title,
+        url: chunk.url,
         texts: [text],
       });
     }
@@ -70,8 +88,8 @@ export function buildRetrievedContext(
 
   const blocks: string[] = [];
   let used = 0;
-  for (const [episodeId, { title, texts }] of byEpisode) {
-    const block = `## エピソード ${episodeId}: ${title}\n${texts.join("\n…\n")}`;
+  for (const { sourceType, title, url, texts } of bySource.values()) {
+    const block = `${blockHeader(sourceType, title, url)}\n${texts.join("\n…\n")}`;
     if (used + block.length > maxTotal) break;
     blocks.push(block);
     used += block.length;

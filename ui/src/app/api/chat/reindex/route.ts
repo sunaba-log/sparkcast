@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/server/auth";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
-import { reindexPodcastMinutes } from "@/server/chat/reindex";
+import { reindexPodcastKnowledge } from "@/server/chat/reindex";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function POST() {
     if (!auth) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
-    const result = await reindexPodcastMinutes(auth.podcastId);
+    const result = await reindexPodcastKnowledge(auth.podcastId);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof Error && error.message === "NO_PODCAST_SELECTED") {

@@ -4,17 +4,30 @@ import { useState, useRef, useEffect } from "react";
 import type { TopicProposal } from "@/types/episode";
 import { ChevronUp, ChevronDown, Plus, X, ArrowLeft, ArrowRight } from "lucide-react";
 
-export function TopicProposalEditor({ proposals }: { proposals: TopicProposal[] }) {
+export function TopicProposalEditor({
+  proposals,
+  initialProposalId,
+}: {
+  proposals: TopicProposal[];
+  /** ディープリンク（/agenda?proposal=...）で初期選択する提案 ID。 */
+  initialProposalId?: string;
+}) {
   // Sort proposals by generatedAt in ascending chronological order
   const sortedProposals = [...proposals].sort((a, b) => {
     return new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime();
   });
 
-  // Select the latest proposal by default
+  // Select the deep-linked proposal if present, otherwise the latest one
   const latestProposal = sortedProposals[sortedProposals.length - 1];
-  const [selectedProposalId, setSelectedProposalId] = useState<string>(
-    latestProposal?.id || ""
-  );
+  const [selectedProposalId, setSelectedProposalId] = useState<string>(() => {
+    if (
+      initialProposalId &&
+      sortedProposals.some((p) => p.id === initialProposalId)
+    ) {
+      return initialProposalId;
+    }
+    return latestProposal?.id || "";
+  });
 
   const selectedProposal = sortedProposals.find((p) => p.id === selectedProposalId) || latestProposal;
 
