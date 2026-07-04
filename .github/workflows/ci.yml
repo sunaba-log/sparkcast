@@ -45,8 +45,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Lint
-        # 既存の ESLint 違反を段階的に解消するため当面は非ブロッキング（#60）
-        continue-on-error: true
         run: npm run lint
       - name: Typecheck
         run: npx tsc --noEmit

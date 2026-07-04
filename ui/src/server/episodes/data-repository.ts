@@ -241,7 +241,7 @@ export async function updateSnsPromotion(input: {
     .collection("sns_promotions")
     .doc(input.promotionId);
 
-  const updateData: any = {
+  const updateData: Record<string, unknown> = {
     edited_at: new Date().toISOString(),
     edited_by: input.updatedBy,
   };

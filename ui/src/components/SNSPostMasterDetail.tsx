@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2, Clock, CheckCircle2, X } from "lucide-react";
 
 export type SNSPostItem = {
@@ -55,25 +55,24 @@ export function SNSPostMasterDetail({
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Synchronize inspector fields when the selected post changes
-  useEffect(() => {
-    if (selectedPost) {
-      setScheduledDate(selectedPost.scheduledDate);
-      setMessage(selectedPost.message);
-      setPlatformUrls(selectedPost.platformUrls);
-      setHashtags(selectedPost.hashtags);
-      setSaveStatus("idle");
-    }
-  }, [selectedPost?.id]);
+  // Synchronize inspector fields when the selected post changes.
+  // (React 推奨の「prop 変化に合わせた state 調整」パターン: レンダー中に前回値と比較)
+  const [prevSelectedPostId, setPrevSelectedPostId] = useState(selectedPost?.id);
+  if (selectedPost && selectedPost.id !== prevSelectedPostId) {
+    setPrevSelectedPostId(selectedPost.id);
+    setScheduledDate(selectedPost.scheduledDate);
+    setMessage(selectedPost.message);
+    setPlatformUrls(selectedPost.platformUrls);
+    setHashtags(selectedPost.hashtags);
+    setSaveStatus("idle");
+  }
 
-  // If no post is selected but posts exist, select the first one
-  useEffect(() => {
-    if (!selectedId && posts.length > 0) {
-      setSelectedId(posts[0].id);
-    }
-  }, [posts, selectedId]);
+  // If no post is selected but posts exist, select the first one.
+  if (!selectedId && posts.length > 0) {
+    setSelectedId(posts[0].id);
+  }
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
     try {
@@ -92,7 +91,7 @@ export function SNSPostMasterDetail({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading, hasMore, offset]);
 
   useEffect(() => {
     if (!hasMore || isLoading) return;
@@ -116,7 +115,7 @@ export function SNSPostMasterDetail({
         observer.unobserve(currentSentinel);
       }
     };
-  }, [hasMore, isLoading, offset]);
+  }, [hasMore, isLoading, loadMore]);
 
   const handleSelect = (post: SNSPostItem) => {
     setSelectedId(post.id);
