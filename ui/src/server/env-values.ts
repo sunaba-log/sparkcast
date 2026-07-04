@@ -34,13 +34,13 @@ export function getFirebaseServiceAccountJson(): string | undefined {
   return process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 }
 
-export function parseServiceAccountJson(raw: string): any {
+export function parseServiceAccountJson(raw: string): unknown {
   let str = raw.trim();
   if (str.startsWith('"') && str.endsWith('"')) {
     str = str.slice(1, -1);
   }
 
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(str);
   } catch {
@@ -67,9 +67,11 @@ export function parseServiceAccountJson(raw: string): any {
   if (
     parsed &&
     typeof parsed === "object" &&
-    typeof parsed.private_key === "string"
+    "private_key" in parsed &&
+    typeof (parsed as Record<string, unknown>).private_key === "string"
   ) {
-    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+    const obj = parsed as { private_key: string };
+    obj.private_key = obj.private_key.replace(/\\n/g, "\n");
   }
   return parsed;
 }

@@ -61,11 +61,18 @@ export function EpisodeMasterDetail({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Sync state and handle source changes when selectedEpisode changes
-  useEffect(() => {
+  // Reset the player UI state synchronously when the episode changes.
+  // (React 推奨の「prop 変化に合わせた state 調整」パターン: レンダー中に前回値と比較)
+  const [prevSelectedId, setPrevSelectedId] = useState(selectedId);
+  if (selectedId !== prevSelectedId) {
+    setPrevSelectedId(selectedId);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+  }
+
+  // Reload the audio element (external system) when the source changes.
+  useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.load();
@@ -296,6 +303,10 @@ export function EpisodeMasterDetail({
               {/* Audio Player Preview */}
               <div className="rounded-xs p-4 border border-brand flex items-center gap-4 backdrop-blur-xs">
                 {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
+                  // アートワークは任意ホストのリモート画像で、next/image 化には
+                  // images.remotePatterns の網羅的な許可が必要になり実運用リスクが高い。
+                  // 固定サイズ表示のため最適化の恩恵も薄いので通常の img を許容する。
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
                     alt={selectedEpisode.title}
