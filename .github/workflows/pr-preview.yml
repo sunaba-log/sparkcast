@@ -85,6 +85,9 @@ jobs:
       # プレビューの動的ホスト名を Firebase Auth の認可ドメインへ自動登録する
       # （PR ごとの手作業を不要にする。PR クローズ時に cleanup 側で削除）。
       - name: Authorize preview domain (Firebase Auth)
+        # 認可ドメイン登録は best-effort（deployer SA に firebaseauth.admin が
+        # 付与されるまでは失敗し得るが、プレビュー配信自体は止めない）。
+        continue-on-error: true
         run: |
           HOST="$(echo '${{ steps.url.outputs.url }}' | sed -E 's#^https?://##; s#/.*##')"
           if [ -n "$HOST" ]; then
@@ -132,6 +135,7 @@ jobs:
       # デプロイ時に登録したプレビュードメインの認可を解除する
       - name: Deauthorize preview domain (Firebase Auth)
         if: steps.url.outputs.url != ''
+        continue-on-error: true
         run: |
           HOST="$(echo '${{ steps.url.outputs.url }}' | sed -E 's#^https?://##; s#/.*##')"
           python3 .github/scripts/firebase_authorized_domain.py remove "$PROJECT_ID" "$HOST"
