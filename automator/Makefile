@@ -84,8 +84,10 @@ terraform-format:
 	$(MAKE) terraform-setup ENVIRONMENT=$(ENVIRONMENT)
 	$(TERRAFORM_BASE_COMMAND) fmt -recursive
 
-terraform-validate:
-	$(MAKE) terraform-setup ENVIRONMENT=$(ENVIRONMENT)
+terraform-validate: terraform-docker-build
+	# validate はバックエンド（GCS state）＝GCP 認証を必要としない。
+	# CI で認証情報なしに実行できるよう -backend=false で init する。
+	$(TERRAFORM_BASE_COMMAND) init -backend=false
 	$(TERRAFORM_BASE_COMMAND) fmt -check -recursive -diff
 	$(TERRAFORM_BASE_COMMAND) validate
 

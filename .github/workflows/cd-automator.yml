@@ -16,13 +16,16 @@ on:
         options:
           - plan
           - apply
-  push:
-    branches:
-      - main
-      - develop
-    paths:
-      - "automator/**"
-      - ".github/workflows/cd-automator.yml"
+  # NOTE: Phase 1 では automator の自動デプロイを休止（GH secrets 未移行のため）。
+  #       Phase 2 で WIF + secrets を整備してから push トリガーを有効化する。
+  #       それまでは workflow_dispatch で手動実行する。
+  # push:
+  #   branches:
+  #     - main
+  #     - develop
+  #   paths:
+  #     - "automator/**"
+  #     - ".github/workflows/cd-automator.yml"
 
 jobs:
 
