@@ -96,3 +96,18 @@ jobs:
             fi
           done
           echo "ok"
+
+  # 失敗時のみ Discord に通知する（成功時はノイズになるため送らない）。
+  report:
+    needs: [ui, automator]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord on failure
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          status: failure
+          title: "ci failed"
+          username: GitHub Actions
