@@ -59,7 +59,6 @@ jobs:
               - '.github/workflows/cd.yml'
             automator:
               - 'automator/**'
-              - '.github/workflows/cd.yml'
 
   # ui のビルド・デプロイ（push 時・ui 変更時のみ）
   ui:
