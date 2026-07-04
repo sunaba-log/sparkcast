@@ -1,0 +1,98 @@
+# モノレポ共通 CI。変更されたパスに応じて ui / automator のジョブを出し分ける。
+# 単一の必須チェックは ci-ok（スキップは許容、失敗のみブロック）。
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+      automator: ${{ steps.filter.outputs.automator }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'ui/**'
+              - '.github/workflows/ci.yml'
+            automator:
+              - 'automator/**'
+              - '.github/workflows/ci.yml'
+
+  ui:
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        # 既存の ESLint 違反を段階的に解消するため当面は非ブロッキング（#60）
+        continue-on-error: true
+        run: npm run lint
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm run test
+
+  automator:
+    needs: changes
+    if: needs.changes.outputs.automator == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+      - name: Install dependencies
+        working-directory: automator/app
+        run: make install
+      - name: Lint
+        working-directory: automator/app
+        run: make lint
+      - name: Test
+        working-directory: automator/app
+        run: make test
+      - name: Prepare .env
+        working-directory: automator
+        run: cp .env.sample .env
+      - name: Terraform validate
+        working-directory: automator
+        run: make terraform-validate
+
+  # パスフィルタでスキップされたジョブが必須チェックをブロックしないよう、
+  # ここを唯一の必須チェックにする（skip は許容、failure/cancelled のみ失敗）。
+  ci-ok:
+    needs: [ui, automator]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate results
+        run: |
+          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }}"
+          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "required job failed"; exit 1
+            fi
+          done
+          echo "ok"
