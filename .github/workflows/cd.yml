@@ -93,8 +93,7 @@ jobs:
               echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
               echo "DEPLOYER_SA=github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com"
               echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
-              # DB パスワードは automator 管理シークレットに一本化（Cloud Run の TF 参照と一致）。
-              echo "DB_PASSWORD_SECRET=podcast-automator-database-password-dev"
+              echo "DB_PASSWORD_SECRET=db-password"
               echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI"
               echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-dev.firebaseapp.com"
               echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-dev"

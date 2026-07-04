@@ -55,7 +55,7 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
         name = "DB_PASSWORD"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.database_password.secret_id
+            secret  = data.google_secret_manager_secret.db_password.secret_id
             version = "latest"
           }
         }
@@ -81,12 +81,19 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
   }
 
   # デプロイ（イメージ更新・リビジョン名・タグ付きプレビュー・トラフィック）は
-  # GitHub Actions が行うため、terraform は初期作成のみ担い以降は無視する。
+  # GitHub Actions（gcloud）が行うため、terraform は初期作成のみ担い以降は無視する。
+  # provider の default_labels 由来のサービスラベル更新も、gcloud 管理サービスへの
+  # 不要な PATCH（リビジョン運用と競合し得る）を避けるため無視する。
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
       template[0].revision,
       template[0].labels,
+      # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。
+      # 「redundant」警告が出ても labels だけでは default_labels を止められないため両者を無視する。
+      labels,
+      terraform_labels,
+      effective_labels,
       traffic,
       client,
       client_version,
