@@ -55,6 +55,16 @@ export function SNSPostMasterDetail({
     }
   }
 
+  // ディープリンクで選択した投稿を一覧内にスクロール表示する。
+  const listItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (!initialSelectedId) return;
+    listItemRefs.current[initialSelectedId]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [initialSelectedId]);
+
   const selectedPost = posts.find((p) => p.id === selectedId) || posts[0];
 
   // Inspector form state
@@ -264,7 +274,13 @@ export function SNSPostMasterDetail({
           {posts.map((post) => {
             const isSelected = selectedPost && post.id === selectedPost.id;
             return (
-              <div key={post.id} className="flex items-start gap-4 relative z-10">
+              <div
+                key={post.id}
+                ref={(el) => {
+                  listItemRefs.current[post.id] = el;
+                }}
+                className="flex items-start gap-4 relative z-10"
+              >
                 {/* Timeline Icon Node */}
                 <div className="mt-1 shrink-0 bg-app-bg p-1 rounded-full">
                   {post.status === "pending" ? (

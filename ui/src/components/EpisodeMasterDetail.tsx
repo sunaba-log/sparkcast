@@ -64,6 +64,16 @@ export function EpisodeMasterDetail({
       setSelectedId(initialSelectedId);
     }
   }
+
+  // ディープリンクで選択したエピソードを一覧内にスクロール表示する。
+  const listItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  useEffect(() => {
+    if (!initialSelectedId) return;
+    listItemRefs.current[initialSelectedId]?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [initialSelectedId]);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [minutesTab, setMinutesTab] = useState<"preview" | "edit">("preview");
 
@@ -231,6 +241,9 @@ export function EpisodeMasterDetail({
             return (
               <div
                 key={ep.id}
+                ref={(el) => {
+                  listItemRefs.current[ep.id] = el;
+                }}
                 onClick={() => handleSelectEpisode(ep)}
                 className={`p-4 rounded-xs cursor-pointer transition-all duration-150 border relative ${isSelected
                   ? "border-2 border-brand"

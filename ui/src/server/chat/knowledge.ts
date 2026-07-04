@@ -35,47 +35,40 @@ function isEphemeralUrl(url: string): boolean {
   return url.includes("vertexaisearch.cloud.google.com");
 }
 
-/** 次回議題の提案（topic_proposals）を知識ドキュメントとして取得する（新しい順に最大5件）。 */
+/**
+ * 次回議題の提案（topic_proposals）を知識ドキュメントとして取得する（新しい順に最大5提案）。
+ * 1 議題 = 1 ドキュメントにし、リンクから該当議題を直接開けるようにする。
+ */
 async function listAgendaKnowledge(podcastId: number): Promise<KnowledgeDoc[]> {
   const proposals = await listTopicProposals(podcastId);
-  return proposals
-    .slice(0, AGENDA_KNOWLEDGE_LIMIT)
-    .map((proposal) => {
-      const parts: string[] = [];
-      if (proposal.targetPeriod) {
-        parts.push(`対象期間: ${proposal.targetPeriod}`);
-      }
-      if (proposal.suggestedTopics.length > 0) {
-        const topics = proposal.suggestedTopics.map((topic, index) => {
-          const lines = [`${index + 1}. ${topic.title}`];
-          if (topic.description) lines.push(`   ${topic.description}`);
-          if (topic.suggestedPoints.length > 0) {
-            lines.push(`   論点: ${topic.suggestedPoints.join(" / ")}`);
-          }
-          return lines.join("\n");
-        });
-        parts.push(`提案トピック:\n${topics.join("\n")}`);
-      }
-      if (proposal.relatedNews.length > 0) {
-        const news = proposal.relatedNews.map((item) => {
-          const url = item.url && !isEphemeralUrl(item.url) ? `（${item.url}）` : "";
-          const lines = [`- ${item.title}${url}`];
-          if (item.summary) lines.push(`  ${item.summary}`);
-          return lines.join("\n");
-        });
-        parts.push(`関連ニュース:\n${news.join("\n")}`);
-      }
-      const period =
-        proposal.targetPeriod || proposal.generatedAt.slice(0, 10) || proposal.id;
-      return {
-        sourceType: "agenda" as const,
-        sourceKey: `agenda:${proposal.id}`,
-        title: `次回議題（${period}）`,
-        url: `/agenda?proposal=${encodeURIComponent(proposal.id)}`,
-        content: parts.join("\n\n").trim(),
-      };
-    })
-    .filter((doc) => doc.content.length > 0);
+  return proposals.slice(0, AGENDA_KNOWLEDGE_LIMIT).flatMap((proposal) => {
+    const period =
+      proposal.targetPeriod || proposal.generatedAt.slice(0, 10) || proposal.id;
+    return proposal.suggestedTopics
+      .map((topic, index) => {
+        const parts: string[] = [`対象期間: ${period}`];
+        if (topic.description) parts.push(topic.description);
+        if (topic.suggestedPoints.length > 0) {
+          parts.push(`論点: ${topic.suggestedPoints.join(" / ")}`);
+        }
+        // 関連ニュースは議題とインデックスで対応している（UI と同じ扱い）。
+        const news = proposal.relatedNews[index];
+        if (news?.title) {
+          const url = news.url && !isEphemeralUrl(news.url) ? `（${news.url}）` : "";
+          const lines = [`関連ニュース: ${news.title}${url}`];
+          if (news.summary) lines.push(news.summary);
+          parts.push(lines.join("\n"));
+        }
+        return {
+          sourceType: "agenda" as const,
+          sourceKey: `agenda:${proposal.id}:${index}`,
+          title: topic.title || `次回議題（${period}）`,
+          url: `/agenda?proposal=${encodeURIComponent(proposal.id)}&topic=${index}`,
+          content: parts.join("\n\n").trim(),
+        };
+      })
+      .filter((doc) => doc.content.length > 0);
+  });
 }
 
 type EpisodeTitleRow = QueryResultRow & {
