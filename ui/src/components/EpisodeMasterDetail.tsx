@@ -33,14 +33,23 @@ type PodcastInfo = {
 export function EpisodeMasterDetail({
   initialEpisodes,
   podcast,
+  initialSelectedId,
 }: {
   initialEpisodes: Episode[];
   podcast: PodcastInfo | null;
+  /** ディープリンク（/?episode=...）で初期選択するエピソード ID。 */
+  initialSelectedId?: string;
 }) {
   const [episodes, setEpisodes] = useState<Episode[]>(initialEpisodes);
-  const [selectedId, setSelectedId] = useState<string>(
-    initialEpisodes.length > 0 ? initialEpisodes[0].id : ""
-  );
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    if (
+      initialSelectedId &&
+      initialEpisodes.some((e) => e.id === initialSelectedId)
+    ) {
+      return initialSelectedId;
+    }
+    return initialEpisodes.length > 0 ? initialEpisodes[0].id : "";
+  });
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [minutesTab, setMinutesTab] = useState<"preview" | "edit">("preview");
 

@@ -3,7 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { chunkText } from "@/server/chat/chunking";
 import { embedTexts } from "@/server/chat/embeddings";
-import { listAllKnowledge } from "@/server/chat/knowledge";
+import { listMinutesKnowledge } from "@/server/chat/knowledge";
 import {
   deleteSourceChunks,
   getIndexedSourceHash,
@@ -24,14 +24,15 @@ function hashContent(content: string): string {
 }
 
 /**
- * チャットの知識源（議事録・次回議題・SNS 投稿）をチャンク分割・埋め込みし、
- * Firestore ベクトルインデックスへ反映する。前回から変わっていないソースはスキップし（冪等）、
- * 現存しなくなったソース（旧形式の残骸を含む）はインデックスから削除する。
+ * 議事録・書き起こしをチャンク分割・埋め込みし、Firestore ベクトルインデックスへ反映する。
+ * 次回議題・SNS 投稿はデータ量が小さく常にコンテキストへ全量注入するため、対象外。
+ * 前回から変わっていないソースはスキップし（冪等）、現存しなくなったソース
+ * （旧形式の残骸を含む）はインデックスから削除する。
  */
 export async function reindexPodcastKnowledge(
   podcastId: number,
 ): Promise<ReindexResult> {
-  const docs = await listAllKnowledge(podcastId);
+  const docs = await listMinutesKnowledge(podcastId);
   const result: ReindexResult = {
     sources: docs.length,
     indexedSources: 0,

@@ -4,7 +4,10 @@ import type { Content } from "@google/genai";
 import { getVertexAiModel } from "@/server/env";
 import type { ChatMessage } from "@/types/chat";
 import { embedQuery } from "@/server/chat/embeddings";
-import { listAllKnowledge } from "@/server/chat/knowledge";
+import {
+  listAllKnowledge,
+  listSupplementalKnowledge,
+} from "@/server/chat/knowledge";
 import {
   buildKnowledgeContext,
   buildRetrievedContext,
@@ -107,8 +110,11 @@ async function buildSearchQuery(messages: ChatMessage[]): Promise<string> {
   }
 }
 
+const SUPPLEMENTAL_MAX_TOTAL_CHARS = 40_000;
+
 /**
- * RAG（ベクトル検索）で関連ナレッジを集めて文脈を作る。
+ * RAG（ベクトル検索）で関連する議事録チャンクを集め、次回議題・SNS 投稿は
+ * データ量が小さいため常に全量を添えて文脈を作る（インデックス未更新でも回答できる）。
  * 検索が使えない / ヒット無しの場合は全ナレッジの全文コンテキストにフォールバックする。
  */
 async function buildContext(
@@ -125,7 +131,13 @@ async function buildContext(
         RETRIEVAL_LIMIT,
       );
       const retrieved = buildRetrievedContext(chunks);
-      if (retrieved) return retrieved;
+      if (retrieved) {
+        const supplemental = buildKnowledgeContext(
+          await listSupplementalKnowledge(podcastId),
+          { maxTotalChars: SUPPLEMENTAL_MAX_TOTAL_CHARS },
+        );
+        return supplemental ? `${retrieved}\n\n${supplemental}` : retrieved;
+      }
     } catch (error) {
       console.warn(
         "Vector search unavailable; falling back to full knowledge",

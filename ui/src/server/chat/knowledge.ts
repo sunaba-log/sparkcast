@@ -13,13 +13,16 @@ export type {
 } from "@/server/chat/knowledge-types";
 
 /** 配信済みエピソードの議事録・書き起こしを知識ドキュメントとして取得する。 */
-async function listMinutesKnowledge(podcastId: number): Promise<KnowledgeDoc[]> {
+export async function listMinutesKnowledge(
+  podcastId: number,
+): Promise<KnowledgeDoc[]> {
   const episodes = await listEpisodeKnowledge(podcastId);
   return episodes.map((episode) => ({
     sourceType: "minutes" as const,
     sourceKey: `minutes:${episode.episodeId}`,
     title: episode.title,
-    url: `/episodes/${episode.episodeId}`,
+    // 編集画面（/episodes/{id}）ではなく、トップの閲覧画面で該当エピソードを開く。
+    url: `/?episode=${episode.episodeId}`,
     content: episode.content,
   }));
 }
@@ -131,14 +134,27 @@ async function listSnsKnowledge(podcastId: number): Promise<KnowledgeDoc[]> {
   return perEpisode.flat().filter((doc) => doc.content.length > 0);
 }
 
+/**
+ * 次回議題・SNS 投稿の知識ドキュメントを取得する。
+ * 議事録と違いデータ量が小さいため、RAG 検索を介さず常にコンテキストへ全量注入する。
+ */
+export async function listSupplementalKnowledge(
+  podcastId: number,
+): Promise<KnowledgeDoc[]> {
+  const [agenda, sns] = await Promise.all([
+    listAgendaKnowledge(podcastId),
+    listSnsKnowledge(podcastId),
+  ]);
+  return [...agenda, ...sns];
+}
+
 /** チャットの知識源（議事録・次回議題・SNS 投稿）をすべて取得する。 */
 export async function listAllKnowledge(
   podcastId: number,
 ): Promise<KnowledgeDoc[]> {
-  const [minutes, agenda, sns] = await Promise.all([
+  const [minutes, supplemental] = await Promise.all([
     listMinutesKnowledge(podcastId),
-    listAgendaKnowledge(podcastId),
-    listSnsKnowledge(podcastId),
+    listSupplementalKnowledge(podcastId),
   ]);
-  return [...minutes, ...agenda, ...sns];
+  return [...minutes, ...supplemental];
 }

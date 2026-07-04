@@ -188,7 +188,7 @@ export async function searchSimilarChunks(
         sourceType: "minutes" as const,
         sourceKey: `minutes:${episodeId}`,
         title: String(data.episode_title ?? ""),
-        url: `/episodes/${episodeId}`,
+        url: `/?episode=${episodeId}`,
         text: String(data.text ?? ""),
       };
     }
