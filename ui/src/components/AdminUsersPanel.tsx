@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Trash2, Lock } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import type { PendingUser } from "@/server/admin/users-repository";
 
 export function AdminUsersPanel({

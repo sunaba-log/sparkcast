@@ -27,7 +27,7 @@ const activeUser: SessionUser = {
 
 describe("usage-limit", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    (mockPool.query as unknown as ReturnType<typeof vi.fn>).mockClear();
   });
 
   describe("checkUsageAllowed", () => {
