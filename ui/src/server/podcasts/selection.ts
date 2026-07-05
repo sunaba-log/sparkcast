@@ -50,7 +50,7 @@ export async function requireSelectedPodcast(
 ): Promise<number> {
   const podcastId = await resolveEffectivePodcastId(user);
   if (!podcastId) {
-    redirect("/channels");
+    redirect("/");
   }
   return podcastId;
 }

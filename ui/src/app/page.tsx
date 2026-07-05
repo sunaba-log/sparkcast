@@ -1,29 +1,24 @@
-import { getEpisodes } from "@/lib/episodes";
-import { EpisodeMasterDetail } from "@/components/EpisodeMasterDetail";
+import { ChannelManager } from "@/components/ChannelManager";
 import { requireRegisteredUser } from "@/server/auth";
-import { getPodcast } from "@/server/podcasts/data-repository";
-import { requireSelectedPodcast } from "@/server/podcasts/selection";
+import {
+  getUserDefaultPodcastId,
+  listPodcastsForUser,
+} from "@/server/podcasts/data-repository";
+import { getSelectedPodcastId } from "@/server/podcasts/selection";
 
 export const dynamic = "force-dynamic";
 
-export default async function EpisodeListPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ episode?: string }>;
-}) {
+export default async function ChannelsPage() {
   const user = await requireRegisteredUser();
-  const podcastId = await requireSelectedPodcast(user);
-  const [episodes, podcast, { episode }] = await Promise.all([
-    getEpisodes(podcastId),
-    getPodcast(podcastId),
-    searchParams,
-  ]);
+  const podcasts = await listPodcastsForUser(user.uid);
+  const selectedPodcastId = await getSelectedPodcastId();
+  const defaultPodcastId = await getUserDefaultPodcastId(user.uid);
 
   return (
-    <EpisodeMasterDetail
-      initialEpisodes={episodes}
-      podcast={podcast}
-      initialSelectedId={episode}
+    <ChannelManager
+      podcasts={podcasts}
+      selectedPodcastId={selectedPodcastId}
+      defaultPodcastId={defaultPodcastId}
     />
   );
 }

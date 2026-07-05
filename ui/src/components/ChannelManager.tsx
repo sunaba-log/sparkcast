@@ -47,7 +47,7 @@ export function ChannelManager({
         throw new Error(result.error ?? "チャンネルの切り替えに失敗しました");
       }
       // 全画面を切り替えるため完全リロードする
-      window.location.assign("/");
+      window.location.assign("/episodes");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -150,7 +150,7 @@ export function ChannelManager({
       if (!response.ok) {
         throw new Error(result.error ?? "チャンネルの作成に失敗しました");
       }
-      router.push("/");
+      router.push("/episodes");
       router.refresh();
     } catch (caught) {
       setError(
@@ -358,6 +358,15 @@ export function ChannelManager({
                           className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
                         >
                           {pendingId === podcast.id ? "切り替え中..." : "切り替え"}
+                        </button>
+                      )}
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={() => router.push("/episodes")}
+                          className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover"
+                        >
+                          エピソード管理
                         </button>
                       )}
                       {isOwner && (
