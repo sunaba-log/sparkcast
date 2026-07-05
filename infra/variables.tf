@@ -134,6 +134,12 @@ variable "cloud_sql_tier" {
   default     = "db-f1-micro"
 }
 
+variable "cloud_sql_availability_type" {
+  type        = string
+  description = "Cloud SQL availability type (ZONAL or REGIONAL/HA). Shared-core tiers (db-f1-micro) are not compatible with REGIONAL."
+  default     = "ZONAL"
+}
+
 variable "cloud_sql_database_name" {
   type        = string
   description = "PostgreSQL database name."

@@ -9,14 +9,14 @@ resource "google_sql_database_instance" "podcast" {
   settings {
     edition           = "ENTERPRISE"
     tier              = var.cloud_sql_tier
-    availability_type = var.environment == "prod" ? "REGIONAL" : "ZONAL"
+    availability_type = var.cloud_sql_availability_type
     disk_type         = "PD_SSD"
     disk_size         = var.environment == "prod" ? 20 : 10
     disk_autoresize   = true
 
     backup_configuration {
       enabled                        = var.environment == "prod"
-      point_in_time_recovery_enabled = var.environment == "prod"
+      point_in_time_recovery_enabled = false
     }
 
     ip_configuration {
