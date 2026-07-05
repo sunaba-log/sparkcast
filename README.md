@@ -1,7 +1,7 @@
 # sparkcast
 
-Podcaster's DevLog（sparkcast）のモノレポ。Web 管理アプリと音声処理オートメーターを
-単一リポジトリで管理する。
+SparkCast — ポッドキャストの運営を自動化・支援するツールのモノレポ。Web 管理アプリと
+音声処理オートメーターを単一リポジトリで管理する。
 
 > 統合の背景と全体計画は [sunaba-log/dev-platform#17](https://github.com/sunaba-log/dev-platform/issues/17) を参照。
 

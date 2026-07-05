@@ -1,6 +1,6 @@
 # podcast-ui
 
-Podcaster's DevLogのdev環境向け管理Webアプリです。Next.jsのUIとWeb APIを
+SparkCast の Web 管理アプリです。Next.jsのUIとWeb APIを
 同一リポジトリで提供します。
 
 ## 機能

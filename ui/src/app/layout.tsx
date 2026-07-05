@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { LogoutButton } from "@/components/LogoutButton";
+import { AccountMenu } from "@/components/AccountMenu";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser, hasPodcastAccess } from "@/server/auth";
@@ -55,16 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
             {user && (
               <div className="flex items-center gap-3">
-                {user.registered && user.displayName && (
-                  <Link
-                    href="/account"
-                    title="アカウント設定"
-                    className="text-xs font-medium text-gray-700 hover:text-brand transition-colors max-w-[10rem] truncate"
-                  >
-                    {user.displayName}
-                  </Link>
-                )}
-                <LogoutButton />
+                {/* 作業系（高頻度）を左に、アカウント系を右端に分けて配置する */}
                 <Link
                   href="/upload"
                   className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5 border border-brand"
@@ -72,6 +63,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <span>+</span> 新規エピソード追加
                 </Link>
                 <ChatWidget />
+                <span className="h-5 w-px bg-brand/20" aria-hidden="true" />
+                <AccountMenu
+                  displayName={user.displayName}
+                  registered={user.registered}
+                  isAdmin={user.isAdmin}
+                />
               </div>
             )}
           </div>

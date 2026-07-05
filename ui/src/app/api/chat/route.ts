@@ -3,6 +3,8 @@ import { z, ZodError } from "zod";
 import { getSessionUser } from "@/server/auth";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import { streamChatReply } from "@/server/chat/chat-service";
+import { getDbPool } from "@/server/db";
+import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +35,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
     const { messages } = chatSchema.parse(await request.json());
+
+    const pool = await getDbPool();
+    const usageCheck = await checkUsageAllowed(pool, auth.user, "chat");
+    if (!usageCheck.allowed) {
+      return NextResponse.json({ error: usageCheck.reason }, { status: 429 });
+    }
+
+    await recordUsage(pool, auth.user.uid, "chat");
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({

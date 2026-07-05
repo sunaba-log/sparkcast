@@ -144,3 +144,51 @@ export function getVertexAiModel(): string {
 export function getVertexAiEmbeddingModel(): string {
   return process.env.VERTEX_AI_EMBEDDING_MODEL ?? "text-multilingual-embedding-002";
 }
+
+export function getAdminEmails(): string[] {
+  return (process.env.ADMIN_EMAILS ?? "admin@sunabalog.com")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminUser(email: string): boolean {
+  const adminEmails = getAdminEmails();
+  return adminEmails.includes(email.toLowerCase());
+}
+
+export function getPendingChatLimit(): number {
+  const raw = process.env.PENDING_CHAT_LIMIT ?? "5";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("PENDING_CHAT_LIMIT must be a positive integer");
+  }
+  return value;
+}
+
+export function getPendingEpisodeUploadLimit(): number {
+  const raw = process.env.PENDING_EPISODE_UPLOAD_LIMIT ?? "2";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("PENDING_EPISODE_UPLOAD_LIMIT must be a positive integer");
+  }
+  return value;
+}
+
+export function getRateLimitHourly(): number {
+  const raw = process.env.RATE_LIMIT_HOURLY ?? "20";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("RATE_LIMIT_HOURLY must be a positive integer");
+  }
+  return value;
+}
+
+export function getRateLimitDaily(): number {
+  const raw = process.env.RATE_LIMIT_DAILY ?? "100";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("RATE_LIMIT_DAILY must be a positive integer");
+  }
+  return value;
+}
