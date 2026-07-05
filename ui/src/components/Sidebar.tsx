@@ -5,15 +5,22 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
+import { AccountMenu } from "./AccountMenu";
 
 export function Sidebar({
   channelTitle,
   podcasts,
   selectedPodcastId,
+  userDisplayName,
+  userRegistered,
+  userIsAdmin,
 }: {
   channelTitle: string | null;
   podcasts: PodcastSummary[];
   selectedPodcastId: number | null;
+  userDisplayName: string | null;
+  userRegistered: boolean;
+  userIsAdmin: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -26,7 +33,6 @@ export function Sidebar({
   const navItems = (isChannelPage || !hasChannel)
     ? [
       { href: "/", label: "チャンネル", icon: Podcast },
-      { href: "/settings", label: "ユーザ設定", icon: Settings },
     ]
     : [
       { href: "/episodes", label: "エピソード", icon: Radio },
@@ -64,7 +70,7 @@ export function Sidebar({
         }`}
     >
       <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20 relative">
-        {!collapsed && (
+        {!collapsed && !isChannelPage && (
           <button
             type="button"
             onClick={() => setSwitcherOpen((open) => !open)}
@@ -163,6 +169,14 @@ export function Sidebar({
           );
         })}
       </nav>
+      <div className="p-3 border-t border-brand/20 shrink-0">
+        <AccountMenu
+          displayName={userDisplayName}
+          registered={userRegistered}
+          isAdmin={userIsAdmin}
+          collapsed={collapsed}
+        />
+      </div>
     </aside>
   );
 }

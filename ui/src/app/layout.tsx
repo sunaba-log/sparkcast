@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { AccountMenu } from "@/components/AccountMenu";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser, hasPodcastAccess } from "@/server/auth";
@@ -63,12 +62,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <span>+</span> 新規エピソード追加
                 </Link>
                 <ChatWidget />
-                <span className="h-5 w-px bg-brand/20" aria-hidden="true" />
-                <AccountMenu
-                  displayName={user.displayName}
-                  registered={user.registered}
-                  isAdmin={user.isAdmin}
-                />
               </div>
             )}
           </div>
@@ -79,6 +72,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               channelTitle={channelTitle}
               podcasts={podcasts}
               selectedPodcastId={selectedPodcastId}
+              userDisplayName={user.displayName}
+              userRegistered={user.registered}
+              userIsAdmin={user.isAdmin}
             />
           )}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>
