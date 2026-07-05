@@ -135,9 +135,9 @@ export function LoginForm() {
 
   return (
     <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
-      <h1 className="text-xl font-bold text-gray-900">管理画面へログイン</h1>
+      <h1 className="text-xl font-bold text-gray-900">SparkCast にログイン</h1>
       <p className="mt-2 text-sm text-gray-500">
-        Podcaster&apos;s DevLogのメンバー用画面です。
+        ポッドキャストの運営を自動化・支援するツールです。Google アカウントで開始できます。
       </p>
       {error && (
         <p className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
