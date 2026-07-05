@@ -7,16 +7,6 @@ import type { AdminUser } from "@/server/admin/users-repository";
 
 type AdminUserItem = AdminUser & { isAdmin: boolean };
 
-const STATUS_BADGES: Record<
-  AdminUser["approvalStatus"],
-  { label: string; className: string }
-> = {
-  pending_approval: {
-    label: "制限あり",
-    className: "bg-yellow-100 text-yellow-800",
-  },
-  active: { label: "制限なし", className: "bg-green-100 text-green-800" },
-};
 
 export function AdminUsersPanel({
   users,
@@ -124,7 +114,6 @@ export function AdminUsersPanel({
         ) : (
           <ul className="border-t border-gray-100 pt-4 space-y-2">
             {users.map((user) => {
-              const badge = STATUS_BADGES[user.approvalStatus];
               const busy = pendingUid !== null;
               return (
                 <li
@@ -137,17 +126,17 @@ export function AdminUsersPanel({
                         <span className="font-semibold text-sm text-gray-900 truncate">
                           {user.displayName || user.email}
                         </span>
-                        {user.isAdmin ? (
+                        {user.isAdmin && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-subtle text-brand">
                             管理者
                           </span>
-                        ) : (
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
-                          >
-                            {badge.label}
-                          </span>
                         )}
+                        {!user.isAdmin &&
+                          user.approvalStatus === "pending_approval" && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              制限あり
+                            </span>
+                          )}
                       </div>
                       <p className="mt-1 text-xs text-gray-500">{user.email}</p>
                       <p className="mt-0.5 text-[10px] text-gray-400">
