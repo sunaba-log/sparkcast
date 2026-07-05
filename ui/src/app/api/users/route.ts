@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser, SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import { isAdminUser } from "@/server/env";
+import { getContactEmail, isAdminUser } from "@/server/env";
+import {
+  isRegistrationAllowed,
+  PRE_REGISTRATION_REQUIRED_MESSAGE,
+} from "@/server/registration-gate";
 import { ensureDefaultChannel } from "@/server/podcasts/data-repository";
 import {
   SELECTED_PODCAST_COOKIE_NAME,
@@ -18,6 +22,15 @@ export async function POST(request: Request) {
     const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    if (!(await isRegistrationAllowed(await getDbPool(), user))) {
+      return NextResponse.json(
+        {
+          error: PRE_REGISTRATION_REQUIRED_MESSAGE,
+          contactEmail: getContactEmail(),
+        },
+        { status: 403 },
+      );
     }
     const { displayName } = displayNameSchema.parse(await request.json());
     const approvalStatus = isAdminUser(user.email) ? "active" : "pending_approval";
