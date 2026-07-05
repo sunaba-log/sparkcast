@@ -56,6 +56,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </Link>
             {user && (
               <div className="flex items-center gap-3">
+                {/* 作業系（高頻度）を左に、アカウント系を右端に分けて配置する */}
+                <Link
+                  href="/upload"
+                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5 border border-brand"
+                >
+                  <span>+</span> 新規エピソード追加
+                </Link>
+                <ChatWidget />
+                <span className="h-5 w-px bg-brand/20" aria-hidden="true" />
                 {user.registered && user.displayName && (
                   <Link
                     href="/account"
@@ -76,13 +85,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   </Link>
                 )}
                 <LogoutButton />
-                <Link
-                  href="/upload"
-                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5 border border-brand"
-                >
-                  <span>+</span> 新規エピソード追加
-                </Link>
-                <ChatWidget />
               </div>
             )}
           </div>
