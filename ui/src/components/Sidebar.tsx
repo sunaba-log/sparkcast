@@ -5,27 +5,41 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
-
-const NAV_ITEMS = [
-  { href: "/", label: "エピソード", icon: Radio },
-  { href: "/sns", label: "SNS投稿", icon: Share2 },
-  { href: "/agenda", label: "次回議題", icon: Lightbulb },
-  { href: "/settings", label: "番組設定", icon: Settings },
-];
+import { AccountMenu } from "./AccountMenu";
 
 export function Sidebar({
   channelTitle,
   podcasts,
   selectedPodcastId,
+  userDisplayName,
+  userRegistered,
+  userIsAdmin,
 }: {
   channelTitle: string | null;
   podcasts: PodcastSummary[];
   selectedPodcastId: number | null;
+  userDisplayName: string | null;
+  userRegistered: boolean;
+  userIsAdmin: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+
+  const isChannelPage = pathname === "/";
+  const hasChannel = channelTitle !== null;
+
+  const navItems = (isChannelPage || !hasChannel)
+    ? [
+      { href: "/", label: "チャンネル", icon: Podcast },
+    ]
+    : [
+      { href: "/episodes", label: "エピソード", icon: Radio },
+      { href: "/sns", label: "SNS投稿", icon: Share2 },
+      { href: "/agenda", label: "次回議題", icon: Lightbulb },
+      { href: "/settings", label: "番組設定", icon: Settings },
+    ];
 
   async function switchChannel(podcastId: number) {
     if (podcastId === selectedPodcastId) {
@@ -44,7 +58,7 @@ export function Sidebar({
         return;
       }
       // 全画面を選択中チャンネルの内容へ確実に切り替えるため完全リロードする
-      window.location.assign("/");
+      window.location.assign("/episodes");
     } catch {
       setSwitching(false);
     }
@@ -56,12 +70,12 @@ export function Sidebar({
         }`}
     >
       <div className="h-14 px-4 flex items-center justify-between border-b border-brand/20 relative">
-        {!collapsed && (
+        {!collapsed && !isChannelPage && (
           <button
             type="button"
             onClick={() => setSwitcherOpen((open) => !open)}
             title="チャンネルを切り替え"
-            className="flex items-center gap-1 min-w-0 font-bold text-gray-900 text-base tracking-tight hover:text-brand transition-colors"
+            className="flex items-center gap-1 min-w-0 font-bold text-gray-900 text-sm tracking-tight hover:text-brand transition-colors"
           >
             <span className="truncate">{channelTitle ?? "チャンネル未選択"}</span>
             <ChevronDown className="w-4 h-4 shrink-0 text-brand" />
@@ -115,7 +129,7 @@ export function Sidebar({
                 </ul>
               )}
               <Link
-                href="/channels"
+                href="/"
                 onClick={() => setSwitcherOpen(false)}
                 className="flex items-center gap-2 px-3 py-2 text-xs text-brand border-t border-brand/20 hover:bg-brand-subtle/40"
               >
@@ -127,12 +141,14 @@ export function Sidebar({
       </div>
 
       <nav className="p-3 space-y-1.5 flex-1">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
             item.href === "/"
-              ? pathname === "/" || pathname.startsWith("/episodes")
-              : pathname.startsWith(item.href);
+              ? pathname === "/"
+              : item.href === "/episodes"
+                ? pathname === "/episodes" || pathname.startsWith("/episodes")
+                : pathname.startsWith(item.href);
 
           return (
             <Link
@@ -153,6 +169,14 @@ export function Sidebar({
           );
         })}
       </nav>
+      <div className="p-3 border-t border-brand/20 shrink-0">
+        <AccountMenu
+          displayName={userDisplayName}
+          registered={userRegistered}
+          isAdmin={userIsAdmin}
+          collapsed={collapsed}
+        />
+      </div>
     </aside>
   );
 }
