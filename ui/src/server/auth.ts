@@ -3,7 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDbPool } from "@/server/db";
-import { isLocalMockAuthEnabled } from "@/server/env";
+import { isLocalMockAuthEnabled, isAdminUser } from "@/server/env";
 import { getAdminAuth } from "@/server/firebase-admin";
 
 export const SESSION_COOKIE_NAME = "podcast_session";
@@ -13,6 +13,8 @@ export type SessionUser = {
   email: string;
   displayName: string | null;
   registered: boolean;
+  approvalStatus: "pending_approval" | "active";
+  isAdmin: boolean;
 };
 
 export function mockUidForEmail(email: string): string {
@@ -33,13 +35,16 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       const user = await (await getDbPool()).query<{
         user_id: string;
         display_name: string | null;
-      }>("SELECT user_id, display_name FROM users WHERE email = $1", [email]);
+        approval_status: string;
+      }>("SELECT user_id, display_name, approval_status FROM users WHERE email = $1", [email]);
       const row = user.rows[0];
       return {
         uid: row?.user_id ?? mockUidForEmail(email),
         email,
         displayName: row?.display_name ?? "Dev Mock User",
         registered: user.rows.length > 0,
+        approvalStatus: (row?.approval_status ?? "pending_approval") as "pending_approval" | "active",
+        isAdmin: isAdminUser(email),
       };
     } catch {
       return null;
@@ -53,7 +58,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const user = await (await getDbPool()).query<{
       user_id: string;
       display_name: string | null;
-    }>("SELECT user_id, display_name FROM users WHERE email = $1", [email]);
+      approval_status: string;
+    }>("SELECT user_id, display_name, approval_status FROM users WHERE email = $1", [email]);
     const row = user.rows[0];
     return {
       uid: row?.user_id ?? token.uid,
@@ -62,6 +68,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         row?.display_name ??
         (typeof token.name === "string" ? token.name : null),
       registered: user.rows.length > 0,
+      approvalStatus: (row?.approval_status ?? "pending_approval") as "pending_approval" | "active",
+      isAdmin: isAdminUser(email),
     };
   } catch {
     return null;
@@ -101,6 +109,12 @@ export async function requirePodcastAccess(
   podcastId: number,
 ): Promise<void> {
   if (!(await hasPodcastAccess(userId, podcastId))) {
+    throw new Error("FORBIDDEN");
+  }
+}
+
+export function requireAdmin(user: SessionUser): void {
+  if (!user.isAdmin) {
     throw new Error("FORBIDDEN");
   }
 }
