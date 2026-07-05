@@ -157,6 +157,10 @@ export function isAdminUser(email: string): boolean {
   return adminEmails.includes(email.toLowerCase());
 }
 
+export function getContactEmail(): string {
+  return process.env.CONTACT_EMAIL ?? "admin@sunabalog.com";
+}
+
 export function getPendingChatLimit(): number {
   const raw = process.env.PENDING_CHAT_LIMIT ?? "5";
   const value = Number(raw);
