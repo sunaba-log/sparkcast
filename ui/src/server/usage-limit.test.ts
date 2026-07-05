@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Pool } from "pg";
 import type { SessionUser } from "@/server/auth";
 import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
@@ -93,9 +93,9 @@ describe("usage-limit", () => {
     });
 
     it("blocks active user when at hourly limit", async () => {
-      (mockPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        rows: [{ count: 20 }],
-      });
+      (mockPool.query as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ rows: [{ count: 20 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 20 }] });
 
       const result = await checkUsageAllowed(mockPool, activeUser, "chat");
 

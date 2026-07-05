@@ -21,6 +21,15 @@ export function mockUidForEmail(email: string): string {
   return "dev_mock_" + email.replace(/[^a-zA-Z0-9]/g, "_");
 }
 
+// 管理者はマイグレーション以前から登録済みの行が pending のままでも承認扱いにする
+function resolveApprovalStatus(
+  email: string,
+  rawStatus: string | undefined,
+): "pending_approval" | "active" {
+  if (isAdminUser(email)) return "active";
+  return rawStatus === "active" ? "active" : "pending_approval";
+}
+
 export async function getSessionUser(): Promise<SessionUser | null> {
   const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!sessionCookie) return null;
@@ -43,7 +52,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         email,
         displayName: row?.display_name ?? "Dev Mock User",
         registered: user.rows.length > 0,
-        approvalStatus: (row?.approval_status ?? "pending_approval") as "pending_approval" | "active",
+        approvalStatus: resolveApprovalStatus(email, row?.approval_status),
         isAdmin: isAdminUser(email),
       };
     } catch {
@@ -68,7 +77,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         row?.display_name ??
         (typeof token.name === "string" ? token.name : null),
       registered: user.rows.length > 0,
-      approvalStatus: (row?.approval_status ?? "pending_approval") as "pending_approval" | "active",
+      approvalStatus: resolveApprovalStatus(email, row?.approval_status),
       isAdmin: isAdminUser(email),
     };
   } catch {
