@@ -12,10 +12,10 @@ const STATUS_BADGES: Record<
   { label: string; className: string }
 > = {
   pending_approval: {
-    label: "承認待ち",
+    label: "制限あり",
     className: "bg-yellow-100 text-yellow-800",
   },
-  active: { label: "承認済み", className: "bg-green-100 text-green-800" },
+  active: { label: "制限なし", className: "bg-green-100 text-green-800" },
 };
 
 export function AdminUsersPanel({
@@ -113,7 +113,7 @@ export function AdminUsersPanel({
             ユーザー管理
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            承認すると AI チャットとエピソードアップロードの制限が通常枠に緩和されます。承認解除でお試し枠に戻せます。
+            「制限あり」のユーザーは AI チャット・エピソードアップロードがお試し枠（少回数）のみ。制限を解除すると通常枠で利用できます。
           </p>
         </div>
 
@@ -164,7 +164,7 @@ export function AdminUsersPanel({
                             disabled={busy}
                             className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
                           >
-                            {pendingUid === user.uid ? "処理中..." : "承認"}
+                            {pendingUid === user.uid ? "処理中..." : "制限を解除"}
                           </button>
                         ) : (
                           <button
@@ -175,7 +175,7 @@ export function AdminUsersPanel({
                             disabled={busy}
                             className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50"
                           >
-                            {pendingUid === user.uid ? "処理中..." : "承認解除"}
+                            {pendingUid === user.uid ? "処理中..." : "制限をかける"}
                           </button>
                         )}
                         <button
