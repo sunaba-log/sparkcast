@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check, Shield } from "lucide-react";
+import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
 
 const NAV_ITEMS = [
@@ -152,20 +152,6 @@ export function Sidebar({
             </Link>
           );
         })}
-        <Link
-          href="/admin"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-medium transition-all duration-150 ${pathname.startsWith("/admin")
-            ? "text-brand border border-brand font-bold"
-            : "text-gray-700 hover:bg-brand-subtle/40 hover:text-gray-900"
-            } ${collapsed ? "justify-center px-0" : ""}`}
-          title={collapsed ? "管理" : undefined}
-        >
-          <Shield
-            className={`w-4 h-4 shrink-0 ${pathname.startsWith("/admin") ? "text-brand" : "text-gray-500"
-              }`}
-          />
-          {!collapsed && <span>管理</span>}
-        </Link>
       </nav>
     </aside>
   );
