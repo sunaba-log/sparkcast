@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Shield } from "lucide-react";
-import { LogoutButton } from "@/components/LogoutButton";
+import { AccountMenu } from "@/components/AccountMenu";
 import { ChatWidget } from "@/components/ChatWidget";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser, hasPodcastAccess } from "@/server/auth";
@@ -65,26 +64,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </Link>
                 <ChatWidget />
                 <span className="h-5 w-px bg-brand/20" aria-hidden="true" />
-                {user.registered && user.displayName && (
-                  <Link
-                    href="/account"
-                    title="アカウント設定"
-                    className="text-xs font-medium text-gray-700 hover:text-brand transition-colors max-w-[10rem] truncate"
-                  >
-                    {user.displayName}
-                  </Link>
-                )}
-                {user.isAdmin && (
-                  <Link
-                    href="/admin"
-                    title="ユーザー管理"
-                    className="text-xs font-medium text-gray-700 hover:text-brand transition-colors flex items-center gap-1"
-                  >
-                    <Shield className="w-3.5 h-3.5" />
-                    管理
-                  </Link>
-                )}
-                <LogoutButton />
+                <AccountMenu
+                  displayName={user.displayName}
+                  registered={user.registered}
+                  isAdmin={user.isAdmin}
+                />
               </div>
             )}
           </div>
