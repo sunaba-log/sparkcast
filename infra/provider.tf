@@ -46,3 +46,20 @@ provider "google-beta" {
 }
 
 provider "cloudflare" {}
+
+# Billing Budget API の呼び出しは quota project に対して検査されるため、
+# API を有効化した自プロジェクトを明示的に quota project として使うエイリアス。
+# budget.tf の google_billing_budget が参照する。
+provider "google" {
+  alias                 = "billing"
+  project               = var.project_id
+  region                = var.region
+  user_project_override = true
+  billing_project       = var.project_id
+
+  default_labels = {
+    org         = var.org
+    environment = var.environment
+    system      = var.system
+  }
+}

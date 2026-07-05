@@ -21,6 +21,7 @@ r2_bucket_name                     = "podcast-dev"
 r2_subdomain                       = "dev.podcast"
 enable_promoter                    = false
 manage_firestore_database          = false
+budget_amount_jpy                  = 5000
 
 # podcast-ui（Cloud Run Service）
 app_service_account_id           = "podcast-ui-dev"
