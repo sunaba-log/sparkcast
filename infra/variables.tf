@@ -235,3 +235,19 @@ variable "custom_domain" {
   type        = string
   description = "Cloud Run に割り当てるカスタムドメイン（例: dev.sparkcast.sunabalog.com）"
 }
+
+variable "billing_account_id" {
+  type        = string
+  description = "Cloud Billing account ID that funds this project (dev / prod 共通)."
+  default     = "018558-5DAE46-0B8F06"
+}
+
+variable "budget_amount_jpy" {
+  type        = number
+  description = "Monthly budget amount in JPY for the project budget alert."
+
+  validation {
+    condition     = var.budget_amount_jpy > 0
+    error_message = "budget_amount_jpy must be a positive number."
+  }
+}

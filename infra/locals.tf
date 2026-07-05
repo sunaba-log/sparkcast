@@ -18,6 +18,8 @@ locals {
     # podcast-ui（旧 ui/infra）由来。WIF の access token 発行・組織ポリシー操作に必要。
     "iamcredentials.googleapis.com",
     "orgpolicy.googleapis.com",
+    # 予算アラート（google_billing_budget）の API 呼び出しに必要。
+    "billingbudgets.googleapis.com",
   ]
 
   default_compute_service_account = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
