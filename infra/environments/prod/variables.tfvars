@@ -18,6 +18,7 @@ database_url_secret_name           = "podcast-database-url-prod"
 cloud_sql_tier                     = "db-f1-micro"
 enable_promoter                    = true
 manage_firestore_database          = true
+budget_amount_jpy                  = 10000
 
 # podcast-ui（Cloud Run Service）
 app_service_account_id           = "podcast-ui-prod"
