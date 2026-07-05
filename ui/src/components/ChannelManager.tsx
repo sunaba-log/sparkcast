@@ -360,6 +360,15 @@ export function ChannelManager({
                           {pendingId === podcast.id ? "切り替え中..." : "切り替え"}
                         </button>
                       )}
+                      {isSelected && (
+                        <button
+                          type="button"
+                          onClick={() => router.push("/episodes")}
+                          className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover"
+                        >
+                          エピソード管理
+                        </button>
+                      )}
                       {isOwner && (
                         <>
                           <button
