@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, requireAdmin } from "@/server/auth";
 import { getDbPool } from "@/server/db";
-import { listPendingUsers } from "@/server/admin/users-repository";
+import { listUsers } from "@/server/admin/users-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,14 +14,13 @@ export async function GET() {
     }
     requireAdmin(user);
 
-    const pool = await getDbPool();
-    const pendingUsers = await listPendingUsers(pool);
-    return NextResponse.json({ users: pendingUsers });
+    const users = await listUsers(await getDbPool());
+    return NextResponse.json({ users });
   } catch (error) {
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });
     }
-    console.error("Failed to list pending users", error);
+    console.error("Failed to list users", error);
     return NextResponse.json({ error: "取得に失敗しました" }, { status: 500 });
   }
 }

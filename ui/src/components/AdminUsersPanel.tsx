@@ -2,19 +2,31 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Trash2 } from "lucide-react";
-import type { PendingUser } from "@/server/admin/users-repository";
+import { Trash2, Users } from "lucide-react";
+import type { AdminUser } from "@/server/admin/users-repository";
+
+type AdminUserItem = AdminUser & { isAdmin: boolean };
+
+const STATUS_BADGES: Record<
+  AdminUser["approvalStatus"],
+  { label: string; className: string }
+> = {
+  pending_approval: {
+    label: "承認待ち",
+    className: "bg-yellow-100 text-yellow-800",
+  },
+  active: { label: "承認済み", className: "bg-green-100 text-green-800" },
+};
 
 export function AdminUsersPanel({
   users,
   isAdmin,
 }: {
-  users: PendingUser[];
+  users: AdminUserItem[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const [approving, setApproving] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [pendingUid, setPendingUid] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -36,27 +48,33 @@ export function AdminUsersPanel({
     );
   }
 
-  async function approveUser(uid: string) {
+  async function setApprovalStatus(
+    uid: string,
+    approvalStatus: AdminUser["approvalStatus"],
+  ) {
     try {
-      setApproving(uid);
+      setPendingUid(uid);
       setError("");
-      const response = await fetch(`/api/admin/users/${uid}/approve`, {
-        method: "POST",
+      const response = await fetch(`/api/admin/users/${uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
-        throw new Error(result.error ?? "承認に失敗しました");
+        throw new Error(result.error ?? "更新に失敗しました");
       }
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "承認に失敗しました");
-      setApproving(null);
+      setError(caught instanceof Error ? caught.message : "更新に失敗しました");
+    } finally {
+      setPendingUid(null);
     }
   }
 
   async function deleteUser(uid: string) {
     try {
-      setDeleting(uid);
+      setPendingUid(uid);
       setError("");
       const response = await fetch(`/api/admin/users/${uid}`, {
         method: "DELETE",
@@ -69,7 +87,8 @@ export function AdminUsersPanel({
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "削除に失敗しました");
-      setDeleting(null);
+    } finally {
+      setPendingUid(null);
     }
   }
 
@@ -90,79 +109,115 @@ export function AdminUsersPanel({
       <div className="rounded-xs border border-brand/30 p-6 space-y-4">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Check className="w-5 h-5 text-brand" />
+            <Users className="w-5 h-5 text-brand" />
             ユーザー管理
           </h1>
           <p className="text-xs text-gray-500 mt-1">
-            登録待ちユーザーを承認すると、AI チャット機能とエピソードアップロードが利用できるようになります。
+            承認すると AI チャットとエピソードアップロードの制限が通常枠に緩和されます。承認解除でお試し枠に戻せます。
           </p>
         </div>
 
         {users.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-gray-500">承認待ちユーザーはいません</p>
+            <p className="text-sm text-gray-500">ユーザーがいません</p>
           </div>
         ) : (
           <ul className="border-t border-gray-100 pt-4 space-y-2">
-            {users.map((user) => (
-              <li
-                key={user.uid}
-                className="rounded-xs border border-brand/20 p-4 flex items-center justify-between"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-gray-900 truncate">
-                      {user.displayName || user.email}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">{user.email}</p>
-                  <p className="mt-0.5 text-[10px] text-gray-400">
-                    登録日時: {new Date(user.createdAt).toLocaleString("ja-JP")}
-                  </p>
-                </div>
+            {users.map((user) => {
+              const badge = STATUS_BADGES[user.approvalStatus];
+              const busy = pendingUid !== null;
+              return (
+                <li
+                  key={user.uid}
+                  className="rounded-xs border border-brand/20 p-4"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-gray-900 truncate">
+                          {user.displayName || user.email}
+                        </span>
+                        {user.isAdmin ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-subtle text-brand">
+                            管理者
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">{user.email}</p>
+                      <p className="mt-0.5 text-[10px] text-gray-400">
+                        登録日時: {new Date(user.createdAt).toLocaleString("ja-JP")}
+                      </p>
+                    </div>
 
-                {confirmDeleteId === user.uid ? (
-                  <div className="shrink-0 ml-4 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => deleteUser(user.uid)}
-                      disabled={deleting !== null}
-                      className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-xs hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {deleting === user.uid ? "削除中..." : "確認"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteId(null)}
-                      disabled={deleting !== null}
-                      className="px-3 py-1.5 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100"
-                    >
-                      キャンセル
-                    </button>
+                    {!user.isAdmin && (
+                      <div className="shrink-0 flex gap-2">
+                        {user.approvalStatus === "pending_approval" ? (
+                          <button
+                            type="button"
+                            onClick={() => setApprovalStatus(user.uid, "active")}
+                            disabled={busy}
+                            className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
+                          >
+                            {pendingUid === user.uid ? "処理中..." : "承認"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setApprovalStatus(user.uid, "pending_approval")
+                            }
+                            disabled={busy}
+                            className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            {pendingUid === user.uid ? "処理中..." : "承認解除"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(user.uid)}
+                          disabled={busy}
+                          title="削除"
+                          className="p-2 text-gray-500 hover:text-red-600 rounded-xs hover:bg-red-50 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="shrink-0 ml-4 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => approveUser(user.uid)}
-                      disabled={approving !== null}
-                      className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
-                    >
-                      {approving === user.uid ? "承認中..." : "承認"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteId(user.uid)}
-                      disabled={approving !== null}
-                      title="削除"
-                      className="p-2 text-gray-500 hover:text-red-600 rounded-xs hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
+
+                  {confirmDeleteId === user.uid && (
+                    <div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between gap-3">
+                      <span className="text-xs text-red-700">
+                        このユーザーとチャンネル所有権を削除します。取り消せません。
+                      </span>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => deleteUser(user.uid)}
+                          disabled={pendingUid !== null}
+                          className="px-4 py-1.5 text-xs font-medium bg-red-600 text-white rounded-xs hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {pendingUid === user.uid ? "削除中..." : "削除する"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-4 py-1.5 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100"
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
