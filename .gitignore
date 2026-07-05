@@ -1,37 +1,17 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# ルートの Makefile / CD が生成する環境変数ファイル
+.env
 
-# testing
-/coverage
+# Terraform（infra/ 一元管理）。.terraform.lock.hcl は追跡する。
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# env files
-.env*
-!.env.example
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-.vercel
+# next

@@ -1,0 +1,120 @@
+# モノレポ共通 CI。変更されたパスに応じて ui / automator のジョブを出し分ける。
+# 単一の必須チェックは ci-ok（スキップは許容、失敗のみブロック）。
+name: ci
+
+# develop/main へのマージは fast-forward（PR で検証済みのコミットと同一）なので、
+# push トリガでの再実行は冗長。CI は PR 上でのみ走らせる。
+on:
+  pull_request:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+      automator: ${{ steps.filter.outputs.automator }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'ui/**'
+              - '.github/workflows/ci.yml'
+            automator:
+              - 'automator/**'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'infra/**'
+              - '.github/workflows/ci.yml'
+
+  ui:
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm run test
+
+  automator:
+    needs: changes
+    if: needs.changes.outputs.automator == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+      - name: Install dependencies
+        working-directory: automator/app
+        run: make install
+      - name: Lint
+        working-directory: automator/app
+        run: make lint
+      - name: Test
+        working-directory: automator/app
+        run: make test
+
+  # Terraform（統合後の infra/）の整形チェック + validate。
+  # 認証不要（-backend=false）。docker で terraform イメージを使う。
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare .env
+        run: cp .env.sample .env
+      - name: Terraform validate
+        run: make terraform-validate
+
+  # パスフィルタでスキップされたジョブが必須チェックをブロックしないよう、
+  # ここを唯一の必須チェックにする（skip は許容、failure/cancelled のみ失敗）。
+  ci-ok:
+    needs: [ui, automator, infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate results
+        run: |
+          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }} infra=${{ needs.infra.result }}"
+          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}" "${{ needs.infra.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "required job failed"; exit 1
+            fi
+          done
+          echo "ok"
+
+  # 失敗時のみ Discord に通知する（成功時はノイズになるため送らない）。
+  report:
+    needs: [ui, automator, infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord on failure
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          status: failure
+          title: "ci failed"
+          username: GitHub Actions

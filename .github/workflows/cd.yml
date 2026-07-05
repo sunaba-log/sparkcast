@@ -1,0 +1,250 @@
+# アプリのビルド・デプロイ（Cloud Run）。ブランチで環境を切り替える。
+#   develop → dev（sunabalog-dev） / main → prod（sunabalog-prod）
+# インフラ（Terraform）は CI では回さず、`make terraform-apply ENVIRONMENT=<env>`
+# で手動デプロイする。PR プレビューは pr-preview.yml が担当する。
+name: cd
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - "ui/**"
+      - "automator/**"
+      - ".github/workflows/cd.yml"
+  # automator の手動 plan/apply 用（push でも automator/** 変更時に自動デプロイする）
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "automator: deploy 対象ブランチ"
+        required: true
+        default: "develop"
+        type: string
+      deploy_mode:
+        description: "automator: Terraform 操作"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+
+concurrency:
+  group: cd-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: asia-northeast1
+
+jobs:
+  # 変更パスに応じて ui / infra を出し分ける
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ui: ${{ steps.filter.outputs.ui }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'ui/**'
+              - '.github/workflows/cd.yml'
+            infra:
+              - 'infra/**'
+              - 'automator/**'
+
+  # ui のビルド・デプロイ（push 時・ui 変更時のみ）
+  ui:
+    needs: changes
+    if: github.event_name == 'push' && needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve environment
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            {
+              echo "ENVIRONMENT=prod"
+              echo "PROJECT_ID=sunabalog-prod"
+              echo "SERVICE=podcast-ui-prod"
+              echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-prod/podcast-ui/podcast-ui"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-prod.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-prod:asia-northeast1:podcast-automator-postgres-prod"
+              echo "DB_PASSWORD_SECRET=podcast-automator-database-password-prod"
+              echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCOe16OGUrP1qWtJTKlatf5gbuKRdiLDg8"
+              echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-prod.firebaseapp.com"
+              echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-prod"
+              echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-prod.firebaseapp.com"
+              echo "APP_URL=https://sparkcast.sunabalog.com"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "ENVIRONMENT=dev"
+              echo "PROJECT_ID=sunabalog-dev"
+              echo "SERVICE=podcast-ui-dev"
+              echo "IMAGE=asia-northeast1-docker.pkg.dev/sunabalog-dev/podcast-ui/podcast-ui"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com"
+              echo "CLOUD_SQL_INSTANCE_CONNECTION_NAME=sunabalog-dev:asia-northeast1:podcast-automator-postgres-dev"
+              echo "DB_PASSWORD_SECRET=db-password"
+              echo "NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCBsZ7_ZC0fin7XpPxgborVu_73zUidJkI"
+              echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sunabalog-dev.firebaseapp.com"
+              echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=sunabalog-dev"
+              echo "FIREBASE_AUTH_HELPER_DOMAIN=sunabalog-dev.firebaseapp.com"
+              echo "APP_URL=https://dev.sparkcast.sunabalog.com"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # 新しいコードを配信する前に DB スキーマを収束させる（Cloud SQL Connector 経由）。
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run migrations
+        working-directory: ui
+        run: |
+          npm ci
+          export GOOGLE_CLOUD_PROJECT="$PROJECT_ID"
+          export DB_NAME=podcast
+          export DB_USER=podcast_app
+          export DB_PASSWORD="$(gcloud secrets versions access latest --secret="$DB_PASSWORD_SECRET" --project="$PROJECT_ID")"
+          npm run db:migrate
+
+      - name: Build image
+        working-directory: ui
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$NEXT_PUBLIC_FIREBASE_API_KEY" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$NEXT_PUBLIC_FIREBASE_PROJECT_ID" \
+            --build-arg FIREBASE_AUTH_HELPER_DOMAIN="$FIREBASE_AUTH_HELPER_DOMAIN" \
+            -t "$IMAGE:${{ github.sha }}" .
+
+      - name: Push image
+        run: docker push "$IMAGE:${{ github.sha }}"
+
+      # プレビューの --no-traffic 運用でトラフィックが特定リビジョンに固定されると
+      # 通常の deploy では最新へ移らないため、自リビジョンへ明示的に 100% を振る。
+      - name: Deploy to Cloud Run
+        run: |
+          SUFFIX="sha-${GITHUB_SHA::8}-${GITHUB_RUN_NUMBER}"
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$IMAGE:${{ github.sha }}" \
+            --revision-suffix "$SUFFIX" \
+            --no-traffic
+          gcloud run services update-traffic "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --to-revisions "${SERVICE}-${SUFFIX}=100"
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          title: "podcast-ui deploy (${{ env.ENVIRONMENT }})"
+          description: "${{ env.APP_URL }}"
+          username: GitHub Actions
+
+  # Terraform デプロイ（push で infra/** または automator/** 変更時、または手動 dispatch）。
+  # 統合後の単一 infra/ を apply する（ui の Cloud Run 基盤 + automator の Job/GCS/SQL 等）。
+  # automator/** も対象にするのは app イメージ変更時に local-exec の再ビルド・push が要るため。
+  # 認証は WIF（キーレス）。共有 SA github-actions-deployer を impersonate する。
+  infra:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve environment
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            REF="refs/heads/${{ inputs.target_branch }}"
+          else
+            REF="${GITHUB_REF}"
+          fi
+          echo "TARGET_REF=$REF" >> "$GITHUB_ENV"
+          if [[ "$REF" == "refs/heads/main" ]]; then
+            {
+              echo "ENVIRONMENT=prod"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-prod.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "ENVIRONMENT=dev"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_REF }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+          token_format: access_token
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Terraform の local-exec が行う app イメージの push（Artifact Registry）用に、
+      # ホスト側 docker の認証を通す（terraform はホスト docker ソケットを使う）。
+      - name: Configure docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # 統合後は Terraform をリポジトリルートの Makefile（infra/ 一元管理）から実行する。
+      # .env はルートに置く（root Makefile が -include .env / --env-file .env で参照）。
+      - name: Prepare .env
+        run: |
+          cat > .env <<EOF
+          CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCESS_KEY_ID=${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          CLOUDFLARE_SECRET_ACCESS_KEY=${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          EOF
+
+      # WIF の access_token を渡す。GCS backend / google provider とも env を直接読む。
+      - name: Deploy
+        env:
+          GOOGLE_OAUTH_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          MODE="apply"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            MODE="${{ inputs.deploy_mode }}"
+          fi
+          if [[ "$MODE" == "plan" ]]; then
+            make terraform-base ENVIRONMENT="${ENVIRONMENT}" COMMAND="plan -no-color"
+          else
+            make terraform-base ENVIRONMENT="${ENVIRONMENT}" COMMAND="apply -auto-approve"
+          fi
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          title: "infra deploy (${{ env.ENVIRONMENT }})"
+          username: GitHub Actions
