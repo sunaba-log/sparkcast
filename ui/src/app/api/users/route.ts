@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser, SESSION_COOKIE_NAME } from "@/server/auth";
 import { getDbPool } from "@/server/db";
+import { isAdminUser } from "@/server/env";
 import { ensureDefaultChannel } from "@/server/podcasts/data-repository";
 import {
   SELECTED_PODCAST_COOKIE_NAME,
@@ -19,12 +20,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
     const { displayName } = displayNameSchema.parse(await request.json());
+    const approvalStatus = isAdminUser(user.email) ? "active" : "pending_approval";
     await (await getDbPool()).query(
-      `INSERT INTO users (user_id, email, display_name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (user_id, email, display_name, approval_status)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (email)
        DO UPDATE SET display_name = EXCLUDED.display_name`,
-      [user.uid, user.email, displayName],
+      [user.uid, user.email, displayName, approvalStatus],
     );
     // 登録直後から使えるよう、チャンネルが無ければデフォルトを作成し選択する
     const podcastId = await ensureDefaultChannel({

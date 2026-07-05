@@ -9,6 +9,7 @@ import {
 } from "@/server/episodes/repository";
 import { createAudioUploadUrl } from "@/server/storage";
 import { getSessionUser, requirePodcastAccess } from "@/server/auth";
+import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
 
 export const runtime = "nodejs";
 
@@ -20,8 +21,17 @@ export async function POST(request: Request) {
     }
     const input = createEpisodeUploadSchema.parse(await request.json());
     await requirePodcastAccess(user.uid, input.podcastId);
+
+    const pool = await getDbPool();
+    const usageCheck = await checkUsageAllowed(pool, user, "episode_upload");
+    if (!usageCheck.allowed) {
+      return NextResponse.json({ error: usageCheck.reason }, { status: 429 });
+    }
+
+    await recordUsage(pool, user.uid, "episode_upload");
+
     const result = await createEpisodeUpload(input, {
-      pool: await getDbPool(),
+      pool,
       signUpload: createAudioUploadUrl,
       createRecord: createEpisodeRecord,
       setAudioPath: setEpisodeAudioFilePath,

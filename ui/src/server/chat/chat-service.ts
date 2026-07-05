@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Content } from "@google/genai";
 import { getVertexAiModel } from "@/server/env";
+import { getPodcast } from "@/server/podcasts/data-repository";
 import type { ChatMessage } from "@/types/chat";
 import { embedQuery } from "@/server/chat/embeddings";
 import {
@@ -18,10 +19,16 @@ import { getVertexAi } from "@/server/chat/vertex-client";
 const RETRIEVAL_LIMIT = 12;
 const CONDENSE_HISTORY_TURNS = 6;
 
-function buildSystemInstruction(context: string): string {
+function buildSystemInstruction(
+  podcastTitle: string | null,
+  context: string,
+): string {
   const knowledge = context || "（参照できるナレッジはまだありません）";
+  const intro = podcastTitle
+    ? `あなたはポッドキャスト「${podcastTitle}」の運営を支援するアシスタントです。日本語で回答してください。`
+    : "あなたはポッドキャストの運営を支援するアシスタントです。日本語で回答してください。";
   return [
-    "あなたはポッドキャスト「Podcaster's DevLog」の運営を支援するアシスタントです。日本語で回答してください。",
+    intro,
     "以下にナレッジ（配信済みエピソードの議事録・書き起こし／次回議題の提案／SNS 投稿）が与えられます。",
     "ナレッジは『## 【種別】タイトル』の見出しと、その直下の『URL: ...』行を持つブロックに分かれています。",
     "",
@@ -162,13 +169,16 @@ export async function* streamChatReply(input: {
   podcastId: number;
   messages: ChatMessage[];
 }): AsyncGenerator<string> {
-  const context = await buildContext(input.podcastId, input.messages);
+  const [context, podcast] = await Promise.all([
+    buildContext(input.podcastId, input.messages),
+    getPodcast(input.podcastId),
+  ]);
 
   const stream = await getVertexAi().models.generateContentStream({
     model: getVertexAiModel(),
     contents: toContents(input.messages),
     config: {
-      systemInstruction: buildSystemInstruction(context),
+      systemInstruction: buildSystemInstruction(podcast?.title ?? null, context),
       temperature: 0.3,
     },
   });
