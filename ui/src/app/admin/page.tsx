@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionUser, requireAdmin } from "@/server/auth";
+import { getSessionUser } from "@/server/auth";
 import { getDbPool } from "@/server/db";
 import { listPendingUsers } from "@/server/admin/users-repository";
 import { AdminUsersPanel } from "@/components/AdminUsersPanel";
@@ -11,14 +11,9 @@ export default async function AdminPage() {
   if (!user) {
     redirect("/login");
   }
-  try {
-    requireAdmin(user);
-  } catch {
-    redirect("/");
-  }
 
   const pool = await getDbPool();
   const pendingUsers = await listPendingUsers(pool);
 
-  return <AdminUsersPanel users={pendingUsers} />;
+  return <AdminUsersPanel users={pendingUsers} isAdmin={user.isAdmin} />;
 }

@@ -17,12 +17,10 @@ export function Sidebar({
   channelTitle,
   podcasts,
   selectedPodcastId,
-  isAdmin,
 }: {
   channelTitle: string | null;
   podcasts: PodcastSummary[];
   selectedPodcastId: number | null;
-  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -154,22 +152,20 @@ export function Sidebar({
             </Link>
           );
         })}
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-medium transition-all duration-150 ${pathname.startsWith("/admin")
-              ? "text-brand border border-brand font-bold"
-              : "text-gray-700 hover:bg-brand-subtle/40 hover:text-gray-900"
-              } ${collapsed ? "justify-center px-0" : ""}`}
-            title={collapsed ? "管理" : undefined}
-          >
-            <Shield
-              className={`w-4 h-4 shrink-0 ${pathname.startsWith("/admin") ? "text-brand" : "text-gray-500"
-                }`}
-            />
-            {!collapsed && <span>管理</span>}
-          </Link>
-        )}
+        <Link
+          href="/admin"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xs text-sm font-medium transition-all duration-150 ${pathname.startsWith("/admin")
+            ? "text-brand border border-brand font-bold"
+            : "text-gray-700 hover:bg-brand-subtle/40 hover:text-gray-900"
+            } ${collapsed ? "justify-center px-0" : ""}`}
+          title={collapsed ? "管理" : undefined}
+        >
+          <Shield
+            className={`w-4 h-4 shrink-0 ${pathname.startsWith("/admin") ? "text-brand" : "text-gray-500"
+              }`}
+          />
+          {!collapsed && <span>管理</span>}
+        </Link>
       </nav>
     </aside>
   );

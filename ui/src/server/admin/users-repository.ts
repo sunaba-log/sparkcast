@@ -36,3 +36,21 @@ export async function approveUser(pool: Pool, userId: string): Promise<void> {
     [userId],
   );
 }
+
+export async function deleteUser(pool: Pool, userId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "DELETE FROM podcast_ownerships WHERE user_id = $1",
+      [userId],
+    );
+    await client.query("DELETE FROM users WHERE user_id = $1", [userId]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}

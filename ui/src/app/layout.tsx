@@ -82,7 +82,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               channelTitle={channelTitle}
               podcasts={podcasts}
               selectedPodcastId={selectedPodcastId}
-              isAdmin={user.isAdmin}
             />
           )}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>
