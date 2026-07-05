@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ChatWidget } from "@/components/ChatWidget";
+import { HeaderActions } from "@/components/HeaderActions";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser, hasPodcastAccess } from "@/server/auth";
 import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
@@ -52,18 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 className="block sm:hidden h-6 w-auto"
               />
             </Link>
-            {user && (
-              <div className="flex items-center gap-3">
-                {/* 作業系（高頻度）を左に、アカウント系を右端に分けて配置する */}
-                <Link
-                  href="/upload"
-                  className="px-4 py-2 text-xs font-normal bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5 border border-brand"
-                >
-                  <span>+</span> 新規エピソード追加
-                </Link>
-                <ChatWidget />
-              </div>
-            )}
+            {user && <HeaderActions />}
           </div>
         </header>
         <div className="flex-1 flex overflow-hidden min-h-0">

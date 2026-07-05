@@ -75,7 +75,7 @@ export function Sidebar({
             type="button"
             onClick={() => setSwitcherOpen((open) => !open)}
             title="チャンネルを切り替え"
-            className="flex items-center gap-1 min-w-0 font-bold text-gray-900 text-base tracking-tight hover:text-brand transition-colors"
+            className="flex items-center gap-1 min-w-0 font-bold text-gray-900 text-sm tracking-tight hover:text-brand transition-colors"
           >
             <span className="truncate">{channelTitle ?? "チャンネル未選択"}</span>
             <ChevronDown className="w-4 h-4 shrink-0 text-brand" />
