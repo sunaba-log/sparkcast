@@ -3,9 +3,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { HeaderActions } from "@/components/HeaderActions";
 import { Sidebar } from "@/components/Sidebar";
-import { getSessionUser, hasPodcastAccess } from "@/server/auth";
+import { getSessionUser } from "@/server/auth";
 import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
-import { getSelectedPodcastId } from "@/server/podcasts/selection";
+import { resolveEffectivePodcastId } from "@/server/podcasts/selection";
 import type { PodcastSummary } from "@/types/podcast";
 import "./globals.css";
 
@@ -21,8 +21,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let selectedPodcastId: number | null = null;
   if (user?.registered) {
     podcasts = await listPodcastsForUser(user.uid);
-    const podcastId = await getSelectedPodcastId();
-    if (podcastId && (await hasPodcastAccess(user.uid, podcastId))) {
+    // Cookie 未設定時もデフォルトチャンネルを「選択中」として表示する
+    const podcastId = await resolveEffectivePodcastId(user);
+    if (podcastId) {
       selectedPodcastId = podcastId;
       channelTitle = (await getPodcast(podcastId))?.title ?? null;
     }
