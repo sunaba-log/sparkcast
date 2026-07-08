@@ -30,7 +30,7 @@ export async function getSelectedPodcastId(): Promise<number | null> {
 // 選択 Cookie が有効ならそれを、無効ならデフォルトチャンネルを、それも無ければ
 // null を返す。Server Component からは Cookie を書き換えられないため、
 // フォールバック時は Cookie を更新せず既定値を返すだけにする（明示切替は API 経由）。
-async function resolveEffectivePodcastId(
+export async function resolveEffectivePodcastId(
   user: SessionUser,
 ): Promise<number | null> {
   const selected = await getSelectedPodcastId();

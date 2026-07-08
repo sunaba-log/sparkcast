@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function RegisterPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (user.registered) redirect("/");
+  if (user.registered) redirect("/episodes");
   if (!(await isRegistrationAllowed(await getDbPool(), user))) {
     return (
       <RegistrationClosedNotice
