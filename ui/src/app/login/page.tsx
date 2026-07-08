@@ -5,6 +5,6 @@ import { getSessionUser } from "@/server/auth";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  if (await getSessionUser()) redirect("/");
+  if (await getSessionUser()) redirect("/episodes");
   return <LoginForm />;
 }

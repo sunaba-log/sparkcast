@@ -29,8 +29,8 @@ export function RegisterForm({
       if (!response.ok) {
         throw new Error(result.error ?? "ユーザ登録に失敗しました");
       }
-      // 登録時にデフォルトチャンネルが作成され選択済みのためトップへ
-      router.push("/");
+      // 登録時にデフォルトチャンネルが作成され選択済みのためエピソード画面へ
+      router.push("/episodes");
       router.refresh();
     } catch (caught) {
       setError(

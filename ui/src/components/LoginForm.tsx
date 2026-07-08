@@ -49,7 +49,7 @@ export function LoginForm() {
     if (!response.ok) {
       throw new Error(result.error ?? "ログインに失敗しました");
     }
-    router.push(result.registered ? "/" : "/register");
+    router.push(result.registered ? "/episodes" : "/register");
     router.refresh();
   }, [router]);
 
@@ -122,7 +122,7 @@ export function LoginForm() {
       if (!response.ok) {
         throw new Error(result.error ?? "モックログインに失敗しました");
       }
-      router.push(result.registered ? "/" : "/register");
+      router.push(result.registered ? "/episodes" : "/register");
       router.refresh();
     } catch (caught) {
       setError(
