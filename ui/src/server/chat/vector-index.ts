@@ -5,24 +5,15 @@ import {
   FieldValue,
 } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/server/firebase-admin";
+import type {
+  ReplaceSourceChunksInput,
+  RetrievedChunk,
+} from "@/server/chat/index-types";
 import type { KnowledgeSourceType } from "@/server/chat/knowledge-types";
 
 const INDEX_COLLECTION = "minutes_index";
 const META_COLLECTION = "minutes_index_meta";
 const MAX_BATCH_OPS = 450;
-
-export type IndexChunk = {
-  chunkIndex: number;
-  text: string;
-};
-
-export type RetrievedChunk = {
-  sourceType: KnowledgeSourceType;
-  sourceKey: string;
-  title: string;
-  url: string;
-  text: string;
-};
 
 function indexCollection(podcastId: number): CollectionReference {
   return getAdminFirestore()
@@ -106,16 +97,9 @@ export async function deleteSourceChunks(
  * 1 ソース分のチャンクを入れ替える。既存チャンクを削除して新しい埋め込みを書き込み、
  * meta（ハッシュ）を更新する。
  */
-export async function replaceSourceChunks(input: {
-  podcastId: number;
-  sourceType: KnowledgeSourceType;
-  sourceKey: string;
-  title: string;
-  url: string;
-  contentHash: string;
-  chunks: IndexChunk[];
-  embeddings: number[][];
-}): Promise<void> {
+export async function replaceSourceChunks(
+  input: ReplaceSourceChunksInput,
+): Promise<void> {
   const firestore = getAdminFirestore();
   const collection = indexCollection(input.podcastId);
   const existing = await collection

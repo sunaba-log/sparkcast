@@ -4,7 +4,7 @@ import {
   buildRetrievedContext,
 } from "@/server/chat/minutes-context";
 import type { KnowledgeDoc } from "@/server/chat/knowledge-types";
-import type { RetrievedChunk } from "@/server/chat/vector-index";
+import type { RetrievedChunk } from "@/server/chat/index-types";
 
 function knowledge(
   overrides: Partial<KnowledgeDoc> & Pick<KnowledgeDoc, "sourceKey">,

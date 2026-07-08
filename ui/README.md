@@ -99,8 +99,17 @@ upload_pending -> uploaded -> processing -> completed
 ## 議事録チャット（RAG）
 
 全ページ右下のアイコンから、配信済みエピソードの議事録を横断して質問できる。
-回答生成はVertex AIのGemini、横断検索はFirestoreのベクトル検索を使う。認証は
-`FIREBASE_SERVICE_ACCOUNT_JSON`と`GOOGLE_CLOUD_PROJECT`を流用する。
+回答生成はVertex AIのGeminiを使う。認証は`FIREBASE_SERVICE_ACCOUNT_JSON`と
+`GOOGLE_CLOUD_PROJECT`を流用する。
+
+横断検索のバックエンドは2種類あり、環境変数で切り替える。
+
+- **Firestoreベクトル検索**（デフォルト）: `ELASTICSEARCH_URL`未設定時。
+- **Elasticsearchハイブリッド検索**: `ELASTICSEARCH_URL`設定時。kuromojiアナライザに
+  よるBM25全文検索とdense vector kNNをRRF（Reciprocal Rank Fusion）で融合する。
+  日本語の固有名詞・略語などキーワード一致に強い。
+
+### Firestoreベクトル検索（デフォルト）
 
 利用前にFirestoreのベクトルインデックスをVertex AIの埋め込み次元(768)で作成する。
 
@@ -111,6 +120,23 @@ gcloud firestore indexes composite create \
   --query-scope=COLLECTION \
   --field-config=field-path=embedding,vector-config='{"dimension":768,"flat":{}}'
 ```
+
+### Elasticsearchハイブリッド検索
+
+`.env.local`（本番はCloud Runの環境変数）に接続情報を設定すると有効になる。
+
+```bash
+ELASTICSEARCH_URL=https://<your-deployment>.es.asia-northeast1.gcp.cloud.es.io
+ELASTICSEARCH_API_KEY=<api-key>
+# インデックス名（省略時: sparkcast-knowledge）
+ELASTICSEARCH_INDEX=sparkcast-knowledge
+```
+
+インデックスは初回書き込み時にマッピング付きで自動作成される（kuromoji
+アナライザを使うため、`analysis-kuromoji`プラグインが有効なクラスタが必要。
+Elastic Cloudでは標準で利用できる）。有効化後は「再インデックス」を実行して
+Elasticsearch側にチャンクを取り込む。`ELASTICSEARCH_URL`を外せばFirestore
+ベクトル検索に戻る（インデックスデータは相互移行されない点に注意）。
 
 議事録のベクトル化は**Cloud Schedulerで日次自動実行**する（`/api/cron/reindex-minutes`）。
 冪等で、未変更のエピソードはスキップするため新規・変更分のみ埋め込む。即時に反映したい

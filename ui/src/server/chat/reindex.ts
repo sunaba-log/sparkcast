@@ -9,7 +9,7 @@ import {
   getIndexedSourceHash,
   listIndexedSourceKeys,
   replaceSourceChunks,
-} from "@/server/chat/vector-index";
+} from "@/server/chat/knowledge-index";
 
 export type ReindexResult = {
   sources: number;
@@ -24,7 +24,8 @@ function hashContent(content: string): string {
 }
 
 /**
- * 議事録・書き起こしをチャンク分割・埋め込みし、Firestore ベクトルインデックスへ反映する。
+ * 議事録・書き起こしをチャンク分割・埋め込みし、ナレッジインデックス
+ * （Firestore / Elasticsearch）へ反映する。
  * 次回議題・SNS 投稿はデータ量が小さく常にコンテキストへ全量注入するため、対象外。
  * 前回から変わっていないソースはスキップし（冪等）、現存しなくなったソース
  * （旧形式の残骸を含む）はインデックスから削除する。

@@ -13,7 +13,7 @@ import {
   buildKnowledgeContext,
   buildRetrievedContext,
 } from "@/server/chat/minutes-context";
-import { searchSimilarChunks } from "@/server/chat/vector-index";
+import { searchRelevantChunks } from "@/server/chat/knowledge-index";
 import { getVertexAi } from "@/server/chat/vertex-client";
 
 const RETRIEVAL_LIMIT = 12;
@@ -126,9 +126,10 @@ async function buildSearchQuery(messages: ChatMessage[]): Promise<string> {
 const SUPPLEMENTAL_MAX_TOTAL_CHARS = 40_000;
 
 /**
- * RAG（ベクトル検索）で関連する議事録チャンクを集め、次回議題・SNS 投稿は
- * データ量が小さいため常に全量を添えて文脈を作る（インデックス未更新でも回答できる）。
- * 検索が使えない / ヒット無しの場合は全ナレッジの全文コンテキストにフォールバックする。
+ * RAG（ハイブリッド検索 / ベクトル検索）で関連する議事録チャンクを集め、次回議題・
+ * SNS 投稿はデータ量が小さいため常に全量を添えて文脈を作る（インデックス未更新でも
+ * 回答できる）。検索が使えない / ヒット無しの場合は全ナレッジの全文コンテキストに
+ * フォールバックする。
  */
 async function buildContext(
   podcastId: number,
@@ -138,9 +139,9 @@ async function buildContext(
   if (query) {
     try {
       const queryVector = await embedQuery(query);
-      const chunks = await searchSimilarChunks(
+      const chunks = await searchRelevantChunks(
         podcastId,
-        queryVector,
+        { text: query, vector: queryVector },
         RETRIEVAL_LIMIT,
       );
       const retrieved = buildRetrievedContext(chunks);

@@ -3,7 +3,7 @@ import {
   type KnowledgeDoc,
   type KnowledgeSourceType,
 } from "@/server/chat/knowledge-types";
-import type { RetrievedChunk } from "@/server/chat/vector-index";
+import type { RetrievedChunk } from "@/server/chat/index-types";
 
 export type BuildKnowledgeContextOptions = {
   /** コンテキスト全体の最大文字数。 */

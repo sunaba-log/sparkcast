@@ -30,6 +30,18 @@ export function getGoogleCloudProject(): string {
   return required("GOOGLE_CLOUD_PROJECT");
 }
 
+export function getElasticsearchUrl(): string | undefined {
+  return process.env.ELASTICSEARCH_URL || undefined;
+}
+
+export function getElasticsearchApiKey(): string | undefined {
+  return process.env.ELASTICSEARCH_API_KEY || undefined;
+}
+
+export function getElasticsearchIndex(): string {
+  return process.env.ELASTICSEARCH_INDEX || "sparkcast-knowledge";
+}
+
 export function getFirebaseServiceAccountJson(): string | undefined {
   return process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 }
