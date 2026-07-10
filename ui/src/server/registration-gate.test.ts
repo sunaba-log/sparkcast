@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Pool } from "pg";
 import {
   isRegistrationAllowed,
@@ -12,6 +12,10 @@ const mockPool = {
 describe("registration-gate", () => {
   beforeEach(() => {
     (mockPool.query as unknown as ReturnType<typeof vi.fn>).mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("allows already registered users without querying the allowlist", async () => {
@@ -57,6 +61,32 @@ describe("registration-gate", () => {
 
     const allowed = await isRegistrationAllowed(mockPool, {
       email: "stranger@example.com",
+      registered: false,
+    });
+
+    expect(allowed).toBe(false);
+  });
+
+  it("allows the guest email without pre-registration when guest mode is enabled", async () => {
+    vi.stubEnv("ENABLE_GUEST_MODE", "true");
+
+    const allowed = await isRegistrationAllowed(mockPool, {
+      email: "guest@sunabalog.com",
+      registered: false,
+    });
+
+    expect(allowed).toBe(true);
+    expect(mockPool.query).not.toHaveBeenCalled();
+  });
+
+  it("denies the guest email when guest mode is disabled and not pre-registered", async () => {
+    (mockPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      rowCount: 0,
+      rows: [],
+    });
+
+    const allowed = await isRegistrationAllowed(mockPool, {
+      email: "guest@sunabalog.com",
       registered: false,
     });
 
