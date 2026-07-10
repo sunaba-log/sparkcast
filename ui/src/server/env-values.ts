@@ -116,6 +116,16 @@ export function isLocalMockAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 }
 
+// ハッカソン審査等でログインなしにお試し利用させるゲストモード。
+// dev の Cloud Run にのみ設定する（prod では未設定＝無効）。
+export function isGuestModeEnabled(): boolean {
+  return process.env.ENABLE_GUEST_MODE === "true";
+}
+
+export function getGuestEmail(): string {
+  return (process.env.GUEST_EMAIL ?? "guest@sunabalog.com").toLowerCase();
+}
+
 export function getUploadBucket(): string {
   return required("GCS_UPLOAD_BUCKET");
 }

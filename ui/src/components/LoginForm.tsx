@@ -30,7 +30,7 @@ function isPopupBlocked(error: unknown) {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -108,6 +108,28 @@ export function LoginForm() {
   const isMockAuthEnabled =
     process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 
+  async function guestLogin() {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await fetch("/api/auth/guest-session", {
+        method: "POST",
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "ゲストログインに失敗しました");
+      }
+      router.push("/episodes");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "ゲストログインに失敗しました",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function mockLogin() {
     try {
       setLoading(true);
@@ -143,6 +165,21 @@ export function LoginForm() {
         <p className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}
         </p>
+      )}
+      {guestEnabled && (
+        <div className="mt-6 p-4 rounded-md bg-emerald-50 border border-emerald-200 text-center">
+          <p className="text-xs font-semibold text-emerald-800 mb-2">
+            🎧 アカウントなしでお試しいただけます
+          </p>
+          <button
+            type="button"
+            onClick={guestLogin}
+            disabled={loading}
+            className="w-full px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {loading ? "ログイン中..." : "ゲストとして試す"}
+          </button>
+        </div>
       )}
       {isMockAuthEnabled && (
         <div className="mt-6 p-4 rounded-md bg-amber-50 border border-amber-200 text-center">
