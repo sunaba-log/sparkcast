@@ -29,6 +29,9 @@ injected by the GitHub Actions workflows (`.github/workflows/`).
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Required | Firebase Console | `.github/workflows/`（build arg） | Must match the Firebase project used for auth. |
 | `FIREBASE_AUTH_HELPER_DOMAIN` | Optional | Firebase project auth helper domain | `.github/workflows/`（build arg） | Defaults to `${NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`. Used by Next.js rewrites for `/__/auth/*`. |
 | `CRON_SECRET` | Required | generated local value | Secret Manager (`cron-secret`) | Cloud Scheduler ジョブが `Authorization: Bearer` で送る値と一致させる。 |
+| `ENABLE_GUEST_MODE` | Optional | 通常は未設定（ローカルはモック認証を使う） | gcloud で dev の Cloud Run にのみ設定 | `true` でログイン画面に「ゲストとして試す」を表示し、共有ゲストアカウントで利用可能にする。prod には設定しない。 |
+| `GUEST_EMAIL` | Optional | 未設定 | 未設定（デフォルトを使用） | ゲストアカウントのメール。デフォルトは `guest@sunabalog.com`。 |
+| `RATE_LIMIT_HOURLY` / `RATE_LIMIT_DAILY` | Optional | 未設定 | 未設定（デフォルト 20 / 100） | ユーザー単位のレート制限。ゲストモード中は全ゲストで共有されるため、審査期間中は dev で引き上げる。 |
 
 ## Current Secret Stores
 
