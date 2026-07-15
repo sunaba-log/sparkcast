@@ -125,21 +125,6 @@ export async function PATCH(
           : input.discord_bot_token || undefined,
     };
 
-    // Python側の仕様に合わせ、5つの必須項目すべてが入力されているかチェック
-    const missing: string[] = [];
-    if (!mergedSecrets.x_api_key) missing.push("API Key");
-    if (!mergedSecrets.x_api_secret) missing.push("API Secret");
-    if (!mergedSecrets.x_access_token) missing.push("Access Token");
-    if (!mergedSecrets.x_access_token_secret) missing.push("Access Token Secret");
-    if (!mergedSecrets.discord_bot_token) missing.push("Discord Bot Token");
-
-    if (missing.length > 0) {
-      return NextResponse.json(
-        { error: `設定に不備があります。以下の項目が未入力です: ${missing.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
     await saveChannelSecrets(podcastId, mergedSecrets);
     return NextResponse.json({ ok: true });
   } catch (error) {

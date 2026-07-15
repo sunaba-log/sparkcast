@@ -77,22 +77,6 @@ class SecretManagerClient(SecretProvider):
             x_access_token_secret = secret_json.get("access_token_secret") or secret_json.get("x_access_token_secret")
             discord_bot_token = secret_json.get("discord_bot_token")
 
-            missing = []
-            if not x_api_key:
-                missing.append("x_api_key/api_key")
-            if not x_api_secret:
-                missing.append("x_api_secret/api_secret")
-            if not x_access_token:
-                missing.append("access_token/x_access_token")
-            if not x_access_token_secret:
-                missing.append("access_token_secret/x_access_token_secret")
-            if not discord_bot_token:
-                missing.append("discord_bot_token")
-
-            if missing:
-                msg = f"Missing required keys in channel secrets for '{podcast_id}': {', '.join(missing)}"
-                raise ValueError(msg)
-
             return ChannelCredentials(
                 x_api_key=x_api_key,
                 x_api_secret=x_api_secret,

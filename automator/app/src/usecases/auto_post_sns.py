@@ -104,15 +104,19 @@ class AutoPostSnsUsecase:
             try:
                 self._logger.info("Fetching channel credentials for podcast_id: %s", podcast_id)
                 creds = self._secret_provider.get_channel_credentials(podcast_id)
-                x_client = XClient(
-                    api_key=creds.x_api_key,
-                    api_secret=creds.x_api_secret,
-                    access_token=creds.x_access_token,
-                    access_token_secret=creds.x_access_token_secret,
-                )
-                # Verify credentials
-                if not x_client.verify_auth():
-                    self._logger.error("X credentials verification failed for podcast_id: %s", podcast_id)
+                if creds.x_api_key and creds.x_api_secret and creds.x_access_token and creds.x_access_token_secret:
+                    x_client = XClient(
+                        api_key=creds.x_api_key,
+                        api_secret=creds.x_api_secret,
+                        access_token=creds.x_access_token,
+                        access_token_secret=creds.x_access_token_secret,
+                    )
+                    # Verify credentials
+                    if not x_client.verify_auth():
+                        self._logger.error("X credentials verification failed for podcast_id: %s", podcast_id)
+                        x_client = None
+                else:
+                    self._logger.info("X credentials are incomplete for podcast_id: %s. Skipping custom XClient initialization.", podcast_id)
                     x_client = None
             except Exception:
                 self._logger.exception("Failed to get or verify channel credentials for podcast_id: %s", podcast_id)

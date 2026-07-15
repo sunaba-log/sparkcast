@@ -65,10 +65,10 @@ def test_secret_manager_client_channel_credentials_alternate_keys() -> None:
 
 
 def test_secret_manager_client_channel_credentials_missing_keys() -> None:
-    """Test error handling when some keys are missing in the JSON payload."""
+    """Test that missing keys in the JSON payload default to None without raising error."""
     mock_client = MagicMock()
     mock_response = MagicMock()
-    # Missing api_key
+    # Missing api_key (x_api_key)
     mock_response.payload.data = (
         b'{"api_secret": "x2", "x_access_token": "x3", "x_access_token_secret": "x4", "discord_bot_token": "db1"}'
     )
@@ -76,8 +76,12 @@ def test_secret_manager_client_channel_credentials_missing_keys() -> None:
 
     with patch("infrastructure.secret_manager.secretmanager_v1.SecretManagerServiceClient", return_value=mock_client):
         client = SecretManagerClient(project_id="proj")
-        with pytest.raises(RuntimeError, match="Failed to retrieve credentials for podcast channel chan123"):
-            client.get_channel_credentials("chan123")
+        creds = client.get_channel_credentials("chan123")
+        assert creds.x_api_key is None
+        assert creds.x_api_secret == "x2"
+        assert creds.x_access_token == "x3"
+        assert creds.x_access_token_secret == "x4"
+        assert creds.discord_bot_token == "db1"
 
 
 def test_secret_manager_client_channel_credentials_nonexistent() -> None:

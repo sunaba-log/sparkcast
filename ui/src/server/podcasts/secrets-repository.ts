@@ -61,36 +61,21 @@ export async function saveChannelSecrets(podcastId: number, secrets: ChannelSecr
   const secretId = `podcast-${podcastId}-secrets`;
   const secretPath = client.secretPath(projectId, secretId);
 
-  // 1. シークレットの存在確認
-  let exists = false;
+  // 1. シークレットの作成を試みる（すでに存在する場合や、作成権限がない場合は無視して次に進み、バージョン追加を試す）
   try {
-    await client.getSecret({ name: secretPath });
-    exists = true;
-  } catch (error) {
-    const isNotFoundError =
-      error && typeof error === "object" && "code" in error && error.code === 5;
-    if (!isNotFoundError) {
-      console.error(`Failed to get secret metadata for podcast ${podcastId}:`, error);
-      throw error;
-    }
-  }
-
-  // 2. 存在しない場合は新規シークレットを作成
-  if (!exists) {
-    try {
-      await client.createSecret({
-        parent: client.projectPath(projectId),
-        secretId,
-        secret: {
-          replication: {
-            automatic: {},
-          },
+    await client.createSecret({
+      parent: client.projectPath(projectId),
+      secretId,
+      secret: {
+        replication: {
+          automatic: {},
         },
-      });
-    } catch (error) {
-      console.error(`Failed to create secret ${secretId}:`, error);
-      throw error;
-    }
+      },
+    });
+  } catch (error) {
+    // すでに存在する場合(ALREADY_EXISTS = 6)や、プロジェクトレベルの作成権限がない場合(PERMISSION_DENIED = 7)などの
+    // エラーが起きてもここでは無視します。シークレットが作成済みであれば、次の addSecretVersion が成功するためです。
+    console.warn(`Failed to create secret ${secretId} (it might already exist or creation is not permitted):`, error);
   }
 
   // 3. バージョンを追加（JSON文字列として保存）
