@@ -116,7 +116,10 @@ class AutoPostSnsUsecase:
                         self._logger.error("X credentials verification failed for podcast_id: %s", podcast_id)
                         x_client = None
                 else:
-                    self._logger.info("X credentials are incomplete for podcast_id: %s. Skipping custom XClient initialization.", podcast_id)
+                    self._logger.info(
+                        "X credentials are incomplete for podcast_id: %s. Skipping custom XClient initialization.",
+                        podcast_id,
+                    )
                     x_client = None
             except Exception:
                 self._logger.exception("Failed to get or verify channel credentials for podcast_id: %s", podcast_id)
