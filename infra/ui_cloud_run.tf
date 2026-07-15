@@ -87,7 +87,6 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      template[0].revision,
       template[0].labels,
       # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。
       # 「redundant」警告が出ても labels だけでは default_labels を止められないため両者を無視する。
