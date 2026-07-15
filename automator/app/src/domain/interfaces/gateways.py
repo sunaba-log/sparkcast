@@ -15,11 +15,11 @@ if TYPE_CHECKING:
 class ChannelCredentials:
     """Credentials for channel-specific integrations."""
 
-    x_api_key: str
-    x_api_secret: str
-    x_access_token: str
-    x_access_token_secret: str
-    discord_bot_token: str
+    x_api_key: str | None = None
+    x_api_secret: str | None = None
+    x_access_token: str | None = None
+    x_access_token_secret: str | None = None
+    discord_bot_token: str | None = None
 
 
 class TranscriptProvider(Protocol):
