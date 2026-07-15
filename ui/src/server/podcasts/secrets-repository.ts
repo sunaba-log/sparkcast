@@ -73,9 +73,13 @@ export async function saveChannelSecrets(podcastId: number, secrets: ChannelSecr
       },
     });
   } catch (error) {
-    // すでに存在する場合(ALREADY_EXISTS = 6)や、プロジェクトレベルの作成権限がない場合(PERMISSION_DENIED = 7)などの
-    // エラーが起きてもここでは無視します。シークレットが作成済みであれば、次の addSecretVersion が成功するためです。
-    console.warn(`Failed to create secret ${secretId} (it might already exist or creation is not permitted):`, error);
+    const isAlreadyExistsError =
+      error && typeof error === "object" && "code" in error && error.code === 6;
+    if (!isAlreadyExistsError) {
+      // 権限不足 (PERMISSION_DENIED = 7) などのエラーが起きた場合は、警告を出力した上で、
+      // シークレットが既に作成済みであると仮定して、次の addSecretVersion の実行を試みます。
+      console.warn(`Failed to create secret ${secretId} (creation is not permitted but it might already exist):`, error);
+    }
   }
 
   // 3. バージョンを追加（JSON文字列として保存）

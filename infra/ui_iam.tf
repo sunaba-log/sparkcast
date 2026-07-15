@@ -8,6 +8,7 @@ locals {
     "roles/datastore.user",     # Firestore 読み書き
     "roles/firebaseauth.admin", # セッションCookie検証 / Auth管理
     "roles/aiplatform.user",    # Vertex AI（議事録チャットの生成・埋め込み）
+    "roles/secretmanager.admin", # シークレットの作成・取得・バージョン追加・削除
   ]
 }
 
