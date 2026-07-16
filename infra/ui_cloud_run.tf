@@ -77,6 +77,27 @@ resource "google_cloud_run_v2_service" "podcast_ui" {
           }
         }
       }
+      dynamic "env" {
+        for_each = var.enable_guest_mode ? [1] : []
+        content {
+          name  = "ENABLE_GUEST_MODE"
+          value = "true"
+        }
+      }
+      dynamic "env" {
+        for_each = var.rate_limit_daily != "" ? [1] : []
+        content {
+          name  = "RATE_LIMIT_DAILY"
+          value = var.rate_limit_daily
+        }
+      }
+      dynamic "env" {
+        for_each = var.rate_limit_hourly != "" ? [1] : []
+        content {
+          name  = "RATE_LIMIT_HOURLY"
+          value = var.rate_limit_hourly
+        }
+      }
     }
   }
 

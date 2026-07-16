@@ -27,3 +27,6 @@ budget_amount_jpy                  = 5000
 app_service_account_id           = "podcast-ui-dev"
 app_service_account_display_name = "Podcast UI dev"
 custom_domain                    = "dev.sparkcast.sunabalog.com"
+enable_guest_mode                = true
+rate_limit_daily                 = "500"
+rate_limit_hourly                = "100"
