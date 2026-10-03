@@ -148,6 +148,11 @@ describe("chunk upload", () => {
     expect(await env.RECORDINGS.get(`sessions/${room.sid}/manifest.json`)).not.toBeNull();
   });
 
+  it("accepts chunks from a participant whose WebSocket has not authenticated yet", async () => {
+    await service("control", { action: "start" });
+    expect((await putChunk(await roomToken(GUEST2, "guest"), { subject: GUEST2 })).status).toBe(201);
+  });
+
   it("only lets participants write their own track, and only the host write backups", async () => {
     await joinAll();
     await service("control", { action: "start" });
@@ -299,7 +304,7 @@ describe("CORS", () => {
 
 describe("isAllowedOrigin", () => {
   it("accepts listed origins and the preview pattern only", async () => {
-    const { isAllowedOrigin } = await import("../src/index");
+    const { isAllowedOrigin } = await import("../src/shared");
     const env = {
       ALLOWED_ORIGINS: "https://dev.sparkcast.sunabalog.com",
       ALLOWED_ORIGIN_PATTERN: "^https://pr-[0-9]+---sparkcast-ui-dev-jztgcd4mia-an\\.a\\.run\\.app$",

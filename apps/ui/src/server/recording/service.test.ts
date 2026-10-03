@@ -264,9 +264,9 @@ describe("finalizeRecording", () => {
     );
     vi.mocked(realtime.snapshotManifest).mockResolvedValue(manifest);
     const d = deps({ runMixerJob: vi.fn().mockRejectedValue(new Error("boom")) });
-    await expect(service.finalizeRecording(d, session({ status: "uploading" }))).rejects.toThrow(
-      "boom",
-    );
+    await expect(service.finalizeRecording(d, session({ status: "uploading" }))).rejects.toMatchObject({
+      code: "UNAVAILABLE",
+    });
     expect(repository.transitionSessionStatus).toHaveBeenLastCalledWith(
       expect.anything(),
       SESSION_ID,

@@ -73,6 +73,7 @@ const ERROR_STATUS: Record<RecordingError["code"], number> = {
   REMOVED: 403,
   PARTICIPANT_LIMIT: 409,
   INVALID_STATE: 409,
+  UNAVAILABLE: 503,
 };
 
 export function recordingErrorResponse(error: unknown, logMessage: string) {

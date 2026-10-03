@@ -114,6 +114,17 @@ jobs:
         run: npm test
       - name: Build (dry run)
         run: npx wrangler deploy --dry-run --env dev --outdir dist
+      # main モジュールの export 違反などはテストでは出ず、起動して初めて落ちるため実際に起動して確かめる
+      - name: Smoke test (wrangler dev)
+        run: |
+          printf 'ROOM_SECRET=ci\nSERVICE_SECRET=ci\nSFU_APP_ID=ci\nSFU_APP_TOKEN=ci\n' > .dev.vars
+          npx wrangler dev --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/health; then exit 0; fi
+            sleep 2
+          done
+          cat wrangler.log
+          exit 1
 
   # パスフィルタでスキップされたジョブが必須チェックをブロックしないよう、
   # ここを唯一の必須チェックにする（skip は許容、failure/cancelled のみ失敗）。

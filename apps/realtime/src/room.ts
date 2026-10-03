@@ -426,10 +426,13 @@ export class Room extends DurableObject<Env> {
     );
   }
 
+  // room JWT で本人確認は済んでいるので、ここでは「閉じていない・退出させられていない」だけを見る。
+  // WebSocket の認証より先に SFU やチャンク送信（リロード後の再送など）が届くことがあるため、
+  // まだ参加者の行が無くても拒否しない。
   isActiveParticipant(pid: string): boolean {
     if (this.status === "closed") return false;
     const row = this.sql.exec<ParticipantRow>("SELECT * FROM participants WHERE pid = ?", pid).toArray()[0];
-    return !!row && !row.kicked;
+    return !row?.kicked;
   }
 
   recordChunk(chunk: ChunkRecord): { ok: true } | { ok: false; reason: string } {

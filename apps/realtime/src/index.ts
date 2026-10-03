@@ -7,6 +7,10 @@ import {
   type RoomTokenClaims,
 } from "./tokens";
 
+import { buildChunkKey, isAllowedOrigin, MAX_CHUNK_BYTES } from "./shared";
+
+// Workers のメインモジュールはハンドラとクラス以外を export できない（起動時に失敗する）。
+// 関数や定数は ./shared に置く。
 export { Room } from "./room";
 
 // sparkcast 収録ルームの Worker（#166）。
@@ -19,7 +23,6 @@ export { Room } from "./room";
 //   POST /rooms/:sid/control | kick | close | manifest
 //   GET  /rooms/:sid/files?key&exp&sig     話者別トラックのダウンロード（署名付き URL）
 
-export const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
 const DEFAULT_REALTIME_API = "https://rtc.live.cloudflare.com/v1";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEGMENT = /^[A-Za-z0-9-]{1,48}$/;
@@ -34,12 +37,6 @@ function json(body: unknown, status = 200, headers: HeadersInit = {}): Response 
     status,
     headers: { "Content-Type": "application/json", ...headers },
   });
-}
-
-export function isAllowedOrigin(origin: string, env: Pick<Env, "ALLOWED_ORIGINS" | "ALLOWED_ORIGIN_PATTERN">): boolean {
-  const allowed = env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean);
-  if (allowed.includes(origin)) return true;
-  return !!env.ALLOWED_ORIGIN_PATTERN && new RegExp(env.ALLOWED_ORIGIN_PATTERN).test(origin);
 }
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
@@ -198,17 +195,6 @@ function intParam(url: URL, name: string, { min = 0, max = Number.MAX_SAFE_INTEG
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const value = Number(raw);
   return value >= min && value <= max ? value : null;
-}
-
-export function buildChunkKey(
-  sid: string,
-  kind: "local" | "backup",
-  participantId: string,
-  segment: string,
-  seq: number,
-  extension: string,
-): string {
-  return `sessions/${sid}/${kind}/${participantId}/${segment}/${String(seq).padStart(6, "0")}.${extension}`;
 }
 
 async function handleChunk(request: Request, env: Env, sid: string, url: URL): Promise<Response> {

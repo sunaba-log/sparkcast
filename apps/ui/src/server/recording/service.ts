@@ -61,7 +61,8 @@ export class RecordingError extends Error {
       | "CONSENT_REQUIRED"
       | "REMOVED"
       | "PARTICIPANT_LIMIT"
-      | "INVALID_STATE",
+      | "INVALID_STATE"
+      | "UNAVAILABLE",
     message: string,
   ) {
     super(message);
@@ -397,6 +398,8 @@ export async function finalizeRecording(
         [episodeId, `収録のミックス開始に失敗しました: ${message}`.slice(0, 2000)],
       );
     }
-    throw error;
+    if (error instanceof RecordingError) throw error;
+    console.error("Failed to finalize recording", error);
+    throw new RecordingError("UNAVAILABLE", "ミックスを開始できませんでした。少し待ってからもう一度お試しください");
   }
 }
