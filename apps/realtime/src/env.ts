@@ -14,6 +14,8 @@ export type Env = {
   TURN_KEY_TOKEN?: string;
   // カンマ区切り。ブラウザから呼べるオリジン
   ALLOWED_ORIGINS: string;
+  // 正規表現。dev では PR プレビュー（pr-<n>---sparkcast-ui-dev-...run.app）を許可する
+  ALLOWED_ORIGIN_PATTERN?: string;
   // テストで SFU API の向き先を差し替える
   REALTIME_API_BASE_URL?: string;
 };

@@ -296,3 +296,18 @@ describe("CORS", () => {
     expect(denied.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
+
+describe("isAllowedOrigin", () => {
+  it("accepts listed origins and the preview pattern only", async () => {
+    const { isAllowedOrigin } = await import("../src/index");
+    const env = {
+      ALLOWED_ORIGINS: "https://dev.sparkcast.sunabalog.com",
+      ALLOWED_ORIGIN_PATTERN: "^https://pr-[0-9]+---sparkcast-ui-dev-jztgcd4mia-an\\.a\\.run\\.app$",
+    };
+    expect(isAllowedOrigin("https://dev.sparkcast.sunabalog.com", env)).toBe(true);
+    expect(isAllowedOrigin("https://pr-166---sparkcast-ui-dev-jztgcd4mia-an.a.run.app", env)).toBe(true);
+    expect(isAllowedOrigin("https://pr-166---sparkcast-ui-dev-jztgcd4mia-an.a.run.app.evil.com", env)).toBe(false);
+    expect(isAllowedOrigin("https://evil.example", env)).toBe(false);
+    expect(isAllowedOrigin("https://evil.example", { ALLOWED_ORIGINS: "" })).toBe(false);
+  });
+});

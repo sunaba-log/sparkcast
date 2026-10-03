@@ -1,0 +1,64 @@
+---
+date: 2026-10-04
+status: accepted
+issue: https://github.com/sunaba-log/sparkcast/issues/166
+---
+
+# ブラウザ収録ルーム（グループ通話＋話者別録音）の構成
+
+## Context
+
+収録は「Discord で通話 → Craig で録音 → 手動ダウンロード → sparkcast にアップロード」で、Discord を前提にしていて手作業も多い。
+Discord に馴染みのない人にも使ってもらえるよう、通話・録音・エピソード登録までを sparkcast の中で完結させたい。
+大規模化を見込み、固定費ゼロ・従量でも安い構成にすることが条件。
+
+## Decision
+
+### 通話は Cloudflare Realtime SFU、録音は各参加者のブラウザで行う
+
+- **通話**: Cloudflare Realtime SFU（＋TURN）を使う。課金は転送量（月 1TB 無料、超過 $0.05/GB）だけなので、分単位で課金されるマネージドの録音サービス（月 10 万回で $16,000 以上）より桁違いに安い。自前ホストの SFU は運用負荷と単一障害点になるため採らない。
+- **録音**: サーバー側で録るとサーバー費がかかり、音質も通話の品質（Opus 32kbps）に縛られる。そこで各自が自分のマイクを手元で録る（MediaRecorder の WebM/Opus 128kbps）。通話の品質と録音の品質を切り離せる。
+- **ホストによる予備の録音**: ホストは、受信した各ゲストの音声を話者ごとにも録る。ゲスト側の欠け（リロード・iPhone の画面ロック・回線断）を補うためと、時刻を合わせるときの基準にするため。
+
+### 在室と台帳は Durable Object、チャンクは Worker 経由で R2 に置く
+
+- ルーム 1 つ = Durable Object 1 つ（SQLite、WebSocket Hibernation API）。在室、SFU トラックの配布、収録の開始と停止、時刻同期（ping/pong）、チャンクの台帳を持つ。Workers Free プランで動く。
+- **録音チャンクは Worker を通して R2 に書く。**（Issue の当初案は「UI が署名付き PUT URL を発行する」だった。）
+  - 保存先のキーは、Worker が room JWT の参加者 ID から組み立てる。他人のパスには書けない。
+  - UI（Cloud Run）に R2 の書き込み鍵を持たせずに済み、バケットに CORS も要らない。
+  - 台帳への記録が保存と同じ場所（Worker → Durable Object）で完結する。
+- 録音は GCS の入力バケットに置かない。入力バケットは、オブジェクトが作られるたびに既存パイプライン（Workflows → app Job）を起動するため。
+
+### 認証は HS256 の JWT を 2 種類使い分ける
+
+- **room JWT（`aud=sparkcast-room`）**: 参加者が Worker を使うためのもの。UI が発行する。ホストはログインとポッドキャストの権限、ゲストは招待キーと録音への同意を確認してから発行する。有効期限は 2 時間で、期限が切れる前に取り直す。
+- **service JWT（`aud=sparkcast-service`）**: UI から Worker の内部 API（開始・停止・退出・台帳の取得）を呼ぶためのもの。秘密は room JWT と分けている。
+- **招待キーと再入室キー**: それぞれセッション ID・参加者 ID の HMAC。DB に保存せず、何度でも同じ URL を出せる（192bit）。
+- 発行側（apps/ui）と検証側（apps/realtime）は WebCrypto で同じ形式を実装し、固定のテストベクタで互いの一致を確かめている。
+
+### 時刻合わせは「サーバー時刻で大まかに置く → 予備の録音との相互相関で詰める」
+
+- 各セグメント（録音を 1 回連続で動かした区間）の開始を、Durable Object の時計（往復時間が最小の ping から求めた offset）で記録する。これで ±数十 ms に置ける。
+- 端末ごとに音声の時計がわずかに違い、1 時間で数十〜数百 ms ずれていく。そこで mixer が、ホストの予備の録音と 8kHz・8 秒の窓で相互相関をとる。ずれを時刻の 1 次式（offset と drift）で近似し、atempo で補正する。
+- ゲストの音は「ホストに聞こえていたタイミング」に揃える（会話の受け答えが自然になる）。ホスト自身の録音は基準なので補正しない。
+
+### ミックスは Cloud Run Job（mixer）で行い、既存パイプラインに渡す
+
+- mixer は app と同じイメージで動き、command で `mixer_main` を起動する。UI が収録を確定したときに、Jobs API の run を env の上書き付きで呼ぶ。UI の SA にはこの Job への `roles/run.jobsExecutorWithOverrides` だけを付ける。
+- 出力は既存の契約どおりのパス `podcasts/{pid}/episodes/{eid}/source/recording-*.flac` に置く。automator は FLAC に対応済みなので、本体は変えていない。二重実行に備えて `ifGenerationMatch=0` で書く。
+- 話者別に位置を合わせた FLAC も R2 に残し、編集したい人がダウンロードできるようにした。録音データはライフサイクル設定で 30 日後に削除する。
+
+### prod は機能フラグで閉じておく
+
+利用者どうしのオンライン会議は、電気通信事業法の「他人の通信の媒介」に当たり、届出が要る見込みである（総務省「電気通信事業参入マニュアル［追補版］」p.25〜29 の事例）。届出が済むまで、prod は次の状態に置く。
+
+- `enable_recording = false`（Terraform）
+- `RECORDING_ENABLED` は未設定（UI）
+- Worker の CD はリポジトリ変数 `RECORDING_PROD_ENABLED` が無いので動かない
+
+## Consequences
+
+- Cloudflare のコストは GCP の予算アラートに含まれない。監視は Cloudflare ダッシュボードの使用量通知で行う（runbook 参照）。
+- Workers Free プランの上限は 1 日 10 万リクエストで、録音チャンク（10 秒ごと）の送信もこれに数えられる。4 人で 1 時間収録すると、ゲストの分とホストの予備の分を合わせて約 2,500 リクエストになる。超えるようなら Workers Paid（月 $5）にする。
+- iPhone の Safari は、画面ロックやアプリの切り替えでマイクが止まる。Web 版では防げないので、案内を出し、予備の録音で補う。ネイティブアプリは別の Issue で扱う。
+- 録音への同意は、ゲストが入室する前に必ずチェックしてもらう。プライバシーポリシーに音声の取得と利用目的を書き足すのは、prod で公開する前に行う。

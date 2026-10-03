@@ -25,8 +25,9 @@
       },
       "r2_buckets": [{ "binding": "RECORDINGS", "bucket_name": "sparkcast-recordings-dev" }],
       "vars": {
-        // PR プレビュー（pr-<n>---...run.app）は都度変わるため、検証時は wrangler の --var で足す
-        "ALLOWED_ORIGINS": "https://dev.sparkcast.sunabalog.com,http://localhost:3000,http://localhost:3002"
+        "ALLOWED_ORIGINS": "https://dev.sparkcast.sunabalog.com,http://localhost:3000,http://localhost:3002",
+        // PR プレビュー（pr-145---sparkcast-ui-dev-jztgcd4mia-an.a.run.app の形）
+        "ALLOWED_ORIGIN_PATTERN": "^https://pr-[0-9]+---sparkcast-ui-dev-jztgcd4mia-an\\.a\\.run\\.app$"
       }
     },
     "prod": {

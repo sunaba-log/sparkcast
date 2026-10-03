@@ -95,6 +95,33 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
           value = var.rate_limit_hourly
         }
       }
+      # ブラウザ収録ルーム（#166）。enable_recording = false の環境（prod）では何も足さない。
+      dynamic "env" {
+        for_each = var.enable_recording ? {
+          RECORDING_ENABLED = "true"
+          REALTIME_BASE_URL = "https://${var.realtime_hostname}"
+          MIXER_JOB_NAME    = "projects/${var.project_id}/locations/${var.region}/jobs/${local.recording_mixer_job_name}"
+        } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.enable_recording ? {
+          RECORDING_ROOM_SECRET    = google_secret_manager_secret.recording_room_secret[0].secret_id
+          RECORDING_SERVICE_SECRET = google_secret_manager_secret.recording_service_secret[0].secret_id
+        } : {}
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
     }
   }
 
@@ -121,7 +148,8 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
       # TF 側から env や service_account を変更する必要が生じたときは、
       # 一時的にここを外して Cloud Run に自動採番させること
       # （#72 Stage 8 の SA 改名では実際にそうした）。
-      template[0].revision,
+      # ⚠️ #166: 収録用の env を足すため一時的に外している。dev への反映後に戻すこと。
+      # template[0].revision,
       template[0].labels,
       template[0].annotations,
       # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。
@@ -139,6 +167,7 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
   depends_on = [
     google_project_service.required,
     google_secret_manager_secret_iam_member.app_secrets,
+    google_secret_manager_secret_iam_member.app_recording_secrets,
   ]
 }
 

@@ -1,4 +1,4 @@
-# モノレポ共通 CI。変更されたパスに応じて ui / automator のジョブを出し分ける。
+# モノレポ共通 CI。変更されたパスに応じて ui / automator / infra / realtime のジョブを出し分ける。
 # 単一の必須チェックは ci-ok（スキップは許容、失敗のみブロック）。
 name: ci
 
@@ -14,6 +14,7 @@ jobs:
       ui: ${{ steps.filter.outputs.ui }}
       automator: ${{ steps.filter.outputs.automator }}
       infra: ${{ steps.filter.outputs.infra }}
+      realtime: ${{ steps.filter.outputs.realtime }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -28,6 +29,9 @@ jobs:
               - '.github/workflows/ci.yml'
             infra:
               - 'infra/**'
+              - '.github/workflows/ci.yml'
+            realtime:
+              - 'apps/realtime/**'
               - '.github/workflows/ci.yml'
 
   ui:
@@ -87,17 +91,41 @@ jobs:
       - name: Terraform validate
         run: make terraform-validate
 
+  # 収録ルームの Cloudflare Worker（#166）。テストは workerd 上で Durable Object・R2 ごと動かす。
+  realtime:
+    needs: changes
+    if: needs.changes.outputs.realtime == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/realtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/realtime/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build (dry run)
+        run: npx wrangler deploy --dry-run --env dev --outdir dist
+
   # パスフィルタでスキップされたジョブが必須チェックをブロックしないよう、
   # ここを唯一の必須チェックにする（skip は許容、failure/cancelled のみ失敗）。
   ci-ok:
-    needs: [ui, automator, infra]
+    needs: [ui, automator, infra, realtime]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate results
         run: |
-          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }} infra=${{ needs.infra.result }}"
-          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}" "${{ needs.infra.result }}"; do
+          echo "ui=${{ needs.ui.result }} automator=${{ needs.automator.result }} infra=${{ needs.infra.result }} realtime=${{ needs.realtime.result }}"
+          for r in "${{ needs.ui.result }}" "${{ needs.automator.result }}" "${{ needs.infra.result }}" "${{ needs.realtime.result }}"; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
               echo "required job failed"; exit 1
             fi
@@ -106,7 +134,7 @@ jobs:
 
   # 失敗時のみ Discord に通知する（成功時はノイズになるため送らない）。
   report:
-    needs: [ui, automator, infra]
+    needs: [ui, automator, infra, realtime]
     if: always()
     runs-on: ubuntu-latest
     steps:

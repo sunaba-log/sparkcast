@@ -36,10 +36,15 @@ function json(body: unknown, status = 200, headers: HeadersInit = {}): Response 
   });
 }
 
+export function isAllowedOrigin(origin: string, env: Pick<Env, "ALLOWED_ORIGINS" | "ALLOWED_ORIGIN_PATTERN">): boolean {
+  const allowed = env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean);
+  if (allowed.includes(origin)) return true;
+  return !!env.ALLOWED_ORIGIN_PATTERN && new RegExp(env.ALLOWED_ORIGIN_PATTERN).test(origin);
+}
+
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("Origin");
-  const allowed = env.ALLOWED_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean);
-  if (!origin || !allowed.includes(origin)) return {};
+  if (!origin || !isAllowedOrigin(origin, env)) return {};
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",

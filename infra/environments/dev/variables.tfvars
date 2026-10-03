@@ -42,3 +42,6 @@ custom_domain                    = "dev.sparkcast.sunabalog.com"
 enable_guest_mode                = true
 rate_limit_daily                 = "500"
 rate_limit_hourly                = "100"
+# ブラウザ収録ルーム（#166）。Worker のホスト名は apps/realtime/wrangler.jsonc の env.dev.routes と揃える。
+enable_recording  = true
+realtime_hostname = "sparkcast-realtime-dev.sunabalog.com"

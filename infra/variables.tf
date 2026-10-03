@@ -286,3 +286,15 @@ variable "rate_limit_hourly" {
   description = "1時間あたりのレート制限回数"
   default     = ""
 }
+
+variable "enable_recording" {
+  type        = bool
+  description = "ブラウザ収録ルーム（#166）の有効化フラグ。電気通信事業の届出が済むまで prod は false。"
+  default     = false
+}
+
+variable "realtime_hostname" {
+  type        = string
+  description = "収録ルームの Cloudflare Worker（apps/realtime）のホスト名。wrangler.jsonc の routes と揃える。"
+  default     = ""
+}
