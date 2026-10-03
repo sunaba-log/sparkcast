@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEpisodeSourceObjectPath,
+  buildRecordingSourceObjectPath,
   createEpisodeUploadSchema,
   MAX_AUDIO_SIZE_BYTES,
   sanitizeFileName,
@@ -46,5 +47,13 @@ describe("episode upload contract", () => {
         fileSize: MAX_AUDIO_SIZE_BYTES,
       }),
     ).not.toThrow();
+  });
+});
+
+describe("buildRecordingSourceObjectPath", () => {
+  it("builds a FLAC path inside the episode source prefix", () => {
+    expect(
+      buildRecordingSourceObjectPath(7, 42, "11111111-1111-4111-8111-111111111111"),
+    ).toBe("podcasts/7/episodes/42/source/recording-11111111.flac");
   });
 });
