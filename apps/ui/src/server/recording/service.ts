@@ -113,7 +113,7 @@ export async function getInvitePath(
   return buildInvitePath(sessionId, await createInviteKey(sessionId, deps.roomSecret));
 }
 
-function isJoinable(session: RecordingSession, now = Date.now()): boolean {
+export function isJoinable(session: RecordingSession, now = Date.now()): boolean {
   if (session.expiresAt.getTime() <= now) return false;
   // 収録停止後（uploading）も、未送信の録音を送り直すために入り直せるようにする
   return ["waiting", "recording", "uploading"].includes(session.status);

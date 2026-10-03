@@ -4,6 +4,7 @@ import Image from "next/image";
 import { HeaderActions } from "@/components/HeaderActions";
 import { Sidebar } from "@/components/Sidebar";
 import { getSessionUser } from "@/server/auth";
+import { isRecordingEnabled } from "@/server/env";
 import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
 import { resolveEffectivePodcastId } from "@/server/podcasts/selection";
 import type { PodcastSummary } from "@/types/podcast";
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               userDisplayName={user.displayName}
               userRegistered={user.registered}
               userIsAdmin={user.isAdmin}
+              recordingEnabled={isRecordingEnabled()}
             />
           )}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>

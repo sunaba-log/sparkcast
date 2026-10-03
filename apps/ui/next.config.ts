@@ -9,6 +9,15 @@ const firebaseAuthHelperDomain =
 const nextConfig: NextConfig = {
   // Cloud Run 用コンテナで動かすため、self-contained な出力にする
   output: "standalone",
+  async headers() {
+    return [
+      {
+        // 収録ルーム（#166）でマイクを使う。自オリジン以外（埋め込み等）には許可しない
+        source: "/:path*",
+        headers: [{ key: "Permissions-Policy", value: "microphone=(self), camera=()" }],
+      },
+    ];
+  },
   async rewrites() {
     if (!firebaseAuthHelperDomain) return [];
     return [

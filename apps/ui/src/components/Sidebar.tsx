@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check } from "lucide-react";
+import { Radio, Share2, Lightbulb, Settings, ChevronsLeft, ChevronsRight, Podcast, ChevronDown, Check, Mic } from "lucide-react";
 import type { PodcastSummary } from "@/types/podcast";
 import { AccountMenu } from "./AccountMenu";
 
@@ -14,6 +14,7 @@ export function Sidebar({
   userDisplayName,
   userRegistered,
   userIsAdmin,
+  recordingEnabled = false,
 }: {
   channelTitle: string | null;
   podcasts: PodcastSummary[];
@@ -21,6 +22,7 @@ export function Sidebar({
   userDisplayName: string | null;
   userRegistered: boolean;
   userIsAdmin: boolean;
+  recordingEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -36,6 +38,7 @@ export function Sidebar({
     ]
     : [
       { href: "/episodes", label: "エピソード", icon: Radio },
+      ...(recordingEnabled ? [{ href: "/record", label: "収録", icon: Mic }] : []),
       { href: "/sns", label: "SNS投稿", icon: Share2 },
       { href: "/agenda", label: "次回議題", icon: Lightbulb },
       { href: "/settings", label: "番組設定", icon: Settings },
