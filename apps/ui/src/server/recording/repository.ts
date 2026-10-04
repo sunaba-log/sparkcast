@@ -137,6 +137,7 @@ export async function getRecordingSession(
   sessionId: string,
 ): Promise<RecordingSession | null> {
   if (!isUuid(sessionId)) return null;
+  await settleExpiredSessions(db, "session_id = $1", [sessionId]);
   const result = await db.query<SessionRow>(
     `SELECT ${SESSION_COLUMNS} FROM recording_sessions WHERE session_id = $1`,
     [sessionId],
@@ -149,6 +150,7 @@ export async function listRecordingSessions(
   podcastId: number,
   limit = 20,
 ): Promise<RecordingSession[]> {
+  await settleExpiredSessions(db, "podcast_id = $1", [podcastId]);
   const result = await db.query<SessionRow>(
     `SELECT ${SESSION_COLUMNS} FROM recording_sessions
      WHERE podcast_id = $1
@@ -355,25 +357,37 @@ export async function listTrackSummaries(
   }));
 }
 
-// 期限を過ぎたセッションを片付ける。
+// 期限を過ぎたセッションの状態を移す。
 // - 収録を始めていない（waiting）ものは expired にする
 // - 収録中（recording）のまま期限を過ぎたものは、録音が残っているので uploading（停止済み）にして、
 //   ホストが後からエピソード化できるようにする（uploading はそのまま残す）
-// - ミックスが止まったもの（mixing のまま一定時間）は failed にする
+// cron は 1 日 1 回なので、読むときにも対象のセッションだけ移す（画面が古い状態で止まらないように）
+async function settleExpiredSessions(
+  db: Queryable,
+  filter = "TRUE",
+  params: unknown[] = [],
+): Promise<{ expired: number; stopped: number }> {
+  const result = await db.query<{ status: RecordingSessionStatus }>(
+    `UPDATE recording_sessions
+     SET status = CASE status WHEN 'waiting' THEN 'expired' ELSE 'uploading' END,
+         updated_at = now()
+     WHERE status IN ('waiting', 'recording') AND expires_at < now() AND ${filter}
+     RETURNING status`,
+    params,
+  );
+  const rows = result.rows ?? [];
+  return {
+    expired: rows.filter((row) => row.status === "expired").length,
+    stopped: rows.filter((row) => row.status === "uploading").length,
+  };
+}
+
+// 期限を過ぎたセッションと、ミックスが止まったもの（mixing のまま一定時間）を片付ける（cron）
 export async function expireStaleRecordingSessions(
   db: Queryable,
   mixingTimeoutMinutes: number,
 ): Promise<{ expired: number; stopped: number; failed: number }> {
-  const expired = await db.query(
-    `UPDATE recording_sessions
-     SET status = 'expired', updated_at = now()
-     WHERE status = 'waiting' AND expires_at < now()`,
-  );
-  const stopped = await db.query(
-    `UPDATE recording_sessions
-     SET status = 'uploading', updated_at = now()
-     WHERE status = 'recording' AND expires_at < now()`,
-  );
+  const settled = await settleExpiredSessions(db);
   const failed = await db.query(
     `UPDATE recording_sessions
      SET status = 'failed',
@@ -382,7 +396,7 @@ export async function expireStaleRecordingSessions(
      WHERE status = 'mixing' AND updated_at < now() - ($1 * interval '1 minute')`,
     [mixingTimeoutMinutes],
   );
-  return { expired: expired.rowCount ?? 0, stopped: stopped.rowCount ?? 0, failed: failed.rowCount ?? 0 };
+  return { ...settled, failed: failed.rowCount ?? 0 };
 }
 
 export async function getEpisodeState(
