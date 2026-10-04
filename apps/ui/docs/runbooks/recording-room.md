@@ -60,7 +60,7 @@ jq -n --arg room "$ROOM" --arg service "$SERVICE" --argjson sfu "$SFU" --argjson
 
 1. `make terraform-deploy-dev`
    - R2 バケット、SFU/TURN アプリ、Secret、mixer Job、IAM、UI の環境変数を作る。
-   - UI の環境変数を足すために、`infra/ui_cloud_run.tf` の `template[0].revision` の ignore を一時的に外している。反映後は ignore を戻すこと（戻さないと、infra を apply するたびに UI のリビジョンが新しく作られる）。
+   - UI の環境変数を足す apply の間だけ、`infra/ui_cloud_run.tf` の `template[0].revision` の ignore を外す（外さないと 409）。反映後は戻す（戻さないと、infra を apply するたびに UI のリビジョンが新しく作られる）。dev はこの手順で反映済み。prod を有効にするときも同じ手順が要る。
 2. Worker をデプロイする（以降の変更は CD が行う）。
 
    ```bash
