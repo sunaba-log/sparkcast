@@ -20,6 +20,7 @@ type Props =
       // 入室できる（期限内で、終わっていない）か。期限を過ぎた収録は入室せずにエピソード化できる
       canEnterRoom: boolean;
       inviteKey?: undefined;
+      acceptsNewGuests?: undefined;
     }
   | {
       mode: "guest";
@@ -28,6 +29,8 @@ type Props =
       initialName: string;
       realtimeBaseUrl: string;
       inviteKey: string;
+      // 新しいゲストを受け付けるか。収録の停止後は、前に入室した端末だけが（未送信の録音を送るために）入り直せる
+      acceptsNewGuests: boolean;
       initialView?: undefined;
       canEnterRoom?: undefined;
     };
@@ -68,10 +71,15 @@ async function postJoin(sessionId: string, body: Record<string, unknown>): Promi
 
 export function RecordingRoomApp(props: Props) {
   const { sessionId, mode } = props;
-  const [stage, setStage] = useState<"prejoin" | "room" | "post">(() =>
-    props.mode === "host" && !props.canEnterRoom
-      ? "post"
-      : "prejoin",
+  const [stage, setStage] = useState<"checking" | "prejoin" | "room" | "post" | "closed">(() =>
+    props.mode === "host"
+      ? props.canEnterRoom
+        ? "prejoin"
+        : "post"
+      : // 前に入室した端末かどうかは localStorage を読むまで分からない（読む前にマイクを求めない）
+        props.acceptsNewGuests
+        ? "prejoin"
+        : "checking",
   );
   const [controller, setController] = useState<RecordingController | null>(null);
   const [joining, setJoining] = useState(false);
@@ -87,6 +95,7 @@ export function RecordingRoomApp(props: Props) {
     // 保存済みの表示名を入室前の画面に出す（localStorage は描画後にしか読めない）
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored?.displayName) setInitialName(stored.displayName);
+    setStage((current) => (current === "checking" ? (stored ? "prejoin" : "closed") : current));
   }, [mode, sessionId]);
 
   const requestJoin = useCallback(
@@ -143,6 +152,13 @@ export function RecordingRoomApp(props: Props) {
         <p className="text-xs font-bold text-brand tracking-wide">収録ルーム</p>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{props.title || "収録"}</h1>
       </header>
+
+      {stage === "closed" && (
+        <div className="border border-brand/20 rounded-xs bg-white/60 p-6 text-center space-y-2">
+          <p className="text-gray-800">収録はすでに終了しています。</p>
+          <p className="text-sm text-gray-500">新しい招待 URL をホストから受け取ってください。</p>
+        </div>
+      )}
 
       {stage === "prejoin" && (
         <PreJoin

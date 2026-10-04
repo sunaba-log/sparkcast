@@ -47,6 +47,7 @@ export default async function JoinPage({
       mode="guest"
       sessionId={sessionId}
       inviteKey={k}
+      acceptsNewGuests={session.status !== "uploading"}
       title={session.title}
       initialName=""
       realtimeBaseUrl={getRealtimeBaseUrl()}
