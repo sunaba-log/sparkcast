@@ -2,6 +2,8 @@ from __future__ import annotations
 
 # ruff: noqa: ARG002, ARG005
 import logging
+import shutil
+import subprocess
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -26,6 +28,7 @@ from infrastructure.speech_transcriber import (
     words_to_segments,
 )
 from services.episode_transcription import EpisodeTranscription, aligned_track_uri
+from services.speech_audio import speech_audio_uri, to_speech_flac
 from services.transcript_builder import SpeakerTrack, is_crosstalk, merge_speaker_tracks
 
 # ---- 時刻・目次 ----
@@ -349,3 +352,55 @@ def test_raises_when_no_minutes_at_all() -> None:
         _service(provider, _Repository(), None).run(
             gcs_uri="gs://in/x.m4a", podcast_id="1", episode_id="2", duration_seconds=90, model_id="m"
         )
+
+
+def test_uploaded_audio_is_converted_before_recognition_but_speakers_use_the_original() -> None:
+    original = "gs://in/podcasts/1/episodes/2/source/a.m4a"
+    flac = speech_audio_uri("work", "1", "2")
+    assert flac == "gs://work/transcribe/1/2.flac"
+    speech = _Speech({flac: [TranscriptSegment(0, 1, "a")]})
+    provider = _Provider()
+    prepared: list[tuple[bytes, str, str]] = []
+    service = EpisodeTranscription(
+        transcript_provider=provider,
+        episode_repository=_Repository(),
+        speech=speech,
+        work_bucket="work",
+        audio_preparer=lambda audio, pid, eid: prepared.append((audio, pid, eid)) or flac,
+        logger=logging.getLogger("test"),
+    )
+    assigned_uris: list[str] = []
+    original_assign = provider.assign_speakers
+
+    def assign(gcs_uri, segments, cast_names=None, model_id=None):
+        assigned_uris.append(gcs_uri)
+        return original_assign(gcs_uri, segments, cast_names, model_id)
+
+    provider.assign_speakers = assign  # type: ignore[method-assign]
+    result = service.run(
+        gcs_uri=original, podcast_id="1", episode_id="2", duration_seconds=90, model_id="m", source_audio=b"m4a"
+    )
+    assert prepared == [(b"m4a", "1", "2")]
+    assert speech.calls == [{flac: 90}]
+    assert assigned_uris == [original]
+    assert result.segments[0].text == "a"
+
+    if shutil.which("ffmpeg"):
+        wav = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=1",
+                "-f",
+                "wav",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+        assert to_speech_flac(wav)[:4] == b"fLaC"

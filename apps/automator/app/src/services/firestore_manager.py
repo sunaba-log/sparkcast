@@ -217,15 +217,20 @@ class FirestoreManager:
             if not isinstance(episode_number, int):
                 continue
 
-            transcript_parts: list[str] = []
-            transcript_docs = doc.reference.collection("transcripts").order_by("chunk_id").stream()
-            for transcript_doc in transcript_docs:
-                transcript_data = transcript_doc.to_dict() or {}
-                text = transcript_data.get("text")
-                if isinstance(text, str) and text.strip():
-                    transcript_parts.append(text.strip())
-
-            content = "\n\n".join(transcript_parts).strip()
+            # #166 以降は議事録が親ドキュメントの minutes にあり、transcripts は発話ごと(話者名は別の項目)。
+            # アジェンダには従来どおり議事録を渡す。以前のエピソードは transcripts に議事録が分割されている。
+            minutes = data.get("minutes")
+            if isinstance(minutes, str) and minutes.strip():
+                content = minutes.strip()
+            else:
+                transcript_parts: list[str] = []
+                transcript_docs = doc.reference.collection("transcripts").order_by("chunk_id").stream()
+                for transcript_doc in transcript_docs:
+                    transcript_data = transcript_doc.to_dict() or {}
+                    text = transcript_data.get("text")
+                    if isinstance(text, str) and text.strip():
+                        transcript_parts.append(text.strip())
+                content = "\n\n".join(transcript_parts).strip()
             if not content:
                 summary = data.get("transcript_summary")
                 content = summary.strip() if isinstance(summary, str) else ""

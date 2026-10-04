@@ -153,6 +153,7 @@ class ProcessPodcastWorkflow:
                 episode_id=episode_ref.episode_id,
                 duration_seconds=float(_duration_to_seconds(duration_str) or 0),
                 model_id=request.ai_model_id,
+                source_audio=original_audio_bytes,
             )
             transcript = transcription.minutes
             self._logger.info("Transcription: %s", transcription.meta)

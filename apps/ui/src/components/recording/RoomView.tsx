@@ -342,10 +342,11 @@ function ParticipantRow({
             className={`w-2 h-2 rounded-full shrink-0 ${participant.connected ? "bg-green-500" : "bg-gray-300"}`}
             title={participant.connected ? "接続中" : "切断"}
           />
-          <span className="text-sm font-medium text-gray-900 truncate">
+          <span className="text-sm font-medium text-gray-900 truncate min-w-0" title={participant.name}>
             {participant.name}
-            {isSelf && <span className="text-gray-500 font-normal">（あなた）</span>}
           </span>
+          {/* 名前が長くて省略されても「自分」が分かるよう、名前の外に置く */}
+          {isSelf && <span className="text-xs text-gray-500 shrink-0">（あなた）</span>}
           {participant.role === "host" && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-light text-brand shrink-0">ホスト</span>
           )}

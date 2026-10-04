@@ -16,7 +16,8 @@ export function AccountMenu({
   displayName: string | null;
   registered: boolean;
   isAdmin: boolean;
-  collapsed?: boolean;
+  // null = サイドバーが自動（狭い画面だけ折りたたみ）
+  collapsed?: boolean | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -39,17 +40,21 @@ export function AccountMenu({
         onClick={() => setOpen((value) => !value)}
         title="アカウントメニュー"
         className={`flex items-center text-gray-700 hover:text-brand hover:bg-brand-subtle/40 rounded-xs transition-colors w-full ${
-          collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5 text-sm font-medium"
+          collapsed === null
+            ? "justify-center px-0 py-2.5 md:justify-start md:gap-3 md:px-3 text-sm font-medium"
+            : collapsed
+              ? "justify-center px-0 py-2.5"
+              : "gap-3 px-3 py-2.5 text-sm font-medium"
         }`}
       >
         <CircleUserRound className="w-4 h-4 text-brand shrink-0" />
-        {!collapsed && (
-          <>
+        {collapsed !== true && (
+          <span className={collapsed === null ? "hidden md:contents" : "contents"}>
             <span className="truncate flex-1 text-left">
               {displayName ?? "アカウント"}
             </span>
             <ChevronDown className="w-3.5 h-3.5 shrink-0 text-gray-500" />
-          </>
+          </span>
         )}
       </button>
 

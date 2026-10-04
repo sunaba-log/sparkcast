@@ -22,6 +22,7 @@ from services.audio_converter import AudioConverter
 from services.episode_transcription import EpisodeTranscription
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
+from services.speech_audio import GcsSpeechAudioPreparer
 from services.track_energy import load_track_energy
 from usecases import ProcessPodcastWorkflow, ProcessPodcastWorkflowInput
 
@@ -235,6 +236,7 @@ def process_podcast_workflow() -> None:
             else None,
             work_bucket=config.work_bucket,
             energy_loader=load_track_energy,
+            audio_preparer=GcsSpeechAudioPreparer(config.work_bucket) if config.work_bucket else None,
             logger=logger,
         ),
     )

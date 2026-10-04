@@ -213,6 +213,19 @@ def test_list_recent_transcript_episodes_reads_transcript_chunks() -> None:
     ]
 
 
+def test_list_recent_transcript_episodes_prefers_minutes_over_utterances() -> None:
+    client = _FakeClient()
+    manager = FirestoreManager(project_id="demo", client=client)
+    episode_doc = client.collection("podcasts").document("p").collection("episodes_contents").document("ep-2")
+    episode_doc.set({"episode_number": 43, "updated_at": "2026-10-04T00:00:00Z", "minutes": " 議事録 "}, merge=True)
+    # 発話ごとの文字起こし(話者は別項目)はアジェンダには渡さない
+    episode_doc.collection("transcripts").document("seg_00001").set({"text": "こんにちは"}, merge=False)
+
+    result = manager.list_recent_transcript_episodes(podcast_id="p", limit=10)
+
+    assert result[0]["content"] == "議事録"
+
+
 def test_save_transcript_segments_replaces_previous_documents() -> None:
     client = _FakeClient()
     manager = FirestoreManager(project_id="demo", client=client)

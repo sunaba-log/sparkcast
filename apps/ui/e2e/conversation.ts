@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 // 音声合成（macOS の say）で、台本どおりに 3 人が順番に話す会話を作る（#166 の文字起こしの検証用）。
@@ -62,4 +62,29 @@ export function buildConversation(speakers = 3): Conversation {
     durationSeconds: total / VOICE_RATE,
     timeline,
   };
+}
+
+// 参加者のトラックを足し合わせ、指定回数ループした 1 本の m4a にする（アップロード経路の検証用）
+export function writeMixedConversation(conversation: Conversation, loops: number, file: string): string {
+  const directory = path.dirname(file);
+  mkdirSync(directory, { recursive: true });
+  const tracks = conversation.tracks.map((track) => {
+    // Buffer のプールは 2 バイト境界に揃っているとは限らないので、写してから読む
+    const bytes = new Uint8Array(Buffer.from(track, "base64"));
+    return new Int16Array(bytes.buffer);
+  });
+  const length = tracks[0].length;
+  const mixed = new Int16Array(length * loops);
+  for (let loop = 0; loop < loops; loop += 1) {
+    for (let i = 0; i < length; i += 1) {
+      let sum = 0;
+      for (const track of tracks) sum += track[i];
+      mixed[loop * length + i] = Math.max(-32768, Math.min(32767, sum));
+    }
+  }
+  const raw = `${file}.raw`;
+  writeFileSync(raw, Buffer.from(mixed.buffer));
+  execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "s16le", "-ar", String(VOICE_RATE), "-ac", "1", "-i", raw, "-c:a", "aac", "-b:a", "96k", file]);
+  rmSync(raw);
+  return file;
 }

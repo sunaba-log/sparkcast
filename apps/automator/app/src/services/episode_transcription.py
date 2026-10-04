@@ -26,6 +26,8 @@ ENGINE = "speech_v2_long"
 
 # 位置合わせ済みトラックの URI 一覧 → 区間の音量を返す関数(読めなければ None)
 EnergyLoader = Callable[[dict[str, str]], EnergyFn | None]
+# アップロードされた音声のバイト列 → 認識用に置いた音声の gs:// URI(services.speech_audio)
+SpeechAudioPreparer = Callable[[bytes, str, str], str]
 
 
 @dataclass
@@ -53,6 +55,7 @@ class EpisodeTranscription:
         speech: SpeechTranscriber | None,
         work_bucket: str | None,
         energy_loader: EnergyLoader | None = None,
+        audio_preparer: SpeechAudioPreparer | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Wire dependencies."""
@@ -61,6 +64,7 @@ class EpisodeTranscription:
         self._speech = speech
         self._work_bucket = work_bucket
         self._energy_loader = energy_loader
+        self._audio_preparer = audio_preparer
         self._logger = logger or logging.getLogger(__name__)
 
     def run(
@@ -71,8 +75,12 @@ class EpisodeTranscription:
         episode_id: str,
         duration_seconds: float,
         model_id: str | None,
+        source_audio: bytes | None = None,
     ) -> TranscriptionResult:
-        """文字起こしと議事録を作る."""
+        """文字起こしと議事録を作る.
+
+        source_audio(アップロードされた音声のバイト列)を渡すと、認識用に FLAC にしてから認識する。
+        """
         cast = self._cast_names(podcast_id)
         recording = self._recording(episode_id)
         if self._speech is not None:
@@ -82,7 +90,10 @@ class EpisodeTranscription:
                     source = "recording"
                     cast = [speaker.name for speaker in recording.speakers]
                 else:
-                    segments = self._transcribe_mixed(gcs_uri, duration_seconds, cast, model_id)
+                    speech_uri = gcs_uri
+                    if self._audio_preparer is not None and source_audio is not None:
+                        speech_uri = self._audio_preparer(source_audio, podcast_id, episode_id)
+                    segments = self._transcribe_mixed(gcs_uri, speech_uri, duration_seconds, cast, model_id)
                     source = "gemini" if any(s.speaker != UNKNOWN_SPEAKER for s in segments) else "none"
                 if segments:
                     minutes = self._provider.generate_minutes(render_transcript(segments), cast, model_id)
@@ -150,12 +161,14 @@ class EpisodeTranscription:
     def _transcribe_mixed(
         self,
         gcs_uri: str,
+        speech_uri: str,
         duration_seconds: float,
         cast: list[str],
         model_id: str | None,
     ) -> list[TranscriptSegment]:
+        """音声認識は speech_uri(FLAC)、話者の推定は元の音声(gcs_uri)で行う."""
         assert self._speech is not None  # noqa: S101
-        segments = self._speech.transcribe({gcs_uri: duration_seconds}).get(gcs_uri, [])
+        segments = self._speech.transcribe({speech_uri: duration_seconds}).get(speech_uri, [])
         if not segments:
             return segments
         try:
