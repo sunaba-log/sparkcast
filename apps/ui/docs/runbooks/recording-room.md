@@ -10,8 +10,8 @@
 | ルーム（Durable Object）・SFU プロキシ・チャンクの受け口 | `apps/realtime`（`sparkcast-realtime-{env}.sunabalog.com`） | CD（realtime ジョブ、wrangler） |
 | ミックス | `apps/automator/app/src/mixer_main.py`（Cloud Run Job `sparkcast-automator-mixer-{env}`） | Terraform（`infra/recording.tf`） |
 | 録音の保存 | R2 `sparkcast-recordings-{env}`（`sessions/` は 30 日で削除） | Terraform |
-| Realtime SFU / TURN アプリ | Cloudflare（`sparkcast-recording-{env}`） | Terraform |
-| 秘密 | Secret Manager: `sparkcast-recording-room-secret`・`sparkcast-recording-service-secret`（UI）、`sparkcast-recording-worker-secrets`（Worker 用 JSON） | Terraform |
+| Realtime SFU / TURN アプリ | Cloudflare（`sparkcast-recording-{env}`） | **手動**（下記。provider の不具合で Terraform では管理できない） |
+| 秘密 | Secret Manager: `sparkcast-recording-room-secret`・`sparkcast-recording-service-secret`（UI、値も Terraform）、`sparkcast-recording-worker-secrets`（Worker 用 JSON、入れ物だけ Terraform・値は手動） | Terraform / 手動 |
 | DB | `recording_sessions`・`recording_participants`・`recording_tracks`（`apps/ui/migrations/008_*`） | CD（マイグレーション） |
 
 ## Cloudflare API トークンに要る権限
@@ -27,6 +27,34 @@ Terraform（`CLOUDFLARE_API_TOKEN`）と CD の wrangler は同じトークン�
 変えたら、ローカルの `.env` と GitHub Secrets の `CLOUDFLARE_API_TOKEN` の両方を更新する。
 
 mixer は既存の R2 キー（Secret Manager の `cloudflare-access-key-id` / `cloudflare-secret-access-key`）を使う。このキーが特定のバケットに限定されている場合は、`sparkcast-recordings-{env}` にも読み書きできるようにする。
+
+## Realtime アプリと Worker 用の秘密（手動）
+
+cloudflare provider v5 の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_app` は refresh で
+`missing required app_id parameter` になり、以降の apply が必ず失敗する（#166 の dev 反映時に発生）。
+そのため Realtime のアプリは API で作り、Worker 用の秘密 JSON は手で入れる。dev は作成済み。
+
+```bash
+ACCOUNT=8ed20f6872cea7c9219d68bfcf5f98ae
+ENV=prod   # 作る環境
+PROJECT=sunabalog-$ENV
+# SFU アプリ（返り値の uid / secret）と TURN キー（返り値の uid / key）を作る
+SFU=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/calls/apps" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+  -d "{\"name\":\"sparkcast-recording-$ENV\"}")
+TURN=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/calls/turn_keys" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+  -d "{\"name\":\"sparkcast-recording-$ENV\"}")
+ROOM=$(gcloud secrets versions access latest --secret=sparkcast-recording-room-secret --project=$PROJECT)
+SERVICE=$(gcloud secrets versions access latest --secret=sparkcast-recording-service-secret --project=$PROJECT)
+jq -n --arg room "$ROOM" --arg service "$SERVICE" --argjson sfu "$SFU" --argjson turn "$TURN" \
+  '{ROOM_SECRET: $room, SERVICE_SECRET: $service, SFU_APP_ID: $sfu.result.uid, SFU_APP_TOKEN: $sfu.result.secret,
+    TURN_KEY_ID: $turn.result.uid, TURN_KEY_TOKEN: $turn.result.key}' \
+  | gcloud secrets versions add sparkcast-recording-worker-secrets --data-file=- --project=$PROJECT
+```
+
+`ROOM_SECRET` / `SERVICE_SECRET` は UI 用の secret と必ず同じ値にする（違うと入室・内部 API が 401 になる）。
+入れたら realtime の CD を流すか、下の手順で `wrangler secret bulk` を実行する。
 
 ## dev への反映（初回）
 

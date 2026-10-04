@@ -1,7 +1,7 @@
 # ブラウザ収録ルーム（#166）。
 #
 # - R2 recordings バケット: 録音チャンク・台帳・話者別トラック（30 日で削除）。公開ドメインは付けない
-# - Cloudflare Realtime SFU / TURN のアプリ
+# - Cloudflare Realtime SFU / TURN のアプリ（Terraform 管理外。下のコメント参照）
 # - ルーム JWT と UI → Worker の service JWT の秘密（UI と Worker で共有）
 # - mixer Job（app と同じイメージ、command で mixer_main を起動）と、UI からの起動権限
 #
@@ -41,18 +41,24 @@ resource "cloudflare_r2_bucket_lifecycle" "recordings" {
   ]
 }
 
-# Realtime の app secret / TURN key は作成時にしか取れないため Terraform で作り、
-# Secret Manager に入れる（値は state にも残る。既存の R2 キーの扱いと同じ）。
-resource "cloudflare_calls_sfu_app" "recording" {
-  count      = local.recording_enabled
-  account_id = var.cloudflare_account_id
-  name       = "sparkcast-recording-${var.environment}"
+# Realtime の SFU / TURN アプリは Terraform で管理しない。
+# cloudflare provider（v5.21）の cloudflare_calls_sfu_app / cloudflare_calls_turn_app は作成はできるが、
+# refresh で「missing required app_id / key_id parameter」となり、以降の apply が必ず失敗する。
+# アプリは API で作り、値は下の sparkcast-recording-worker-secrets に手で入れる
+# （手順は apps/ui/docs/runbooks/recording-room.md）。dev で一度 Terraform が作ったものは
+# state からだけ外し、実物は使い続ける。
+removed {
+  from = cloudflare_calls_sfu_app.recording
+  lifecycle {
+    destroy = false
+  }
 }
 
-resource "cloudflare_calls_turn_app" "recording" {
-  count      = local.recording_enabled
-  account_id = var.cloudflare_account_id
-  name       = "sparkcast-recording-${var.environment}"
+removed {
+  from = cloudflare_calls_turn_app.recording
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "random_password" "recording_room_secret" {
@@ -100,7 +106,10 @@ resource "google_secret_manager_secret_version" "recording_service_secret" {
   secret_data = random_password.recording_service_secret[0].result
 }
 
-# Worker（wrangler secret bulk）にそのまま渡す JSON
+# Worker（wrangler secret bulk）にそのまま渡す JSON。
+# 中身（ROOM_SECRET / SERVICE_SECRET / SFU_APP_ID / SFU_APP_TOKEN / TURN_KEY_ID / TURN_KEY_TOKEN）は
+# 手で入れる（上の理由で Realtime の値を Terraform から書けないため）。ROOM_SECRET / SERVICE_SECRET は
+# 下の UI 用の secret と同じ値にすること。
 resource "google_secret_manager_secret" "recording_worker_secrets" {
   count     = local.recording_enabled
   project   = var.project_id
@@ -111,17 +120,11 @@ resource "google_secret_manager_secret" "recording_worker_secrets" {
   depends_on = [google_project_service.required]
 }
 
-resource "google_secret_manager_secret_version" "recording_worker_secrets" {
-  count  = local.recording_enabled
-  secret = google_secret_manager_secret.recording_worker_secrets[0].id
-  secret_data = jsonencode({
-    ROOM_SECRET    = random_password.recording_room_secret[0].result
-    SERVICE_SECRET = random_password.recording_service_secret[0].result
-    SFU_APP_ID     = cloudflare_calls_sfu_app.recording[0].uid
-    SFU_APP_TOKEN  = cloudflare_calls_sfu_app.recording[0].secret
-    TURN_KEY_ID    = cloudflare_calls_turn_app.recording[0].uid
-    TURN_KEY_TOKEN = cloudflare_calls_turn_app.recording[0].key
-  })
+removed {
+  from = google_secret_manager_secret_version.recording_worker_secrets
+  lifecycle {
+    destroy = false
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "app_recording_secrets" {
