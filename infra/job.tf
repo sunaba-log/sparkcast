@@ -40,7 +40,8 @@ module "cloud_run_job" {
     SNS_SCHEDULE_OFFSET_HOURS                = var.sns_schedule_offset_hours
     # 話者・時刻つきの文字起こし（#166、transcription.tf）
     WORK_BUCKET     = google_storage_bucket.work.name
-    SPEECH_LOCATION = "us-central1"
+    SPEECH_LOCATION = "asia-northeast1"
+    SPEECH_MODEL    = "long"
   }
 
   secret_environment_variables = {

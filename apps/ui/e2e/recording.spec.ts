@@ -1,4 +1,5 @@
 import { chromium, expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { buildConversation, CONVERSATION, type Conversation } from "./conversation";
 import { writeFakeVoices } from "./fake-audio";
 import { installFakeMic } from "./fake-mic";
 
@@ -17,6 +18,7 @@ import { installFakeMic } from "./fake-mic";
 //   E2E_EXPECT          どこまで確かめるか: tracks（録音が届いたまで）/ mix（ミックス完了）/ episode（エピソード完成）
 //   E2E_EXPECT_CALL     1 なら通話（SFU）がつながり、ホストの予備録音が届くことも確かめる
 //   E2E_FAKE_MIC        stub（既定。ページ内で合成した声）/ flag（Chromium の偽マイク。Linux 向け）
+//   E2E_VOICE           tts なら macOS の say で台本の会話を作って流し、文字起こしの話者と時刻を台本と突き合わせる
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3002";
 const GUESTS = Number(process.env.E2E_GUESTS ?? "2");
@@ -25,11 +27,16 @@ const SCENARIOS = new Set((process.env.E2E_SCENARIOS ?? "").split(",").map((valu
 const EXPECT = process.env.E2E_EXPECT ?? "tracks";
 const EXPECT_CALL = process.env.E2E_EXPECT_CALL === "1";
 const FAKE_MIC = process.env.E2E_FAKE_MIC ?? "stub";
+const VOICE = process.env.E2E_VOICE ?? "synth";
+// 全員の偽マイクを揃える時刻基準
+const EPOCH_MS = Date.now();
+let conversation: Conversation | null = null;
 
 type Participant = { browser: Browser; context: BrowserContext; page: Page; name: string };
 
 type SessionView = {
   status: string;
+  recordingStartedAtMs: number | null;
   episodeId: number | null;
   episodeStatus: string | null;
   error: string | null;
@@ -49,10 +56,23 @@ async function launch(audioFile: string): Promise<Browser> {
   return chromium.launch({ args });
 }
 
-async function newParticipant(audioFile: string, name: string, seed: number): Promise<Participant> {
+async function newParticipant(
+  audioFile: string,
+  name: string,
+  seed: number,
+  speakerIndex: number,
+): Promise<Participant> {
   const browser = await launch(audioFile);
   const context = await browser.newContext({ baseURL: BASE_URL, permissions: ["microphone"] });
-  if (FAKE_MIC === "stub") await context.addInitScript(installFakeMic, { seed, seconds: 120 });
+  if (FAKE_MIC === "stub") {
+    await context.addInitScript(installFakeMic, {
+      seed,
+      seconds: 120,
+      ...(conversation
+        ? { pcm16: conversation.tracks[speakerIndex], rate: 16_000, epochMs: EPOCH_MS }
+        : {}),
+    });
+  }
   const page = await context.newPage();
   page.on("response", (response) => {
     if (response.status() >= 400) {
@@ -97,7 +117,8 @@ async function sessionView(host: Participant, sessionId: string): Promise<Sessio
 
 test("ホストとゲストが入室して収録し、録音が揃ってエピソード化できる", async () => {
   const voices = writeFakeVoices(GUESTS + 1);
-  const host = await newParticipant(voices[0], "ホスト", 1000);
+  if (VOICE === "tts") conversation = buildConversation(GUESTS + 1);
+  const host = await newParticipant(voices[0], "ホスト", 1000, 0);
   const guests: Participant[] = [];
   try {
     await loginHost(host);
@@ -116,7 +137,7 @@ test("ホストとゲストが入室して収録し、録音が揃ってエピ�
 
     // ゲストが招待 URL から入る（ログイン不要）
     for (let index = 0; index < GUESTS; index += 1) {
-      const guest = await newParticipant(voices[index + 1], `ゲスト${index + 1}`, 1000 + (index + 1) * 77);
+      const guest = await newParticipant(voices[index + 1], `ゲスト${index + 1}`, 1000 + (index + 1) * 77, index + 1);
       guests.push(guest);
       await guest.page.goto(inviteUrl);
       await enterRoom(guest, { name: guest.name, consent: true });
@@ -202,8 +223,70 @@ test("ホストとゲストが入室して収録し、録音が揃ってエピ�
       await expect
         .poll(async () => (await sessionView(host, sessionId)).episodeStatus, { timeout: 30 * 60_000, intervals: [15_000] })
         .toBe("completed");
+      if (conversation) {
+        await verifyTranscript(host, await sessionView(host, sessionId), conversation);
+      }
     }
   } finally {
     for (const participant of [host, ...guests]) await participant.browser.close().catch(() => undefined);
   }
 });
+
+type TranscriptSegment = { start: number; end: number; speaker: string; text: string };
+
+function normalize(text: string): string {
+  return text.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+// 2 つの文字列の共通部分の割合（文字の bigram の重なり）
+function similarity(a: string, b: string): number {
+  const grams = (value: string) => new Set(Array.from({ length: Math.max(0, value.length - 1) }, (_, i) => value.slice(i, i + 2)));
+  const left = grams(normalize(a));
+  const right = grams(normalize(b));
+  if (left.size === 0 || right.size === 0) return 0;
+  let shared = 0;
+  for (const gram of left) if (right.has(gram)) shared += 1;
+  return shared / Math.min(left.size, right.size);
+}
+
+// 文字起こしを台本と突き合わせる：台詞ごとに、最も似た発話の話者が正しいこと・時刻が合っていること
+async function verifyTranscript(host: Participant, view: SessionView, script: Conversation) {
+  const response = await host.context.request.get(`/api/episodes/${view.episodeId}/transcript`);
+  expect(response.ok(), `transcript API ${response.status()}`).toBeTruthy();
+  const { segments } = (await response.json()) as { segments: TranscriptSegment[] };
+  console.log(`transcript: ${segments.length} segments`);
+  for (const segment of segments) {
+    console.log(`  [${segment.start.toFixed(1)}-${segment.end.toFixed(1)}] ${segment.speaker}: ${segment.text}`);
+  }
+  expect(segments.length).toBeGreaterThan(0);
+
+  const hostName = view.participants.find((participant) => participant.role === "host")!.displayName;
+  const names = [hostName, ...Array.from({ length: GUESTS }, (_, index) => `ゲスト${index + 1}`)];
+  const recordingStartMs = view.recordingStartedAtMs ?? 0;
+  const loop = script.durationSeconds;
+
+  let matched = 0;
+  let speakerCorrect = 0;
+  const timeErrors: number[] = [];
+  for (const line of script.timeline) {
+    const best = segments
+      .map((segment) => ({ segment, score: similarity(segment.text, line.text) }))
+      .sort((a, b) => b.score - a.score)[0];
+    if (!best || best.score < 0.5) continue;
+    matched += 1;
+    if (best.segment.speaker === names[line.speaker]) speakerCorrect += 1;
+    // 台詞が鳴った時刻（ループの何周目かは、文字起こしの時刻に最も近い周を選ぶ）
+    const base = (EPOCH_MS - recordingStartMs) / 1000 + line.start;
+    const cycle = Math.round((best.segment.start - base) / loop);
+    timeErrors.push(Math.abs(best.segment.start - (base + cycle * loop)));
+  }
+  const sorted = [...timeErrors].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? Infinity;
+  console.log(
+    `matched ${matched}/${CONVERSATION.length} lines, speaker correct ${speakerCorrect}/${matched}, ` +
+      `time error median ${median.toFixed(2)}s max ${(sorted.at(-1) ?? 0).toFixed(2)}s`,
+  );
+  expect(matched, "lines recognized").toBeGreaterThanOrEqual(Math.ceil(CONVERSATION.length * 0.7));
+  expect(speakerCorrect, "speaker attribution").toBe(matched);
+  expect(median, "median timestamp error (s)").toBeLessThan(1.0);
+}

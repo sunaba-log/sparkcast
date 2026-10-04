@@ -16,7 +16,15 @@ from domain.models.transcript import (
     render_transcript,
 )
 from infrastructure.episode_repository import split_cast_names
-from infrastructure.speech_transcriber import ChirpTranscriber, Word, result_words, words_to_segments
+from infrastructure.speech_transcriber import (
+    ChirpTranscriber,
+    Word,
+    clean_transcript,
+    result_words,
+    results_to_segments,
+    sentences_to_segments,
+    words_to_segments,
+)
 from services.episode_transcription import EpisodeTranscription, aligned_track_uri
 from services.transcript_builder import SpeakerTrack, is_crosstalk, merge_speaker_tracks
 
@@ -104,6 +112,36 @@ def test_result_words_uses_word_offsets_or_falls_back_to_result_bounds() -> None
     assert words == [Word("こんにちは。", 1.0, 1.8), Word("時刻なし", 2.0, 5.0)]
 
 
+def test_sentences_keep_punctuation_and_take_times_from_words() -> None:
+    words = [
+        Word("今日は", 10.0, 10.4),
+        Word("晴れ", 10.4, 10.8),
+        Word("です", 10.8, 11.1),
+        Word("明日も", 12.0, 12.5),
+        Word("晴れ", 12.5, 12.9),
+        Word("ますか", 12.9, 13.4),
+    ]
+    segments = sentences_to_segments("今日は晴れです。明日も晴れますか\uff1f", words)
+    assert [(s.start, s.end, s.text) for s in segments] == [
+        (10.0, 11.1, "今日は晴れです。"),
+        (12.0, 13.4, "明日も晴れますか\uff1f"),
+    ]
+
+
+def test_results_to_segments_cleans_spaces_and_falls_back_to_pauses() -> None:
+    assert clean_transcript("議事録の目 次 の時刻 Cloud Run を使う") == "議事録の目次の時刻Cloud Runを使う"
+    with_punctuation = _result("議事録の目 次です。", [("議事録の", 1.0, 1.5), ("目次です", 1.5, 2.2)], 2.5)
+    without_punctuation = _result(
+        "では始めます それでは", [("では", 5.0, 5.3), ("始めます", 5.3, 6.0), ("それでは", 8.0, 8.6)], 9.0
+    )
+    segments = results_to_segments([with_punctuation, without_punctuation])  # type: ignore[list-item]
+    assert [(s.start, s.end, s.text) for s in segments] == [
+        (1.0, 2.2, "議事録の目次です。"),
+        (5.0, 6.0, "では始めます"),
+        (8.0, 8.6, "それでは"),
+    ]
+
+
 class _FakeSpeechClient:
     def __init__(self) -> None:
         self.batch_requests = []
@@ -128,13 +166,18 @@ class _FakeSpeechClient:
 def test_transcriber_uses_batch_for_long_audio_and_sync_for_short_audio() -> None:
     client = _FakeSpeechClient()
     transcriber = ChirpTranscriber(project_id="p", client=client)  # type: ignore[arg-type]
-    output = transcriber.transcribe({"gs://b/long.flac": 3600, "gs://b/short.flac": 30})
+    output = transcriber.transcribe({"gs://b/long.flac": 3600, "gs://b/long2.flac": 600, "gs://b/short.flac": 30})
 
-    assert [f.uri for f in client.batch_requests[0].files] == ["gs://b/long.flac"]
+    # inline の結果は 1 リクエスト 1 ファイルまで
+    assert [[f.uri for f in request.files] for request in client.batch_requests] == [
+        ["gs://b/long.flac"],
+        ["gs://b/long2.flac"],
+    ]
+    assert output["gs://b/long2.flac"][0].text == "長い。"
     assert client.sync_requests[0].uri == "gs://b/short.flac"
-    assert client.batch_requests[0].config.model == "chirp_2"
+    assert client.batch_requests[0].config.model == "long"
     assert client.batch_requests[0].config.features.enable_word_time_offsets is True
-    assert client.batch_requests[0].recognizer == "projects/p/locations/us-central1/recognizers/_"
+    assert client.batch_requests[0].recognizer == "projects/p/locations/asia-northeast1/recognizers/_"
     assert output["gs://b/long.flac"][0].text == "長い。"
     assert output["gs://b/short.flac"][0].start == 1.0
 

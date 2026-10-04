@@ -19,7 +19,7 @@ locals {
     "orgpolicy.googleapis.com",
     # 予算アラート（google_billing_budget）の API 呼び出しに必要。
     "billingbudgets.googleapis.com",
-    # 話者・時刻つきの文字起こし（Chirp 2、#166）
+    # 話者・時刻つきの文字起こし（Speech-to-Text v2、#166）
     "speech.googleapis.com",
   ]
 

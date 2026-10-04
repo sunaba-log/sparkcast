@@ -1,6 +1,6 @@
 # 話者・時刻つきの文字起こし（#166）。全エピソードの処理（app Job）で使う。
 #
-# - Speech-to-Text v2 の Chirp 2（us-central1）で、時刻つきの発話を作る。
+# - Speech-to-Text v2 の long モデル（asia-northeast1）で、時刻つきの発話を作る（Chirp は日本語の時刻が取れないため。ADR 参照）。
 # - BatchRecognize は Speech のサービスエージェントが GCS を読むので、入力バケットと作業用バケットの
 #   閲覧権限をサービスエージェントに付ける。
 # - 作業用バケット: ブラウザ収録の話者別トラック（mixer が置き、app Job が話者ごとに認識する）。

@@ -281,4 +281,4 @@ def test_workflow_saves_timestamped_segments_and_topics() -> None:
         {"time": "0:00", "title": "はじめに"},
         {"time": "1:05", "title": "本題"},
     ]
-    assert content["transcript_meta"]["engine"] == "chirp_2"
+    assert content["transcript_meta"]["engine"] == "speech_v2_long"

@@ -1,6 +1,6 @@
 """エピソードの文字起こしと議事録を作る(#166).
 
-1. 音声認識(Chirp 2)で時刻つきの発話を作る
+1. 音声認識(Speech-to-Text v2 の long モデル)で時刻つきの発話を作る
    - ブラウザ収録のエピソード: 話者ごとの位置合わせ済みトラックを話者ごとに認識し、話者名を付けてまとめる
    - それ以外: ミックス済みの音声を認識し、各発話の話者を Gemini に推定させる
 2. 時刻・話者つきの文字起こしから、Gemini が議事録を作る(目次の時刻は文字起こしの時刻)
@@ -22,7 +22,7 @@ from services.transcript_builder import EnergyFn, SpeakerTrack, merge_speaker_tr
 if TYPE_CHECKING:
     from domain.interfaces import EpisodeRepository, RecordingSpeakers, SpeechTranscriber, TranscriptProvider
 
-ENGINE = "chirp_2"
+ENGINE = "speech_v2_long"
 
 # 位置合わせ済みトラックの URI 一覧 → 区間の音量を返す関数(読めなければ None)
 EnergyLoader = Callable[[dict[str, str]], EnergyFn | None]

@@ -53,7 +53,8 @@ class PodcastEnvConfig:
     r2_custom_domain: str
     sns_promotion_count: int
     speech_enabled: bool = True
-    speech_location: str = "us-central1"
+    speech_location: str = "asia-northeast1"
+    speech_model: str = "long"
     work_bucket: str | None = None
 
 
@@ -88,7 +89,8 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     sns_promotion_count = int(environ.get("SNS_PROMOTION_COUNT", "3"))
     # 話者・時刻つきの文字起こし(#166)。SPEECH_ENABLED=false で従来の Gemini 音声方式に戻せる
     speech_enabled = environ.get("SPEECH_ENABLED", "true").lower() != "false"
-    speech_location = environ.get("SPEECH_LOCATION", "us-central1")
+    speech_location = environ.get("SPEECH_LOCATION", "asia-northeast1")
+    speech_model = environ.get("SPEECH_MODEL", "long")
     work_bucket = environ.get("WORK_BUCKET") or None
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
@@ -114,6 +116,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         sns_promotion_count=sns_promotion_count,
         speech_enabled=speech_enabled,
         speech_location=speech_location,
+        speech_model=speech_model,
         work_bucket=work_bucket,
     )
 
@@ -133,7 +136,7 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("AI_MODEL_ID: %s", config.ai_model_id)
     logger.info("R2_CUSTOM_DOMAIN: %s", config.r2_custom_domain)
     logger.info("SNS_PROMOTION_COUNT: %s", config.sns_promotion_count)
-    logger.info("SPEECH_ENABLED: %s (%s)", config.speech_enabled, config.speech_location)
+    logger.info("SPEECH_ENABLED: %s (%s %s)", config.speech_enabled, config.speech_model, config.speech_location)
     logger.info("WORK_BUCKET: %s", config.work_bucket)
     logger.info("###########################\n")
 
@@ -225,7 +228,9 @@ def process_podcast_workflow() -> None:
         transcription=EpisodeTranscription(
             transcript_provider=audio_analyzer,
             episode_repository=episode_repository,
-            speech=ChirpTranscriber(project_id=config.project_id, location=config.speech_location)
+            speech=ChirpTranscriber(
+                project_id=config.project_id, location=config.speech_location, model=config.speech_model
+            )
             if config.speech_enabled
             else None,
             work_bucket=config.work_bucket,

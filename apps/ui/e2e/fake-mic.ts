@@ -3,7 +3,22 @@
 // Chromium の --use-fake-device-for-media-stream は macOS の Playwright で getUserMedia が返ってこないことがある。
 // そこで AudioContext で声っぽい信号を鳴らし、MediaStreamDestination のトラックをマイクの代わりに渡す。
 // 参加者ごとに seed を変えて別の声にする。この関数は addInitScript でページに注入されるので、外の変数を参照しないこと。
-export function installFakeMic({ seed, seconds }: { seed: number; seconds: number }) {
+//
+// pcm16（16bit PCM の base64）を渡すと、合成音の代わりにそれを鳴らす（音声合成した台本の会話）。
+// epochMs を渡すと、全員が同じ時刻基準でループの同じ位置を鳴らす（別々のブラウザでも会話の順番が揃う）。
+export function installFakeMic({
+  seed,
+  seconds,
+  pcm16,
+  rate,
+  epochMs,
+}: {
+  seed: number;
+  seconds: number;
+  pcm16?: string;
+  rate?: number;
+  epochMs?: number;
+}) {
   type State = { context: AudioContext; destination: MediaStreamAudioDestinationNode };
   let state: State | null = null;
 
@@ -35,17 +50,31 @@ export function installFakeMic({ seed, seconds }: { seed: number; seconds: numbe
     return samples;
   }
 
+  function decodePcm16(base64: string): Float32Array {
+    const binary = atob(base64);
+    const samples = new Float32Array(binary.length / 2);
+    for (let i = 0; i < samples.length; i += 1) {
+      const value = binary.charCodeAt(i * 2) | (binary.charCodeAt(i * 2 + 1) << 8);
+      samples[i] = (value >= 0x8000 ? value - 0x10000 : value) / 0x8000;
+    }
+    return samples;
+  }
+
   async function ensure(): Promise<State> {
     if (!state) {
       const context = new AudioContext({ sampleRate: 48_000 });
-      const buffer = context.createBuffer(1, Math.floor(seconds * context.sampleRate), context.sampleRate);
-      buffer.copyToChannel(synthesize(context.sampleRate) as Float32Array<ArrayBuffer>, 0);
+      const bufferRate = pcm16 && rate ? rate : context.sampleRate;
+      const samples = pcm16 ? decodePcm16(pcm16) : synthesize(context.sampleRate);
+      const buffer = context.createBuffer(1, samples.length, bufferRate);
+      buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
       const destination = context.createMediaStreamDestination();
       source.connect(destination);
-      source.start();
+      const length = samples.length / bufferRate;
+      const offset = epochMs === undefined ? 0 : (((Date.now() - epochMs) / 1000) % length + length) % length;
+      source.start(0, offset);
       state = { context, destination };
     }
     if (state.context.state === "suspended") await state.context.resume();

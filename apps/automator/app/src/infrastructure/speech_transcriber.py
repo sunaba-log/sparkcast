@@ -1,6 +1,8 @@
-"""Speech-to-Text v2(Chirp 2)で時刻つきの発話を作る(#166).
+"""Speech-to-Text v2 で時刻つきの発話を作る(#166).
 
-- Chirp 2 は日本語の単語ごとの時刻を返す(話者分離は無い)。
+- モデルは `long`(asia-northeast1)。日本語で発話ごとの結果と単語ごとの時刻が返る(話者分離は無い)。
+  2026-10 時点で実際に試した結果、Chirp 2 の ja-JP は us-central1 で提供終了・asia-southeast1 で結果が空、
+  Chirp 3 は全文が 1 件にまとまり時刻が付かなかったため使わない。
 - 60 秒を超える音声は BatchRecognize、短い音声は Recognize(どちらも GCS の URI を渡す)。
 - 単語の時刻から、句点やポーズで区切った発話(TranscriptSegment)にまとめる。
 """
@@ -8,6 +10,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from dataclasses import dataclass
 
 from google.api_core.client_options import ClientOptions
@@ -23,7 +27,7 @@ BATCH_MIN_SECONDS = 60
 # 発話を区切るポーズ(秒)と、1 発話の最大の長さ(秒)
 PAUSE_SECONDS = 0.8
 MAX_SEGMENT_SECONDS = 30.0
-SENTENCE_END = ("。", "?", "!", "?", "!")
+SENTENCE_END = ("\u3002", "\uff1f", "\uff01", "?", "!")  # 句点・全角と半角の疑問符と感嘆符
 
 
 @dataclass(frozen=True)
@@ -80,6 +84,75 @@ def words_to_segments(words: list[Word]) -> list[TranscriptSegment]:
     return segments
 
 
+_SENTENCE_SPLIT = re.compile("(?<=[\u3002\uff1f\uff01?!])")  # 句点・疑問符・感嘆符の後ろで区切る
+# 日本語の文字の間に入る余計な空白(「目 次」のような認識結果)
+_INNER_SPACE = re.compile(r"(?<=[^\x00-\x7f])\s+|\s+(?=[^\x00-\x7f])")
+
+
+def _chars(text: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFKC", text) if ch.isalnum())
+
+
+def clean_transcript(text: str) -> str:
+    """認識結果の文から、日本語の文字の間の余計な空白を取る."""
+    return _INNER_SPACE.sub("", text).strip()
+
+
+def sentences_to_segments(transcript: str, words: list[Word]) -> list[TranscriptSegment]:
+    """句読点つきの文を本文に、単語の時刻を文の時刻にする.
+
+    文の文字数(英数字と仮名漢字だけを数える)ぶん単語を順に割り当て、最初の単語の開始から
+    最後の単語の終了までを、その文の時刻にする。
+    """
+    sentences = [clean_transcript(part) for part in _SENTENCE_SPLIT.split(transcript)]
+    sentences = [sentence for sentence in sentences if _chars(sentence)]
+    segments: list[TranscriptSegment] = []
+    index = 0
+    for number, sentence in enumerate(sentences):
+        needed = len(_chars(sentence))
+        taken: list[Word] = []
+        count = 0
+        last = number == len(sentences) - 1
+        while index < len(words) and (count < needed or last):
+            taken.append(words[index])
+            count += len(_chars(words[index].text))
+            index += 1
+        if not taken:
+            # 単語が足りないとき(認識結果の文と単語がずれた場合)は直前の発話の終わりに置く
+            at = segments[-1].end if segments else (words[-1].end if words else 0.0)
+            segments.append(TranscriptSegment(start=at, end=at, text=sentence))
+            continue
+        segments.append(TranscriptSegment(start=taken[0].start, end=taken[-1].end, text=sentence))
+    return segments
+
+
+def results_to_segments(results: list[cloud_speech.SpeechRecognitionResult]) -> list[TranscriptSegment]:
+    """認識結果を発話にする。句読点のある結果は文ごと、無い結果は単語のポーズで区切る."""
+    segments: list[TranscriptSegment] = []
+    previous_end = 0.0
+    for result in results:
+        if not result.alternatives:
+            continue
+        alternative = result.alternatives[0]
+        result_end = _seconds(result.result_end_offset) or previous_end
+        words = [
+            Word(text=w.word, start=_seconds(w.start_offset), end=_seconds(w.end_offset) or result_end)
+            for w in alternative.words
+        ]
+        transcript = clean_transcript(alternative.transcript)
+        if not transcript:
+            previous_end = result_end
+            continue
+        if not words:
+            segments.append(TranscriptSegment(start=previous_end, end=result_end, text=transcript))
+        elif _SENTENCE_SPLIT.search(transcript[:-1]) or transcript.endswith(SENTENCE_END):
+            segments.extend(sentences_to_segments(transcript, words))
+        else:
+            segments.extend(words_to_segments(words))
+        previous_end = result_end
+    return segments
+
+
 def result_words(results: list[cloud_speech.SpeechRecognitionResult]) -> list[Word]:
     """認識結果から単語の並びを取り出す。単語の時刻が無い結果は、結果全体を 1 語として扱う."""
     words: list[Word] = []
@@ -101,13 +174,13 @@ def result_words(results: list[cloud_speech.SpeechRecognitionResult]) -> list[Wo
 
 
 class ChirpTranscriber:
-    """Speech-to-Text v2 の Chirp 2 で日本語を認識する."""
+    """Speech-to-Text v2 で日本語を認識する."""
 
     def __init__(
         self,
         project_id: str,
-        location: str = "us-central1",
-        model: str = "chirp_2",
+        location: str = "asia-northeast1",
+        model: str = "long",
         language_code: str = "ja-JP",
         client: SpeechClient | None = None,
     ) -> None:
@@ -132,18 +205,25 @@ class ChirpTranscriber:
         long_files = [uri for uri, seconds in files.items() if seconds > BATCH_MIN_SECONDS]
         short_files = [uri for uri in files if uri not in long_files]
 
-        if long_files:
-            request = cloud_speech.BatchRecognizeRequest(
-                recognizer=self.recognizer,
-                config=self.config,
-                files=[cloud_speech.BatchRecognizeFileMetadata(uri=uri) for uri in long_files],
-                recognition_output_config=cloud_speech.RecognitionOutputConfig(
-                    inline_response_config=cloud_speech.InlineOutputConfig(),
-                ),
+        # 結果を応答で受け取る(inline)設定は 1 リクエスト 1 ファイルまでなので、
+        # ファイルごとにリクエストを出してから、まとめて待つ(話者ごとの認識が並行に進む)
+        operations = {
+            uri: self.client.batch_recognize(
+                request=cloud_speech.BatchRecognizeRequest(
+                    recognizer=self.recognizer,
+                    config=self.config,
+                    files=[cloud_speech.BatchRecognizeFileMetadata(uri=uri)],
+                    recognition_output_config=cloud_speech.RecognitionOutputConfig(
+                        inline_response_config=cloud_speech.InlineOutputConfig(),
+                    ),
+                )
             )
-            logger.info("BatchRecognize %d file(s)", len(long_files))
-            response = self.client.batch_recognize(request=request).result(timeout=timeout)
-            for uri in long_files:
+            for uri in long_files
+        }
+        if operations:
+            logger.info("BatchRecognize %d file(s)", len(operations))
+            for uri, operation in operations.items():
+                response = operation.result(timeout=timeout)
                 file_result = response.results.get(uri)
                 if file_result is None:
                     message = f"Speech-to-Text returned no result for {uri}"
@@ -151,11 +231,11 @@ class ChirpTranscriber:
                 if file_result.error and file_result.error.message:
                     message = f"Speech-to-Text failed for {uri}: {file_result.error.message}"
                     raise RuntimeError(message)
-                output[uri] = words_to_segments(result_words(list(file_result.transcript.results)))
+                output[uri] = results_to_segments(list(file_result.transcript.results))
 
         for uri in short_files:
             response = self.client.recognize(
                 request=cloud_speech.RecognizeRequest(recognizer=self.recognizer, config=self.config, uri=uri)
             )
-            output[uri] = words_to_segments(result_words(list(response.results)))
+            output[uri] = results_to_segments(list(response.results))
         return output
