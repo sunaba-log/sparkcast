@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Mic, Plus } from "lucide-react";
 import { formatJstDateTime } from "@/lib/datetime";
 import type { RecordingSessionStatus } from "@/lib/recording/types";
@@ -27,9 +27,13 @@ export function RecordingSessionList({
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // state の反映は次の描画まで遅れるので、素早い二度押しは ref で止める（ルームが 2 つできないように）
+  const creatingRef = useRef(false);
 
   async function createRoom(event: React.FormEvent) {
     event.preventDefault();
+    if (creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     setError(null);
     try {
@@ -42,12 +46,14 @@ export function RecordingSessionList({
       if (!response.ok || !body.sessionId) {
         setError(body.error ?? "収録ルームを作成できませんでした");
         setCreating(false);
+        creatingRef.current = false;
         return;
       }
       router.push(`/record/${body.sessionId}`);
     } catch {
       setError("通信に失敗しました");
       setCreating(false);
+      creatingRef.current = false;
     }
   }
 

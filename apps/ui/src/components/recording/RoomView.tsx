@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -73,6 +73,8 @@ export function RoomView({
   const [actionError, setActionError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
+  // 開始・停止・退出・エピソード化の二度押しを止める（state の反映を待たずに効く）
+  const runningRef = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 500);
@@ -105,6 +107,8 @@ export function RoomView({
   const inviteUrl = initialView ? `${window.location.origin}${initialView.invitePath}` : null;
 
   async function run(action: () => Promise<unknown>) {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setBusy(true);
     setActionError(null);
     try {
@@ -112,6 +116,7 @@ export function RoomView({
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "操作に失敗しました");
     } finally {
+      runningRef.current = false;
       setBusy(false);
     }
   }

@@ -75,6 +75,8 @@ export function RecordingRoomApp(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [initialName, setInitialName] = useState(props.initialName);
   const audioContainer = useRef<HTMLDivElement>(null);
+  // 入室の二度押しで参加者が 2 人分できないよう、state の反映を待たずに止める
+  const joiningRef = useRef(false);
 
   useEffect(() => {
     if (mode !== "guest") return;
@@ -101,6 +103,8 @@ export function RecordingRoomApp(props: Props) {
   );
 
   async function handleJoin(result: PreJoinResult) {
+    if (joiningRef.current) return;
+    joiningRef.current = true;
     setJoining(true);
     setError(null);
     try {
@@ -119,6 +123,7 @@ export function RecordingRoomApp(props: Props) {
       result.track.stop();
       setError(cause instanceof Error ? cause.message : "入室できませんでした");
     } finally {
+      joiningRef.current = false;
       setJoining(false);
     }
   }
