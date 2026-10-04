@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Download, Loader2, XCircle } from "lucide-react";
 import type { RecordingSessionView } from "@/lib/recording/types";
 import { RecordingStatusBadge } from "@/components/recording/RecordingStatusBadge";
@@ -18,6 +18,29 @@ const EPISODE_STATUS_LABELS: Record<string, string> = {
 export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
   const [view, setView] = useState<RecordingSessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const finalizingRef = useRef(false);
+
+  // 期限を過ぎて入室できなくなった収録を、入室せずにエピソード化する
+  async function finalize() {
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
+    setFinalizing(true);
+    setFinalizeError(null);
+    try {
+      const response = await fetch(`/api/recording/sessions/${sessionId}/finalize`, { method: "POST" });
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? "エピソード化に失敗しました");
+      setReload((value) => value + 1);
+    } catch (cause) {
+      setFinalizeError(cause instanceof Error ? cause.message : "エピソード化に失敗しました");
+    } finally {
+      finalizingRef.current = false;
+      setFinalizing(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +56,7 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
         const finished =
           next.status === "failed" ||
           next.status === "expired" ||
+          next.status === "uploading" ||
           next.episodeStatus === "completed" ||
           next.episodeStatus === "failed";
         if (!finished) timer = setTimeout(load, 4000);
@@ -47,7 +71,7 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [sessionId]);
+  }, [sessionId, reload]);
 
   if (!view) {
     return (
@@ -74,7 +98,29 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
           )}
         </div>
 
-        {failed ? (
+        {view.status === "expired" ? (
+          <p className="text-sm text-gray-700">
+            このルームは期限が切れました。収録は行われていません。
+          </p>
+        ) : view.status === "uploading" ? (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-700">
+              収録は終わっていますが、まだエピソード化されていません。届いている録音でエピソードを作ります。
+            </p>
+            <button
+              type="button"
+              disabled={finalizing}
+              onClick={() => void finalize()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xs bg-brand text-white hover:bg-brand-hover disabled:opacity-40"
+            >
+              {finalizing && <Loader2 className="w-4 h-4 animate-spin" />}
+              エピソード化する
+            </button>
+            {(finalizeError || view.error) && (
+              <p className="text-sm text-red-600">{finalizeError ?? view.error}</p>
+            )}
+          </div>
+        ) : failed ? (
           <p className="inline-flex items-start gap-1.5 text-sm text-red-700">
             <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
             処理に失敗しました。{view.error ?? view.episodeError ?? ""}

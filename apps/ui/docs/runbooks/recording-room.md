@@ -87,6 +87,7 @@ jq -n --arg room "$ROOM" --arg service "$SERVICE" --argjson sfu "$SFU" --argjson
 | 録音が届かない | ルーム画面の「未送信 n 件」と Worker のログ。ゲストの端末には IndexedDB に録音が残っており、同じ招待 URL を開き直すと送信が再開する |
 | ミックスが失敗した | Cloud Run Job `sparkcast-automator-mixer-dev` の実行ログ、Discord のエラー通知、`recording_sessions.error` |
 | ミックスが止まった | 3 時間たっても終わらないものは、cron（`/api/cron/cleanup-uploads`）が `failed` にする |
+| ルームの期限（作成から 6 時間）が過ぎた | cron が、収録を始めていないルームは `expired`、収録中のまま放置されたルームは `uploading`（停止済み）にする。`uploading` は残るので、ホストがルームの画面を開けば、入室せずに「エピソード化する」を押せる（R2 の録音が 30 日で消えるまで） |
 
 - ミックスのやり直しは、Job を同じ env の上書きで再実行する。出力先の FLAC が既にあるときは上書きしない。
 - 出力先の FLAC が既にあり、もう一度パイプラインに流したいときは、GCS の当該オブジェクトを消してから再実行する。

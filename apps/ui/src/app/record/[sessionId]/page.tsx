@@ -4,6 +4,7 @@ import { hasPodcastAccess, requireRegisteredUser } from "@/server/auth";
 import { getDbPool } from "@/server/db";
 import { getRealtimeBaseUrl, getRecordingRoomSecret, isRecordingEnabled } from "@/server/env";
 import { getRecordingSession } from "@/server/recording/repository";
+import { isJoinable } from "@/server/recording/service";
 import { buildSessionView } from "@/server/recording/view";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function HostRecordingPage({
       title={session.title}
       initialName={user.displayName ?? "ホスト"}
       initialView={view}
+      canEnterRoom={isJoinable(session)}
       realtimeBaseUrl={getRealtimeBaseUrl()}
     />
   );

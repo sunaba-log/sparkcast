@@ -86,6 +86,14 @@ export function TranscriptPanel({
     return <p className="text-sm text-red-600">{state.message}</p>;
   }
 
+  if (state.segments.length === 0) {
+    return (
+      <p className="text-sm text-gray-400 italic">
+        聞き取れた発話がありません。音声が無音だったか、音声認識で聞き取れませんでした。
+      </p>
+    );
+  }
+
   return (
     <ol className="space-y-2 text-sm" aria-label="文字起こし">
       {state.segments.map((segment) => {

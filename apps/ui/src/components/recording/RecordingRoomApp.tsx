@@ -17,6 +17,8 @@ type Props =
       initialName: string;
       realtimeBaseUrl: string;
       initialView: RecordingSessionView;
+      // 入室できる（期限内で、終わっていない）か。期限を過ぎた収録は入室せずにエピソード化できる
+      canEnterRoom: boolean;
       inviteKey?: undefined;
     }
   | {
@@ -27,6 +29,7 @@ type Props =
       realtimeBaseUrl: string;
       inviteKey: string;
       initialView?: undefined;
+      canEnterRoom?: undefined;
     };
 
 type StoredGuest = { participantId: string; rejoinKey: string; displayName: string };
@@ -66,7 +69,7 @@ async function postJoin(sessionId: string, body: Record<string, unknown>): Promi
 export function RecordingRoomApp(props: Props) {
   const { sessionId, mode } = props;
   const [stage, setStage] = useState<"prejoin" | "room" | "post">(() =>
-    props.mode === "host" && ["mixing", "done", "failed", "expired"].includes(props.initialView.status)
+    props.mode === "host" && !props.canEnterRoom
       ? "post"
       : "prejoin",
   );

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const updated = await markAbandonedUploadsFailed(24 * 60);
-  // 収録ルーム（#166）: 期限切れと、ミックスが 3 時間以上止まったもの
+  // 収録ルーム（#166）: 期限を過ぎたもの（録音があれば停止扱いにして残す）と、ミックスが 3 時間以上止まったもの
   const recording = await expireStaleRecordingSessions(await getDbPool(), 3 * 60);
   return NextResponse.json({ updated, recording });
 }

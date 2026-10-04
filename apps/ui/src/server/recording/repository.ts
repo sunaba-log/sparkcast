@@ -355,15 +355,24 @@ export async function listTrackSummaries(
   }));
 }
 
-// 期限切れのまま放置されたセッションを expired に、ミックスが止まったものを failed にする。
+// 期限を過ぎたセッションを片付ける。
+// - 収録を始めていない（waiting）ものは expired にする
+// - 収録中（recording）のまま期限を過ぎたものは、録音が残っているので uploading（停止済み）にして、
+//   ホストが後からエピソード化できるようにする（uploading はそのまま残す）
+// - ミックスが止まったもの（mixing のまま一定時間）は failed にする
 export async function expireStaleRecordingSessions(
   db: Queryable,
   mixingTimeoutMinutes: number,
-): Promise<{ expired: number; failed: number }> {
+): Promise<{ expired: number; stopped: number; failed: number }> {
   const expired = await db.query(
     `UPDATE recording_sessions
      SET status = 'expired', updated_at = now()
-     WHERE status IN ('waiting', 'recording', 'uploading') AND expires_at < now()`,
+     WHERE status = 'waiting' AND expires_at < now()`,
+  );
+  const stopped = await db.query(
+    `UPDATE recording_sessions
+     SET status = 'uploading', updated_at = now()
+     WHERE status = 'recording' AND expires_at < now()`,
   );
   const failed = await db.query(
     `UPDATE recording_sessions
@@ -373,7 +382,7 @@ export async function expireStaleRecordingSessions(
      WHERE status = 'mixing' AND updated_at < now() - ($1 * interval '1 minute')`,
     [mixingTimeoutMinutes],
   );
-  return { expired: expired.rowCount ?? 0, failed: failed.rowCount ?? 0 };
+  return { expired: expired.rowCount ?? 0, stopped: stopped.rowCount ?? 0, failed: failed.rowCount ?? 0 };
 }
 
 export async function getEpisodeState(
