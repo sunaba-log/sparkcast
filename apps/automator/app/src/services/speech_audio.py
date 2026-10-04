@@ -8,6 +8,8 @@ Speech-to-Text v2 の自動判別は、m4a(MP4 コンテナの AAC)を「Provide
 from __future__ import annotations
 
 import subprocess
+import tempfile
+from pathlib import Path
 
 from google.cloud import storage
 
@@ -17,34 +19,41 @@ SPEECH_SAMPLE_RATE = 16000
 
 
 def to_speech_flac(audio: bytes) -> bytes:
-    """音声のバイト列を 16kHz・モノラルの FLAC にする."""
-    # 引数はここで組み立てたものだけ(シェルを通さない)
-    result = subprocess.run(  # noqa: S603
-        [
-            ffmpeg_binary(),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            "pipe:0",
-            "-ac",
-            "1",
-            "-ar",
-            str(SPEECH_SAMPLE_RATE),
-            "-c:a",
-            "flac",
-            "-f",
-            "flac",
-            "pipe:1",
-        ],
-        input=audio,
-        check=False,
-        capture_output=True,
-    )
-    if result.returncode != 0 or not result.stdout:
-        message = f"ffmpeg could not convert audio for speech: {result.stderr.decode(errors='replace')[-500:]}"
-        raise RuntimeError(message)
-    return result.stdout
+    """音声のバイト列を 16kHz・モノラルの FLAC にする.
+
+    入出力はパイプにしない。m4a は末尾の情報を読む必要があり、パイプからだと途中までしか読めない
+    (「partial file」)。また FLAC をパイプに書くと、ヘッダの総サンプル数を書き戻せず 0 のままになり、
+    Speech-to-Text が「Provided file is empty.」とする(どちらも dev で確認)。
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / "source"
+        target = Path(tmp) / "speech.flac"
+        source.write_bytes(audio)
+        # 引数はここで組み立てたものだけ(シェルを通さない)
+        result = subprocess.run(  # noqa: S603
+            [
+                ffmpeg_binary(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(source),
+                "-ac",
+                "1",
+                "-ar",
+                str(SPEECH_SAMPLE_RATE),
+                "-c:a",
+                "flac",
+                str(target),
+            ],
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode != 0 or not target.exists() or target.stat().st_size == 0:
+            message = f"ffmpeg could not convert audio for speech: {result.stderr.decode(errors='replace')[-500:]}"
+            raise RuntimeError(message)
+        return target.read_bytes()
 
 
 def speech_audio_uri(work_bucket: str, podcast_id: str, episode_id: str) -> str:

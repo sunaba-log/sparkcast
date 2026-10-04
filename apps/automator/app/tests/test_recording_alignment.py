@@ -5,10 +5,12 @@ import pytest
 
 from services.recording_mixer.alignment import (
     ANALYSIS_RATE,
+    WINDOW_SECONDS,
     LagSample,
     coverage_gaps,
     find_lag,
     fit_alignment,
+    fit_piecewise,
     measure_lags,
 )
 
@@ -103,3 +105,29 @@ def test_coverage_gaps() -> None:
     assert coverage_gaps([], 0, 3) == [(0, 3)]
     # 重なりと範囲外
     assert coverage_gaps([(-5, 4), (2, 8), (25, 40)], 0, 30) == [(8, 25)]
+
+
+def test_fit_piecewise_splits_at_a_latency_step() -> None:
+    # dev で実際に出た形: 回線断から戻ると、受信側の遅れが 0.13s → 0.213s に段差状に変わる
+    samples = [LagSample(at=float(t), lag=0.13, correlation=0.95) for t in (16, 33, 41, 58, 74)]
+    samples.append(LagSample(at=82.0, lag=0.6, correlation=0.4))  # 1 つだけ飛んだ窓は捨てる
+    samples += [LagSample(at=float(t), lag=0.213, correlation=0.95) for t in (99, 115, 123, 132, 140, 156, 164)]
+    ranges = fit_piecewise(samples)
+    assert len(ranges) == 2
+    assert ranges[0].start == 0.0
+    assert ranges[0].alignment.offset == pytest.approx(0.13, abs=1e-6)
+    assert ranges[1].alignment.offset == pytest.approx(0.213, abs=1e-6)
+    boundary = (74 + 99) / 2 + WINDOW_SECONDS / 2
+    assert ranges[0].end == pytest.approx(boundary)
+    assert ranges[1].start == pytest.approx(boundary)
+    assert ranges[1].end is None
+
+
+def test_fit_piecewise_keeps_one_range_for_drift_and_isolated_outliers() -> None:
+    # 速度差による緩やかな変化(120 秒で 18ms)は区切らない
+    drift = [LagSample(at=float(t), lag=0.05 + 150e-6 * t, correlation=0.9) for t in range(0, 1800, 120)]
+    drift.insert(5, LagSample(at=610.0, lag=0.9, correlation=0.4))
+    ranges = fit_piecewise(drift)
+    assert len(ranges) == 1
+    assert ranges[0].alignment.drift == pytest.approx(150e-6, abs=5e-6)
+    assert fit_piecewise([])[0].alignment.samples_used == 0

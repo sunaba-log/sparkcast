@@ -165,7 +165,7 @@ export function RoomView({
             <input
               readOnly
               value={inviteUrl}
-              className="flex-1 min-w-0 border border-gray-300 rounded-xs px-2 py-1.5 text-xs bg-white text-gray-600"
+              className="flex-1 min-w-0 border border-gray-300 rounded-xs px-2 py-1.5 text-base sm:text-xs bg-white text-gray-600"
               onFocus={(event) => event.currentTarget.select()}
             />
             <button
@@ -353,7 +353,7 @@ function ParticipantRow({
           {micLabel && <span className="text-xs text-yellow-700 shrink-0">{micLabel}</span>}
           {!participant.connected && <span className="text-xs text-gray-500 shrink-0">切断中</span>}
         </div>
-        <LevelBar level={participant.connected ? level : 0} compact />
+        <LevelBar level={participant.connected ? level : 0} compact label={`${participant.name} の音量`} />
         {showUpload && (
           <p className="text-[11px] text-gray-500">
             {participant.recorder === "recording" ? "録音中 · " : participant.recorder === "error" ? "録音エラー · " : ""}

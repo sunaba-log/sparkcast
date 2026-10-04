@@ -50,7 +50,8 @@ def render_transcript(segments: list[TranscriptSegment]) -> str:
     return "\n".join(f"[{format_timestamp(s.start)}] {s.speaker}: {s.text}" for s in segments)
 
 
-_TOC_LINE = re.compile(r"^\s*[-*・]?\s*((?:\d{1,2}:)?\d{1,2}:\d{2})\s+(.+?)\s*$")
+# 目次の 1 行。モデルが文字起こしに倣って `[0:03] タイトル` と角括弧を付けることもある
+_TOC_LINE = re.compile(r"^\s*[-*・]?\s*\[?((?:\d{1,2}:)?\d{1,2}:\d{2})\]?\s*[-\u2013:\uff1a]?\s*(.+?)\s*$")
 
 
 def extract_topics(minutes: str) -> list[dict[str, str]]:

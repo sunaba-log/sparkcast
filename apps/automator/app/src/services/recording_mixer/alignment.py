@@ -167,6 +167,55 @@ def fit_alignment(samples: list[LagSample]) -> Alignment:
     return Alignment(offset=offset, drift=drift, samples_used=len(points))
 
 
+# 隣り合う窓のずれがこれ以上変わったら、そこで遅れが段差状に変わったとみなす(回線断からの復帰など)。
+# 時計の速度差による変化は窓の間隔ぶんでも数十 ms 未満なので、ここでは区切らない。
+STEP_SECONDS = 0.05
+
+
+@dataclass(frozen=True)
+class AlignedRange:
+    """セグメントのうち、同じ補正量を使う区間(local の時計で、セグメント先頭からの秒)."""
+
+    start: float
+    # None ならセグメントの終わりまで
+    end: float | None
+    alignment: Alignment
+
+
+def fit_piecewise(samples: list[LagSample], window_seconds: float = WINDOW_SECONDS) -> list[AlignedRange]:
+    """ずれが途中で段差状に変わるとき(回線断から戻ると受信側の遅れが変わる)は、段差の前後で別々に当てはめる.
+
+    1 つの窓だけ飛んだもの(相関の取り違え)は区間にせず捨てる。段差が無ければ fit_alignment と同じ。
+    """
+    if len(samples) < 2:  # noqa: PLR2004
+        return [AlignedRange(start=0.0, end=None, alignment=fit_alignment(samples))]
+    groups: list[list[LagSample]] = [[samples[0]]]
+    for sample in samples[1:]:
+        if abs(sample.lag - groups[-1][-1].lag) > STEP_SECONDS:
+            groups.append([sample])
+        else:
+            groups[-1].append(sample)
+    kept: list[list[LagSample]] = []
+    for group in groups:
+        if len(group) < 2:  # noqa: PLR2004
+            continue
+        # 飛んだ窓を捨てた結果、前後が同じ水準に戻っていれば 1 つの区間にまとめる
+        if kept and abs(group[0].lag - kept[-1][-1].lag) <= STEP_SECONDS:
+            kept[-1].extend(group)
+        else:
+            kept.append(group)
+    if len(kept) <= 1:
+        return [AlignedRange(start=0.0, end=None, alignment=fit_alignment(kept[0] if kept else samples))]
+
+    ranges: list[AlignedRange] = []
+    for index, group in enumerate(kept):
+        # 区切りは、前の区間の最後の窓と、この区間の最初の窓の中ほど(窓の中心どうしの中点)
+        start = 0.0 if index == 0 else (kept[index - 1][-1].at + group[0].at) / 2 + window_seconds / 2
+        end = None if index == len(kept) - 1 else (group[-1].at + kept[index + 1][0].at) / 2 + window_seconds / 2
+        ranges.append(AlignedRange(start=start, end=end, alignment=fit_alignment(group)))
+    return ranges
+
+
 def coverage_gaps(
     covered: list[tuple[float, float]],
     start: float,

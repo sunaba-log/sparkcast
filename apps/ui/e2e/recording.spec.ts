@@ -265,28 +265,42 @@ async function verifyTranscript(host: Participant, view: SessionView, script: Co
   const recordingStartMs = view.recordingStartedAtMs ?? 0;
   const loop = script.durationSeconds;
 
-  let matched = 0;
-  let speakerCorrect = 0;
-  const timeErrors: number[] = [];
+  // 偽マイクは参加者ごとに別のブラウザで鳴らすため、鳴り始めの位置が実行のたびに最大 1 秒ほどずれる
+  // （生の録音の時点でずれている。製品はそれを「ホストに聞こえたとおり」に並べる）。
+  // そこで話者ごとに一定のずれ（中央値）を差し引き、残りを各台詞の時刻の誤差として見る。
+  type Match = { speaker: number; error: number; correct: boolean };
+  const matches: Match[] = [];
   for (const line of script.timeline) {
     const best = segments
       .map((segment) => ({ segment, score: similarity(segment.text, line.text) }))
       .sort((a, b) => b.score - a.score)[0];
     if (!best || best.score < 0.5) continue;
-    matched += 1;
-    if (best.segment.speaker === names[line.speaker]) speakerCorrect += 1;
     // 台詞が鳴った時刻（ループの何周目かは、文字起こしの時刻に最も近い周を選ぶ）
     const base = (EPOCH_MS - recordingStartMs) / 1000 + line.start;
     const cycle = Math.round((best.segment.start - base) / loop);
-    timeErrors.push(Math.abs(best.segment.start - (base + cycle * loop)));
+    matches.push({
+      speaker: line.speaker,
+      error: best.segment.start - (base + cycle * loop),
+      correct: best.segment.speaker === names[line.speaker],
+    });
   }
-  const sorted = [...timeErrors].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)] ?? Infinity;
+  const median = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)] ?? 0;
+  };
+  const speakerOffsets = names.map((_, speaker) =>
+    median(matches.filter((match) => match.speaker === speaker).map((match) => match.error)),
+  );
+  const residuals = matches.map((match) => Math.abs(match.error - speakerOffsets[match.speaker]));
+  const matched = matches.length;
+  const speakerCorrect = matches.filter((match) => match.correct).length;
+  const residualMedian = median(residuals);
   console.log(
     `matched ${matched}/${CONVERSATION.length} lines, speaker correct ${speakerCorrect}/${matched}, ` +
-      `time error median ${median.toFixed(2)}s max ${(sorted.at(-1) ?? 0).toFixed(2)}s`,
+      `per-speaker start offset (fake mic) ${speakerOffsets.map((offset) => offset.toFixed(2)).join(", ")}s, ` +
+      `time error after offset median ${residualMedian.toFixed(2)}s max ${Math.max(0, ...residuals).toFixed(2)}s`,
   );
   expect(matched, "lines recognized").toBeGreaterThanOrEqual(Math.ceil(CONVERSATION.length * 0.7));
   expect(speakerCorrect, "speaker attribution").toBe(matched);
-  expect(median, "median timestamp error (s)").toBeLessThan(1.0);
+  expect(residualMedian, "median timestamp error (s)").toBeLessThan(0.5);
 }

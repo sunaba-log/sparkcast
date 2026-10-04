@@ -58,6 +58,11 @@ def test_extract_topics_from_minutes() -> None:
         {"time": "1:02:30", "title": "まとめ"},
     ]
     assert extract_topics("目次なし") == []
+    # 文字起こしに倣って角括弧を付けた目次(dev で実際に出た形)
+    assert extract_topics("## 目次\n\n[0:03] ブラウザ収録\n[1:02:36] 文字起こし\n") == [
+        {"time": "0:03", "title": "ブラウザ収録"},
+        {"time": "1:02:36", "title": "文字起こし"},
+    ]
 
 
 def test_split_cast_names() -> None:
@@ -385,22 +390,30 @@ def test_uploaded_audio_is_converted_before_recognition_but_speakers_use_the_ori
     assert assigned_uris == [original]
     assert result.segments[0].text == "a"
 
-    if shutil.which("ffmpeg"):
-        wav = subprocess.run(
-            [
-                "ffmpeg",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-f",
-                "lavfi",
-                "-i",
-                "sine=frequency=440:duration=1",
-                "-f",
-                "wav",
-                "pipe:1",
-            ],
-            capture_output=True,
-            check=True,
-        ).stdout
-        assert to_speech_flac(wav)[:4] == b"fLaC"
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
+def test_to_speech_flac_reads_m4a_fully_and_writes_the_sample_count(tmp_path) -> None:
+    # m4a を作る。パイプから読むと途中までしか読めず、パイプに書くと総サンプル数が 0 になっていた
+    m4a = tmp_path / "in.m4a"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=3",
+            "-c:a",
+            "aac",
+            str(m4a),
+        ],
+        check=True,
+    )
+    flac = to_speech_flac(m4a.read_bytes())
+    assert flac[:4] == b"fLaC"
+    # STREAMINFO(先頭の "fLaC" 4 バイトとブロックヘッダ 4 バイトの後ろ)の 14〜18 バイト目の下位 36bit が総サンプル数
+    streaminfo = flac[8:42]
+    total_samples = int.from_bytes(streaminfo[13:18], "big") & 0xFFFFFFFFF
+    assert total_samples == pytest.approx(3 * 16000, rel=0.02)

@@ -31,6 +31,7 @@ def test_generate_minutes_uses_the_transcript_times_and_forbids_invented_dates(a
     assert "登場人物: 小野、数森" in prompt
     assert "推測で時刻を作らないで下さい" in prompt
     assert "日付の欄を作らないで下さい" in prompt
+    assert "見出しは「【目次】」" in prompt
     assert generate.call_args.kwargs["model"] == "m"
 
 

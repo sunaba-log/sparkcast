@@ -63,7 +63,7 @@ export function RecordingSessionList({
             onChange={(event) => setTitle(event.target.value)}
             maxLength={255}
             placeholder="例: 第12回 ゲスト回"
-            className="flex-1 min-w-0 border border-gray-300 rounded-xs px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand"
+            className="flex-1 min-w-0 border border-gray-300 rounded-xs px-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:border-brand"
           />
           <button
             type="submit"

@@ -153,7 +153,7 @@ export function PreJoin({
               id="mic-select"
               value={deviceId ?? activeDeviceId ?? ""}
               onChange={(event) => setDeviceId(event.target.value || null)}
-              className="w-full border border-gray-300 rounded-xs px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand"
+              className="w-full border border-gray-300 rounded-xs px-3 py-2 text-base sm:text-sm bg-white focus:outline-none focus:border-brand"
             >
               {devices.length === 0 && <option value="">マイクを確認しています…</option>}
               {devices.map((device, index) => (

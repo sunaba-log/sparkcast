@@ -234,7 +234,7 @@ export function SettingsForm({
               }}
               maxLength={500}
               placeholder="例: 小野、数森、高島"
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base sm:text-sm text-gray-900 focus:outline-none focus:border-brand"
             />
             <p className="text-xs text-gray-500 mt-1">
               読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。

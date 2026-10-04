@@ -20,9 +20,10 @@ import numpy as np
 from services.recording_mixer.alignment import (
     ANALYSIS_RATE,
     NO_ALIGNMENT,
+    AlignedRange,
     Alignment,
     coverage_gaps,
-    fit_alignment,
+    fit_piecewise,
     measure_lags,
 )
 from services.recording_mixer.ffmpeg_tools import Piece, build_segment_file, decode_pcm, render_mix, render_speaker
@@ -133,27 +134,31 @@ def plan_speaker(
     covered: list[tuple[float, float]] = []
     for segment, path, signal in local:
         nominal = (segment.start_ms - origin_ms) / 1000
-        alignment = NO_ALIGNMENT
-        if reference is not None:
-            alignment = fit_alignment(measure_lags(signal, reference, nominal_start=nominal))
-        report.alignments.append(alignment)
         duration = len(signal) / ANALYSIS_RATE
-        piece = _clip_piece(
-            Piece(
-                source=path,
-                src_start=0.0,
-                duration=duration,
-                dst_start=nominal + alignment.offset,
-                tempo=alignment.tempo,
-            ),
-            total,
-        )
-        if piece is None:
-            continue
-        pieces.append(piece)
-        end = piece.dst_start + piece.duration / piece.tempo
-        covered.append((piece.dst_start, end))
-        report.local_seconds += end - piece.dst_start
+        ranges = [AlignedRange(start=0.0, end=None, alignment=NO_ALIGNMENT)]
+        if reference is not None:
+            ranges = fit_piecewise(measure_lags(signal, reference, nominal_start=nominal))
+        for aligned in ranges:
+            alignment = aligned.alignment
+            report.alignments.append(alignment)
+            range_end = duration if aligned.end is None else min(aligned.end, duration)
+            piece = _clip_piece(
+                Piece(
+                    source=path,
+                    src_start=aligned.start,
+                    duration=range_end - aligned.start,
+                    # 位置 = 名目の開始 + offset + τ x (1 + drift)
+                    dst_start=nominal + alignment.offset + aligned.start * (1 + alignment.drift),
+                    tempo=alignment.tempo,
+                ),
+                total,
+            )
+            if piece is None:
+                continue
+            pieces.append(piece)
+            end = piece.dst_start + piece.duration / piece.tempo
+            covered.append((piece.dst_start, end))
+            report.local_seconds += end - piece.dst_start
 
     # local が無い区間をバックアップで埋める
     for gap_lo, gap_hi in coverage_gaps(covered, 0.0, total):
