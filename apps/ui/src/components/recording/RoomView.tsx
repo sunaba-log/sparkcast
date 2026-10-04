@@ -75,6 +75,24 @@ export function RoomView({
   const [copied, setCopied] = useState(false);
   // 開始・停止・退出・エピソード化の二度押しを止める（state の反映を待たずに効く）
   const runningRef = useRef(false);
+  // 開始・停止で押したボタンが消えると焦点が body に落ちるので、その状態になったら次の操作へ移す
+  const rootRef = useRef<HTMLDivElement>(null);
+  const focusOnStatus = useRef<string | null>(null);
+  const roomStatus = snapshot.room?.status ?? "idle";
+
+  useEffect(() => {
+    // 入室直後は焦点が body にあるので、自分の操作（ミュート）に置く
+    if (document.activeElement === document.body) {
+      rootRef.current?.querySelector<HTMLElement>("[data-focus-on='join']")?.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (busy || focusOnStatus.current !== roomStatus) return;
+    focusOnStatus.current = null;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    rootRef.current?.querySelector<HTMLElement>(`[data-focus-on='${roomStatus}']`)?.focus();
+  }, [busy, roomStatus]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 500);
@@ -122,7 +140,7 @@ export function RoomView({
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} className="space-y-4">
       {/* 状態とタイマー */}
       <div className="flex flex-wrap items-center gap-3 border border-brand/20 rounded-xs bg-white/60 px-4 py-3">
         {status === "recording" ? (
@@ -165,9 +183,12 @@ export function RoomView({
       {/* 招待 URL（ホスト） */}
       {isHost && inviteUrl && status !== "stopped" && (
         <div className="border border-brand/20 rounded-xs bg-white/60 p-3 space-y-2">
-          <p className="text-sm font-medium text-gray-700">招待 URL（ゲストに送ってください）</p>
+          <label htmlFor="invite-url" className="block text-sm font-medium text-gray-700">
+            招待 URL（ゲストに送ってください）
+          </label>
           <div className="flex gap-2">
             <input
+              id="invite-url"
               readOnly
               value={inviteUrl}
               className="flex-1 min-w-0 border border-gray-300 rounded-xs px-2 py-1.5 text-base sm:text-xs bg-white text-gray-600"
@@ -211,6 +232,7 @@ export function RoomView({
         <button
           type="button"
           onClick={() => controller.setMuted(!snapshot.muted)}
+          data-focus-on="join"
           className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xs border ${snapshot.muted ? "border-red-500 text-red-600 bg-red-50" : "border-gray-300 text-gray-700 bg-white"}`}
           aria-pressed={snapshot.muted}
         >
@@ -222,7 +244,10 @@ export function RoomView({
           <button
             type="button"
             disabled={busy || others.length === 0}
-            onClick={() => void run(() => hostAction(sessionId, "control", { action: "start" }))}
+            onClick={() => {
+              focusOnStatus.current = "recording";
+              void run(() => hostAction(sessionId, "control", { action: "start" }));
+            }}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xs bg-red-600 text-white hover:bg-red-700 disabled:opacity-40"
             title={others.length === 0 ? "ゲストが入室すると開始できます" : undefined}
           >
@@ -235,9 +260,11 @@ export function RoomView({
             disabled={busy}
             onClick={() => {
               if (window.confirm("収録を停止しますか？停止すると再開はできません。")) {
+                focusOnStatus.current = "stopped";
                 void run(() => hostAction(sessionId, "control", { action: "stop" }));
               }
             }}
+            data-focus-on="recording"
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-xs bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40"
           >
             <Square className="w-4 h-4" /> 収録を停止
@@ -260,7 +287,8 @@ export function RoomView({
 
       {/* 収録後 */}
       {status === "stopped" && (
-        <div className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-3">
+        // エピソード化のボタンはしばらく押せないことがあるので、案内の枠ごと焦点を受ける
+        <div data-focus-on="stopped" tabIndex={-1} className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-3 outline-none">
           {isHost ? (
             <>
               <p className="text-sm text-gray-800">
@@ -376,6 +404,8 @@ function ParticipantRow({
           }}
           className="p-1.5 text-gray-400 hover:text-red-600"
           title="退出させる"
+          // 参加者ごとに同じアイコンが並ぶので、誰のボタンかを読み上げ名に入れる
+          aria-label={`${participant.name} さんを退出させる`}
         >
           <UserX className="w-4 h-4" />
         </button>
