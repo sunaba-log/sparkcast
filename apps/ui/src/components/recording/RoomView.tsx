@@ -15,7 +15,7 @@ import {
   Volume2,
   WifiOff,
 } from "lucide-react";
-import type { RecordingController } from "@/lib/recording/controller";
+import type { ControllerSnapshot, RecordingController } from "@/lib/recording/controller";
 import type { ParticipantView } from "@/lib/recording/protocol";
 import type { RecordingSessionView } from "@/lib/recording/types";
 import { LevelBar } from "@/components/recording/LevelBar";
@@ -27,6 +27,16 @@ const ENDED_MESSAGES = {
   unauthorized: "認証の期限が切れました。ページを再読み込みしてください。",
   full: "ルームが満員のため入室できませんでした。",
 } as const;
+
+// 通話（WebRTC）の状態。英語の状態名を画面に出さない
+const CALL_LABELS: Record<ControllerSnapshot["call"], string> = {
+  new: "準備中",
+  connecting: "接続中",
+  connected: "接続",
+  disconnected: "再接続中",
+  failed: "接続できません",
+  closed: "終了",
+};
 
 // 6 分超えなら「1:02:03」、未満は「05:03」
 export function formatElapsed(ms: number): string {
@@ -159,7 +169,7 @@ export function RoomView({
               <WifiOff className="w-3.5 h-3.5" /> 再接続中…
             </span>
           )}
-          {snapshot.call === "connected" ? "通話: 接続" : `通話: ${snapshot.call === "new" ? "準備中" : snapshot.call}`}
+          通話: {CALL_LABELS[snapshot.call]}
         </span>
       </div>
 
