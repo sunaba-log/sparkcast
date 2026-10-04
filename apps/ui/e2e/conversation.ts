@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 // 音声合成（macOS の say）で、台本どおりに 3 人が順番に話す会話を作る（#166 の文字起こしの検証用）。
@@ -42,11 +43,14 @@ function synthesize(text: string, voice: string, directory: string, index: numbe
 }
 
 export function buildConversation(speakers = 3): Conversation {
-  const directory = path.join(__dirname, ".audio", "tts");
-  rmSync(directory, { recursive: true, force: true });
-  mkdirSync(directory, { recursive: true });
-
-  const clips = CONVERSATION.map((line, index) => synthesize(line.text, VOICES[line.speaker % VOICES.length], directory, index));
+  // 実行ごとに別の場所で作る（収録とアップロードの E2E を同時に流すと、同じ場所の台詞を消し合って音が欠ける）
+  const directory = mkdtempSync(path.join(os.tmpdir(), "sparkcast-tts-"));
+  let clips: Int16Array[];
+  try {
+    clips = CONVERSATION.map((line, index) => synthesize(line.text, VOICES[line.speaker % VOICES.length], directory, index));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
   const gap = Math.round(GAP_SECONDS * VOICE_RATE);
   const total = clips.reduce((sum, clip) => sum + clip.length + gap, gap);
   const tracks = Array.from({ length: speakers }, () => new Int16Array(total));
@@ -82,7 +86,7 @@ export function writeMixedConversation(conversation: Conversation, loops: number
       mixed[loop * length + i] = Math.max(-32768, Math.min(32767, sum));
     }
   }
-  const raw = `${file}.raw`;
+  const raw = `${file}.${process.pid}.raw`;
   writeFileSync(raw, Buffer.from(mixed.buffer));
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "s16le", "-ar", String(VOICE_RATE), "-ac", "1", "-i", raw, "-c:a", "aac", "-b:a", "96k", file]);
   rmSync(raw);
