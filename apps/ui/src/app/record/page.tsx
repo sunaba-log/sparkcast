@@ -3,7 +3,8 @@ import { RecordingSessionList } from "@/components/recording/RecordingSessionLis
 import { requireRegisteredUser } from "@/server/auth";
 import { getDbPool } from "@/server/db";
 import { isRecordingEnabled } from "@/server/env";
-import { listRecordingSessions } from "@/server/recording/repository";
+import { recordingDisplayStatus } from "@/lib/recording/types";
+import { listEpisodeStatuses, listRecordingSessions } from "@/server/recording/repository";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,12 @@ export default async function RecordPage() {
   if (!isRecordingEnabled()) notFound();
   const user = await requireRegisteredUser();
   const podcastId = await requireSelectedPodcast(user);
-  const sessions = await listRecordingSessions(await getDbPool(), podcastId);
+  const pool = await getDbPool();
+  const sessions = await listRecordingSessions(pool, podcastId);
+  const episodeStatuses = await listEpisodeStatuses(
+    pool,
+    sessions.flatMap((session) => (session.episodeId === null ? [] : [session.episodeId])),
+  );
 
   return (
     <div className="max-w-3xl">
@@ -26,7 +32,10 @@ export default async function RecordPage() {
         sessions={sessions.map((session) => ({
           sessionId: session.sessionId,
           title: session.title,
-          status: session.status,
+          status: recordingDisplayStatus(
+            session.status,
+            session.episodeId === null ? null : episodeStatuses.get(session.episodeId),
+          ),
           createdAt: session.createdAt.toISOString(),
           episodeId: session.episodeId,
         }))}

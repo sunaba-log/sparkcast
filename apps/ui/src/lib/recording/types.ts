@@ -62,3 +62,11 @@ export const RECORDING_STATUS_LABELS: Record<RecordingSessionStatus, string> = {
   failed: "失敗",
   expired: "期限切れ",
 };
+
+// 札に出す状態。ミックスまで済んでも、その後の文字起こしなどでエピソードが失敗したら「失敗」と出す
+export function recordingDisplayStatus(
+  status: RecordingSessionStatus,
+  episodeStatus: string | null | undefined,
+): RecordingSessionStatus {
+  return status === "done" && episodeStatus === "failed" ? "failed" : status;
+}

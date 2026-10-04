@@ -29,7 +29,7 @@ ENGINE = "speech_v2_long"
 # 音声に会話が無いとき、Gemini に議事録の代わりに返させる印(ai_analyzer.generate_transcript と揃える)
 NO_SPEECH_MARKER = "NO_SPEECH"
 NO_SPEECH_MESSAGE = (
-    "音声から発話を聞き取れませんでした。マイクが無音(ミュート)だったか、録音が届いていない可能性があります。"
+    "音声から発話を聞き取れませんでした。マイクがミュートのままだったか、録音が届いていない可能性があります。"
 )
 
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Download, Loader2, XCircle } from "lucide-react";
-import type { RecordingSessionView } from "@/lib/recording/types";
+import { recordingDisplayStatus, type RecordingSessionView } from "@/lib/recording/types";
 import { RecordingStatusBadge } from "@/components/recording/RecordingStatusBadge";
 
 const EPISODE_STATUS_LABELS: Record<string, string> = {
@@ -90,8 +90,8 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
     <div className="space-y-4">
       <div className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <RecordingStatusBadge status={view.status} />
-          {view.episodeStatus && (
+          <RecordingStatusBadge status={recordingDisplayStatus(view.status, view.episodeStatus)} />
+          {view.episodeStatus && view.episodeStatus !== "failed" && (
             <span className="text-sm text-gray-700">
               エピソード: {EPISODE_STATUS_LABELS[view.episodeStatus] ?? view.episodeStatus}
             </span>
@@ -123,7 +123,8 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
         ) : failed ? (
           <p className="inline-flex items-start gap-1.5 text-sm text-red-700">
             <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            処理に失敗しました。{view.error ?? view.episodeError ?? ""}
+            処理に失敗しました。
+            {(view.status === "failed" ? view.error : (view.episodeError ?? view.error)) ?? ""}
           </p>
         ) : completed ? (
           <p className="inline-flex items-center gap-1.5 text-sm text-green-700">
@@ -141,7 +142,7 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
         {view.episodeId !== null && (
           <Link
             href={`/episodes/${view.episodeId}`}
-            className="inline-block text-sm text-brand underline underline-offset-2"
+            className="block w-fit text-sm text-brand underline underline-offset-2"
           >
             エピソードを開く
           </Link>

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   expireStaleRecordingSessions,
   getRecordingSession,
+  listEpisodeStatuses,
   listRecordingSessions,
 } from "@/server/recording/repository";
 
@@ -50,5 +51,19 @@ describe("reading sessions", () => {
       expect.stringMatching(/expires_at < now\(\) AND podcast_id = \$1/),
       [7],
     ]);
+  });
+});
+
+describe("listEpisodeStatuses", () => {
+  it("skips the query when there are no episodes", async () => {
+    const query = vi.fn();
+    await expect(listEpisodeStatuses({ query } as never, [])).resolves.toEqual(new Map());
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("maps episode ids to statuses", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ episode_id: 21, status: "failed" }] });
+    await expect(listEpisodeStatuses({ query } as never, [21, 22])).resolves.toEqual(new Map([[21, "failed"]]));
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("ANY($1::int[])"), [[21, 22]]);
   });
 });

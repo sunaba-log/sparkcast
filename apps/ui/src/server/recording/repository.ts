@@ -399,6 +399,16 @@ export async function expireStaleRecordingSessions(
   return { ...settled, failed: failed.rowCount ?? 0 };
 }
 
+// 収録一覧の札に使う、エピソードの処理状態
+export async function listEpisodeStatuses(db: Queryable, episodeIds: number[]): Promise<Map<number, string>> {
+  if (episodeIds.length === 0) return new Map();
+  const result = await db.query<{ episode_id: number; status: string }>(
+    "SELECT episode_id, status FROM episodes WHERE episode_id = ANY($1::int[])",
+    [episodeIds],
+  );
+  return new Map(result.rows.map((row) => [Number(row.episode_id), row.status]));
+}
+
 export async function getEpisodeState(
   db: Queryable,
   episodeId: number,
