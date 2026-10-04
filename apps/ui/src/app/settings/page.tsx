@@ -18,6 +18,7 @@ export default async function SettingsPage() {
       title={podcast.title}
       description={podcast.description ?? ""}
       rssFeedPath={podcast.rssFeedPath ?? ""}
+      castMembers={podcast.castMembers ?? ""}
     />
   );
 }

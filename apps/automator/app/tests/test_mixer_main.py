@@ -55,9 +55,18 @@ def test_uploads_the_mix_and_marks_the_session_done(env: None, monkeypatch: pyte
     )
     uploads: list[tuple[str, str]] = []
     monkeypatch.setattr(mixer_main, "upload_to_gcs", lambda bucket, path, _file: uploads.append((bucket, path)))
+    aligned: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        mixer_main,
+        "upload_aligned_tracks",
+        lambda bucket, sid, _speakers: aligned.append((bucket, sid)),
+    )
+    monkeypatch.setenv("WORK_BUCKET", "work")
 
     mixer_main.main()
 
+    # 話者別トラックは入力バケットより先に作業用バケットへ(文字起こしがそれを読む)
+    assert aligned == [("work", "sid")]
     assert uploads == [("input", "podcasts/7/episodes/42/source/recording-sid.flac")]
     names = [name for name, _ in _Repository.instance.calls]
     assert names == ["set_aligned_track", "mark_episode_uploaded", "mark_session_done"]

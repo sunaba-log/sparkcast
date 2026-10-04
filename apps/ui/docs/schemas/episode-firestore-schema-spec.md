@@ -130,9 +130,21 @@ podcasts/{podcast_id}/episodes_contents/{episode_id}
       { "time": "03:15", "title": "なぜ文字起こしデータはFirestoreに最適なのか" },
       { "time": "15:40", "title": "エンディング" }
     ]
+  },
+  "minutes": "# 議事録\n\n## 【目次】\n0:00 オープニング\n3:15 ...",
+  "transcript_meta": {
+    "engine": "chirp_2",
+    "speaker_source": "recording",
+    "segment_count": 412,
+    "generated_at": "2026-10-04T09:05:00Z"
   }
 }
 ```
+
+- `minutes`: AI が作った議事録（Markdown）。#166 以降は、時刻・話者つきの文字起こし（3.2）から作るので、目次の時刻は実際の時刻になる。UI の表示は `editorial.minutes`（人が編集したもの）→ `minutes` の順。
+- `show_notes_summary.topics`: `minutes` の【目次】から取り出した時刻とトピック。
+- `transcript_meta.engine`: `chirp_2`（音声認識）または `gemini_audio`（音声認識に失敗したときの従来方式。3.2 は議事録の分割になる）。
+- `transcript_meta.speaker_source`: `recording`（ブラウザ収録の話者別トラックを話者ごとに認識）／`gemini`（ミックス音声の各発話の話者を Gemini が推定）／`none`。
 
 ### 3.2 文字起こし断片（サブコレクション）
 
@@ -142,12 +154,17 @@ podcasts/{podcast_id}/episodes_contents/{episode_id}/transcripts/{chunk_id}
 
 ```json
 {
+  "chunk_id": "seg_00012",
   "start_time": 12.5,
   "end_time": 15.0,
   "speaker": "ゲストA",
+  "speaker_id": "8f0c...（ブラウザ収録の参加者 ID。それ以外は null）",
   "text": "ここでCloudSQLとFirestoreの使い分けについてですが…"
 }
 ```
+
+- #166 以降は 1 発話 = 1 ドキュメント（`chunk_id` = `seg_00001` からの連番＝時刻順）。時刻は音声の先頭からの秒（Speech-to-Text の単語の時刻）。再処理のときは古いドキュメントを消してから書く。
+- それ以前のエピソードは、議事録を 1,200 字ごとに分けたもの（`chunk_0001`〜、`speaker: "unknown"`、時刻 0）。
 
 ### 3.3 SNS宣伝用投稿文（サブコレクション）
 

@@ -5,8 +5,9 @@ import type { Episode, EpisodePromotion } from "@/types/episode";
 import { Check, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { TranscriptPanel } from "@/components/TranscriptPanel";
 
-type TabType = "overview" | "minutes" | "promotions";
+type TabType = "overview" | "minutes" | "transcript" | "promotions";
 
 function formatDate(dateStr: string) {
   try {
@@ -309,6 +310,15 @@ export function EpisodeMasterDetail({
                   議事録
                 </button>
                 <button
+                  onClick={() => setActiveTab("transcript")}
+                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "transcript"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
+                >
+                  文字起こし
+                </button>
+                <button
                   onClick={() => setActiveTab("promotions")}
                   className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "promotions"
                     ? "border-brand text-brand"
@@ -521,6 +531,24 @@ export function EpisodeMasterDetail({
                     />
                   )}
                 </div>
+              )}
+
+              {activeTab === "transcript" && (
+                <TranscriptPanel
+                  episodeId={selectedEpisode.id}
+                  available={selectedEpisode.transcriptAvailable}
+                  currentTime={currentTime}
+                  canSeek={Boolean(selectedEpisode.audioUrl)}
+                  onSeek={(seconds) => {
+                    if (!audioRef.current) return;
+                    audioRef.current.currentTime = seconds;
+                    setCurrentTime(seconds);
+                    audioRef.current
+                      .play()
+                      .then(() => setIsPlaying(true))
+                      .catch(() => undefined);
+                  }}
+                />
               )}
 
               {activeTab === "promotions" && (

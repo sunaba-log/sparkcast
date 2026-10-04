@@ -38,6 +38,9 @@ module "cloud_run_job" {
     CLOUDFLARE_SECRET_ACCESS_KEY_SECRET_NAME = var.cloudflare_secret_access_key_secret_name
     PODCAST_ID                               = var.podcast_id
     SNS_SCHEDULE_OFFSET_HOURS                = var.sns_schedule_offset_hours
+    # 話者・時刻つきの文字起こし（#166、transcription.tf）
+    WORK_BUCKET     = google_storage_bucket.work.name
+    SPEECH_LOCATION = "us-central1"
   }
 
   secret_environment_variables = {

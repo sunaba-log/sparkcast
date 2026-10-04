@@ -8,7 +8,15 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from domain.models import AgendaResult, DiscordMessage, NewsItem, SnsPromotionsResponse, Summary, TopicMatch
+    from domain.models import (
+        AgendaResult,
+        DiscordMessage,
+        NewsItem,
+        SnsPromotionsResponse,
+        Summary,
+        TopicMatch,
+        TranscriptSegment,
+    )
 
 
 @dataclass(frozen=True)
@@ -25,8 +33,30 @@ class ChannelCredentials:
 class TranscriptProvider(Protocol):
     """Provides transcript generation and summarization."""
 
-    def generate_transcript(self, source_uri: str, model_id: str | None = None) -> str | None:
-        """Generate transcript text from an audio URI."""
+    def generate_transcript(
+        self,
+        source_uri: str,
+        model_id: str | None = None,
+        cast_names: list[str] | None = None,
+    ) -> str | None:
+        """Generate minutes directly from an audio URI (fallback when speech recognition fails)."""
+
+    def generate_minutes(
+        self,
+        transcript_text: str,
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+    ) -> str:
+        """Generate minutes from a timestamped, speaker-labelled transcript."""
+
+    def assign_speakers(
+        self,
+        gcs_uri: str,
+        segments: list[TranscriptSegment],
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+    ) -> list[TranscriptSegment]:
+        """Label speakers of segments recognized from a mixed audio file."""
 
     def summarize_transcript(
         self,
@@ -112,6 +142,36 @@ class EpisodeRepository(Protocol):
 
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
+
+    def get_cast_names(self, *, podcast_id: str) -> list[str]:
+        """Return the cast (登場人物) registered in the podcast settings."""
+
+    def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
+        """Return the speakers when the episode was recorded in the browser recording room."""
+
+
+@dataclass(frozen=True)
+class RecordingSpeaker:
+    """ブラウザ収録の参加者(#166)."""
+
+    participant_id: str
+    name: str
+    role: str
+
+
+@dataclass(frozen=True)
+class RecordingSpeakers:
+    """ブラウザ収録のセッションと参加者."""
+
+    session_id: str
+    speakers: list[RecordingSpeaker]
+
+
+class SpeechTranscriber(Protocol):
+    """Speech recognition with timestamps."""
+
+    def transcribe(self, files: dict[str, float], timeout: float = 3600) -> dict[str, list[TranscriptSegment]]:
+        """Transcribe GCS audio files (URI → duration seconds) into timestamped segments."""
 
 
 class DiscordTranscriptSource(Protocol):

@@ -16,10 +16,13 @@ from infrastructure.ai_analyzer import AudioAnalyzer
 from infrastructure.episode_repository import PostgresEpisodeRepository
 from infrastructure.notifier import Notifier
 from infrastructure.secret_manager import SecretManagerClient
+from infrastructure.speech_transcriber import ChirpTranscriber
 from infrastructure.storage import GCSClient, R2Client, get_audio_info
 from services.audio_converter import AudioConverter
+from services.episode_transcription import EpisodeTranscription
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
+from services.track_energy import load_track_energy
 from usecases import ProcessPodcastWorkflow, ProcessPodcastWorkflowInput
 
 if TYPE_CHECKING:
@@ -49,6 +52,9 @@ class PodcastEnvConfig:
     ai_model_id: str
     r2_custom_domain: str
     sns_promotion_count: int
+    speech_enabled: bool = True
+    speech_location: str = "us-central1"
+    work_bucket: str | None = None
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -80,6 +86,10 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     ai_model_id = environ.get("AI_MODEL_ID", "gemini-2.5-flash")
     r2_custom_domain = environ.get("R2_CUSTOM_DOMAIN", "podcast.sunabalog.com")
     sns_promotion_count = int(environ.get("SNS_PROMOTION_COUNT", "3"))
+    # 話者・時刻つきの文字起こし(#166)。SPEECH_ENABLED=false で従来の Gemini 音声方式に戻せる
+    speech_enabled = environ.get("SPEECH_ENABLED", "true").lower() != "false"
+    speech_location = environ.get("SPEECH_LOCATION", "us-central1")
+    work_bucket = environ.get("WORK_BUCKET") or None
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -102,6 +112,9 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         ai_model_id=ai_model_id,
         r2_custom_domain=r2_custom_domain,
         sns_promotion_count=sns_promotion_count,
+        speech_enabled=speech_enabled,
+        speech_location=speech_location,
+        work_bucket=work_bucket,
     )
 
 
@@ -120,6 +133,8 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("AI_MODEL_ID: %s", config.ai_model_id)
     logger.info("R2_CUSTOM_DOMAIN: %s", config.r2_custom_domain)
     logger.info("SNS_PROMOTION_COUNT: %s", config.sns_promotion_count)
+    logger.info("SPEECH_ENABLED: %s (%s)", config.speech_enabled, config.speech_location)
+    logger.info("WORK_BUCKET: %s", config.work_bucket)
     logger.info("###########################\n")
 
 
@@ -207,6 +222,16 @@ def process_podcast_workflow() -> None:
         firestore_manager=firestore_manager,
         episode_repository=episode_repository,
         logger=logger,
+        transcription=EpisodeTranscription(
+            transcript_provider=audio_analyzer,
+            episode_repository=episode_repository,
+            speech=ChirpTranscriber(project_id=config.project_id, location=config.speech_location)
+            if config.speech_enabled
+            else None,
+            work_bucket=config.work_bucket,
+            energy_loader=load_track_energy,
+            logger=logger,
+        ),
     )
     usecase.run(
         ProcessPodcastWorkflowInput(

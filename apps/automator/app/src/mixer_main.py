@@ -69,6 +69,20 @@ class R2RecordingObjects:
         self.client.upload_file(str(path), self.bucket, key, ExtraArgs={"ContentType": content_type})
 
 
+def upload_aligned_tracks(bucket_name: str, session_id: str, speakers: list) -> None:
+    """話者別トラックを作業用バケットに置く(音声認識は GCS からしか読めないため).
+
+    入力バケットに置くと既存パイプラインが起動してしまうので、必ず別のバケットにする。
+    パスは services.episode_transcription.aligned_track_uri と揃える。
+    """
+    bucket = storage.Client().bucket(bucket_name)
+    for speaker in speakers:
+        if speaker.aligned_path is None:
+            continue
+        blob = bucket.blob(f"recordings/{session_id}/aligned/{speaker.participant_id}.flac")
+        blob.upload_from_filename(str(speaker.aligned_path), content_type="audio/flac")
+
+
 def upload_to_gcs(bucket_name: str, object_path: str, path: Path) -> None:
     """GCS に置く。同じパスが既にあれば上書きしない(Job の再実行で既存パイプラインを二重に起動しない)."""
     blob = storage.Client().bucket(bucket_name).blob(object_path)
@@ -107,6 +121,11 @@ def main() -> None:
                     repository.set_aligned_track(
                         session_id=session_id, participant_id=speaker.participant_id, object_key=speaker.aligned_key
                     )
+            work_bucket = os.environ.get("WORK_BUCKET")
+            if work_bucket:
+                upload_aligned_tracks(work_bucket, session_id, result.speakers)
+            else:
+                logger.warning("WORK_BUCKET is not set; the transcript will not be split by speaker")
             upload_to_gcs(_required_env("GCS_BUCKET"), object_path, result.output_path)
         repository.mark_episode_uploaded(episode_id=episode_id)
         repository.mark_session_done(session_id=session_id)

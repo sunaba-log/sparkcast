@@ -177,6 +177,11 @@ resource "google_cloud_run_v2_job" "recording_mixer" {
           name  = "GCS_BUCKET"
           value = google_storage_bucket.input.name
         }
+        # 話者別トラックを文字起こし用に置く（transcription.tf）
+        env {
+          name  = "WORK_BUCKET"
+          value = google_storage_bucket.work.name
+        }
         env {
           name  = "RECORDINGS_BUCKET"
           value = cloudflare_r2_bucket.recordings[0].name

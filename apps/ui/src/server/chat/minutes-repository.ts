@@ -3,6 +3,7 @@ import "server-only";
 import type { QueryResultRow } from "pg";
 import { getDbPool } from "@/server/db";
 import { getAdminFirestore } from "@/server/firebase-admin";
+import { formatTimestamp } from "@/lib/timestamp";
 
 export type EpisodeKnowledge = {
   episodeId: number;
@@ -20,6 +21,7 @@ type EpisodeRow = QueryResultRow & {
 
 type FirestoreEpisodeContent = {
   transcript_summary?: string;
+  minutes?: string;
   editorial?: {
     minutes?: string;
   };
@@ -64,7 +66,7 @@ async function loadContent(
   const data = snapshot.data() as FirestoreEpisodeContent | undefined;
   const parts: string[] = [];
 
-  const minutes = stripHtml(data?.editorial?.minutes ?? "");
+  const minutes = stripHtml(data?.editorial?.minutes ?? data?.minutes ?? "");
   const summary = stripHtml(data?.transcript_summary ?? "");
   if (minutes) parts.push(`【議事録】\n${minutes}`);
   if (summary) parts.push(`【概要】\n${summary}`);
@@ -73,8 +75,11 @@ async function loadContent(
     .map((doc) => doc.data())
     .sort((a, b) => Number(a.start_time ?? 0) - Number(b.start_time ?? 0))
     .map((turn) => {
-      const speaker = turn.speaker ? `${String(turn.speaker)}: ` : "";
-      return `${speaker}${stripHtml(String(turn.text ?? ""))}`;
+      // 以前の形式は speaker が "unknown"・時刻が 0 固定なので付けない
+      const speaker =
+        turn.speaker && turn.speaker !== "unknown" ? `${String(turn.speaker)}: ` : "";
+      const time = Number(turn.start_time ?? 0) > 0 ? `[${formatTimestamp(Number(turn.start_time))}] ` : "";
+      return `${time}${speaker}${stripHtml(String(turn.text ?? ""))}`;
     })
     .filter((line) => line.trim().length > 0);
   if (transcript.length > 0) {

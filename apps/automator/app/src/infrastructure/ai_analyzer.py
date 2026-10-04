@@ -8,7 +8,8 @@ from google import genai
 from google.genai.types import GenerateContentConfig, Part
 
 from domain.interfaces import TranscriptProvider
-from domain.models import SnsPromotionsResponse, Summary
+from domain.models import SnsPromotionsResponse, SpeakerAssignments, Summary
+from domain.models.transcript import TranscriptSegment, format_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +56,16 @@ class AudioAnalyzer(TranscriptProvider):
 
         return AUDIO_FORMAT_MAPPING[extension]
 
-    def generate_transcript(self, gcs_uri: str, model_id: str | None = None) -> str | None:
-        """Generate transcript text from an audio object in GCS."""
+    def generate_transcript(
+        self,
+        gcs_uri: str,
+        model_id: str | None = None,
+        cast_names: list[str] | None = None,
+    ) -> str | None:
+        """Generate minutes directly from an audio object in GCS.
+
+        音声認識が使えなかったときの予備。目次の時刻はモデルの推測になる。
+        """
         model_id = model_id or self.DEFAULT_MODEL_ID
         mime_type = self._get_mime_type(gcs_uri)
 
@@ -73,8 +82,9 @@ class AudioAnalyzer(TranscriptProvider):
 5:00 CCC
 12:54 DDD
 17:11 EEE
-登場人物は小野、数森、高島です。
 """
+        if cast_names:
+            prompt += f"登場人物は{'、'.join(cast_names)}です。\n"
 
         response = self.client.models.generate_content(
             model=model_id,
@@ -82,6 +92,97 @@ class AudioAnalyzer(TranscriptProvider):
         )
 
         return response.text
+
+    def generate_minutes(
+        self,
+        transcript_text: str,
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+    ) -> str:
+        """話者と時刻つきの文字起こし(`[m:ss] 話者: 本文` の行)から議事録を作る(#166).
+
+        目次の時刻は文字起こしの時刻をそのまま使わせる(モデルに推測させない)。
+        """
+        model_id = model_id or self.DEFAULT_MODEL_ID
+        cast = f"登場人物: {'、'.join(cast_names)}\n" if cast_names else ""
+        prompt = f"""
+以下はポッドキャスト配信の文字起こしです。各行は「[開始時刻] 話者: 発言」の形式で、時刻は音声の先頭からの経過時間です。
+{cast}
+この文字起こしをもとに、議事録を作成して下さい。
+議論された主要なトピック、決定事項、各担当者のアクションアイテムを正確かつ簡潔に記録した、フォーマルなビジネス文書にして下さい。
+発言者が分かる箇所は、発言者の名前を明記して下さい。
+
+また、【目次】も作成して下さい。主要トピックを時系列で抽出し、以下の形式で記載して下さい。
+0:00 AAA
+5:00 BBB
+1:02:30 CCC
+目次の時刻は、そのトピックが始まる行の時刻を文字起こしからそのまま使って下さい。推測で時刻を作らないで下さい。
+
+--- 以下が文字起こしです ---
+{transcript_text}
+"""
+        response = self.client.models.generate_content(
+            model=model_id,
+            contents=[prompt],
+            config=GenerateContentConfig(temperature=0.2, max_output_tokens=16000),
+        )
+        if not response.text:
+            raise ValueError("No minutes received from the model.")
+        return response.text
+
+    def assign_speakers(
+        self,
+        gcs_uri: str,
+        segments: list[TranscriptSegment],
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+    ) -> list[TranscriptSegment]:
+        """1 本に混ざった音声の各発話に、音声を聞かせて話者を割り当てる(#166).
+
+        日本語の話者分離に対応した音声認識が無いための推定。分からない話者は「話者A」のように
+        一貫したラベルにさせる。返り値は話者を付けた発話(数と順序は入力と同じ)。
+        """
+        if not segments:
+            return segments
+        model_id = model_id or self.DEFAULT_MODEL_ID
+        listing = "\n".join(
+            f"{index}\t{format_timestamp(segment.start)}-{format_timestamp(segment.end)}\t{segment.text}"
+            for index, segment in enumerate(segments)
+        )
+        cast = (
+            f"登場人物は {'、'.join(cast_names)} です。声と話の内容から、できるだけこの名前で答えて下さい。"
+            if cast_names
+            else "登場人物の名前は分かりません。"
+        )
+        prompt = f"""
+音声はポッドキャストの収録です。下の一覧は、この音声を音声認識した発話の一覧です(番号、開始-終了の時刻、本文)。
+音声を聞いて、各発話を話しているのが誰かを判定して下さい。
+{cast}
+名前が分からない話者は「話者A」「話者B」のように、同じ人には同じラベルを一貫して付けて下さい。
+すべての番号について 1 件ずつ答えて下さい。
+
+--- 発話一覧 ---
+{listing}
+"""
+        audio_part = Part.from_uri(file_uri=gcs_uri, mime_type=self._get_mime_type(gcs_uri))
+        response = self.client.models.generate_content(
+            model=model_id,
+            contents=[audio_part, prompt],
+            config=GenerateContentConfig(
+                temperature=0.0,
+                max_output_tokens=65000,
+                response_mime_type="application/json",
+                response_json_schema=SpeakerAssignments.model_json_schema(),
+            ),
+        )
+        if not response.text:
+            raise ValueError("No speaker assignments received from the model.")
+        assignments = SpeakerAssignments.model_validate_json(response.text.strip())
+        speakers = {item.id: item.speaker.strip() for item in assignments.assignments if item.speaker.strip()}
+        return [
+            segment.with_speaker(speakers[index]) if index in speakers else segment
+            for index, segment in enumerate(segments)
+        ]
 
     def summarize_transcript(self, transcript: str, prompt: str | None = None, model_id: str | None = None) -> Summary:
         """Generate a structured summary from transcript text."""

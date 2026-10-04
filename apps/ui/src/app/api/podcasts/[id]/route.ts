@@ -16,6 +16,7 @@ const updateSchema = z.object({
   title: z.string().trim().min(1).max(255),
   description: z.string().trim().max(2000).optional(),
   rssFeedPath: z.string().trim().max(2000).optional(),
+  castMembers: z.string().trim().max(500).optional(),
 });
 
 function parsePodcastId(raw: string): number | null {
@@ -53,6 +54,8 @@ export async function PATCH(
       description: input.description || null,
       rssFeedPath:
         input.rssFeedPath === undefined ? undefined : input.rssFeedPath || null,
+      castMembers:
+        input.castMembers === undefined ? undefined : input.castMembers || null,
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -62,6 +62,8 @@ class SpeakerReport:
     filled_seconds: float = 0.0
     alignments: list[Alignment] = field(default_factory=list)
     aligned_key: str | None = None
+    # 作業ディレクトリ内の位置合わせ済み FLAC(呼び出し側が GCS にも置く)
+    aligned_path: Path | None = None
 
 
 @dataclass
@@ -228,6 +230,7 @@ def mix_session(
         out = workdir / f"speaker-{participant_id}.flac"
         render_speaker(pieces, total, out)
         report.aligned_key = f"{prefix}aligned/{participant_id}.flac"
+        report.aligned_path = out
         objects.upload(out, report.aligned_key, "audio/flac")
         speaker_paths.append(out)
         reports.append(report)
