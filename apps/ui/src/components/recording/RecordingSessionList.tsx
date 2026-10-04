@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Mic, Plus } from "lucide-react";
+import { formatJstDateTime } from "@/lib/datetime";
 import type { RecordingSessionStatus } from "@/lib/recording/types";
 import { RecordingStatusBadge } from "@/components/recording/RecordingStatusBadge";
 
@@ -95,7 +96,7 @@ export function RecordingSessionList({
                       {session.title || "（タイトルなし）"}
                     </span>
                     <span className="block text-xs text-gray-500">
-                      {new Date(session.createdAt).toLocaleString("ja-JP")}
+                      {formatJstDateTime(session.createdAt)}
                     </span>
                   </span>
                   <RecordingStatusBadge status={session.status} />

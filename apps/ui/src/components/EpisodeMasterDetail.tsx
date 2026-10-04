@@ -6,21 +6,15 @@ import { Check, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
+import { jstParts } from "@/lib/datetime";
 
 type TabType = "overview" | "minutes" | "transcript" | "promotions";
 
+// 日本時間で固定して書式化する（サーバーとブラウザで同じ文字列にし、描画の食い違いを防ぐ）
 function formatDate(dateStr: string) {
-  try {
-    const d = new Date(dateStr);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hours = String(d.getHours()).padStart(2, "0");
-    const mins = String(d.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${mins}:00`;
-  } catch {
-    return dateStr;
-  }
+  const parts = jstParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:00`;
 }
 
 type PodcastInfo = {
