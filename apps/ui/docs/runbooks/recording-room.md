@@ -38,7 +38,8 @@ cloudflare provider v5 の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_a
 ACCOUNT=8ed20f6872cea7c9219d68bfcf5f98ae
 ENV=prod   # 作る環境
 PROJECT=sunabalog-$ENV
-# SFU アプリ（返り値の uid / secret）と TURN キー（返り値の uid / key）を作る
+# SFU アプリと TURN キーを作る。どちらも返り値の result.uid が ID、result.secret が値。
+# （API ドキュメントは TURN の値を key としているが、実際は secret で返る。provider が値を取れないのもこのため）
 SFU=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/calls/apps" \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
   -d "{\"name\":\"sparkcast-recording-$ENV\"}")
@@ -49,7 +50,7 @@ ROOM=$(gcloud secrets versions access latest --secret=sparkcast-recording-room-s
 SERVICE=$(gcloud secrets versions access latest --secret=sparkcast-recording-service-secret --project=$PROJECT)
 jq -n --arg room "$ROOM" --arg service "$SERVICE" --argjson sfu "$SFU" --argjson turn "$TURN" \
   '{ROOM_SECRET: $room, SERVICE_SECRET: $service, SFU_APP_ID: $sfu.result.uid, SFU_APP_TOKEN: $sfu.result.secret,
-    TURN_KEY_ID: $turn.result.uid, TURN_KEY_TOKEN: $turn.result.key}' \
+    TURN_KEY_ID: $turn.result.uid, TURN_KEY_TOKEN: $turn.result.secret}' \
   | gcloud secrets versions add sparkcast-recording-worker-secrets --data-file=- --project=$PROJECT
 ```
 
