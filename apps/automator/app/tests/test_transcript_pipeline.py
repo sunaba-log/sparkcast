@@ -27,7 +27,7 @@ from infrastructure.speech_transcriber import (
     sentences_to_segments,
     words_to_segments,
 )
-from services.episode_transcription import EpisodeTranscription, aligned_track_uri
+from services.episode_transcription import EpisodeTranscription, NoSpeechError, aligned_track_uri
 from services.speech_audio import speech_audio_uri, to_speech_flac
 from services.transcript_builder import SpeakerTrack, is_crosstalk, merge_speaker_tracks
 
@@ -356,6 +356,35 @@ def test_raises_when_no_minutes_at_all() -> None:
     with pytest.raises(ValueError, match="Failed to make transcript"):
         _service(provider, _Repository(), None).run(
             gcs_uri="gs://in/x.m4a", podcast_id="1", episode_id="2", duration_seconds=90, model_id="m"
+        )
+
+
+def test_no_speech_fails_instead_of_asking_gemini_to_write_minutes() -> None:
+    provider = _Provider()
+    called = []
+    provider.generate_transcript = lambda *a, **k: called.append(a) or "申し訳ございませんが…"  # type: ignore[method-assign]
+    with pytest.raises(NoSpeechError, match="発話を聞き取れませんでした"):
+        _service(provider, _Repository(), _Speech({"gs://in/x.flac": []})).run(
+            gcs_uri="gs://in/x.flac", podcast_id="1", episode_id="2", duration_seconds=30, model_id="m"
+        )
+    assert called == []
+    assert provider.minutes_input is None
+
+
+def test_no_speech_in_recording_tracks_fails() -> None:
+    recording = RecordingSpeakers(session_id="sid", speakers=[RecordingSpeaker("p-host", "小野", "host")])
+    with pytest.raises(NoSpeechError):
+        _service(_Provider(), _Repository(recording), _Speech({})).run(
+            gcs_uri="gs://in/x.flac", podcast_id="1", episode_id="2", duration_seconds=30, model_id="m"
+        )
+
+
+def test_gemini_audio_minutes_reporting_no_speech_fails() -> None:
+    provider = _Provider()
+    provider.generate_transcript = lambda *a, **k: "```\nNO_SPEECH\n```"  # type: ignore[method-assign]
+    with pytest.raises(NoSpeechError):
+        _service(provider, _Repository(), _Speech(error=RuntimeError("quota"))).run(
+            gcs_uri="gs://in/x.m4a", podcast_id="1", episode_id="2", duration_seconds=30, model_id="m"
         )
 
 

@@ -6,6 +6,8 @@
 2. 時刻・話者つきの文字起こしから、Gemini が議事録を作る(目次の時刻は文字起こしの時刻)
 
 音声認識に失敗したときは、以前の方式(Gemini に音声から直接議事録を作らせる)で続ける。
+音声認識が成功して発話が 1 つも無いとき(無音など)は、議事録を作らずに失敗させる
+(Gemini に音声を渡すと「音声がありません」という返事が議事録として公開されてしまう)。
 """
 
 from __future__ import annotations
@@ -23,6 +25,17 @@ if TYPE_CHECKING:
     from domain.interfaces import EpisodeRepository, RecordingSpeakers, SpeechTranscriber, TranscriptProvider
 
 ENGINE = "speech_v2_long"
+
+# 音声に会話が無いとき、Gemini に議事録の代わりに返させる印(ai_analyzer.generate_transcript と揃える)
+NO_SPEECH_MARKER = "NO_SPEECH"
+NO_SPEECH_MESSAGE = (
+    "音声から発話を聞き取れませんでした。マイクが無音(ミュート)だったか、録音が届いていない可能性があります。"
+)
+
+
+class NoSpeechError(ValueError):
+    """音声に発話が無く、議事録を作れない."""
+
 
 # 位置合わせ済みトラックの URI 一覧 → 区間の音量を返す関数(読めなければ None)
 EnergyLoader = Callable[[dict[str, str]], EnergyFn | None]
@@ -83,6 +96,7 @@ class EpisodeTranscription:
         """
         cast = self._cast_names(podcast_id)
         recording = self._recording(episode_id)
+        no_speech = False
         if self._speech is not None:
             try:
                 if recording is not None and self._work_bucket:
@@ -107,11 +121,15 @@ class EpisodeTranscription:
                             "generated_at": datetime.now(UTC).isoformat(),
                         },
                     )
-                self._logger.warning("Speech recognition returned no speech; falling back to Gemini audio minutes")
+                no_speech = True
             except Exception:
                 self._logger.exception("Speech recognition failed; falling back to Gemini audio minutes")
+        if no_speech:
+            raise NoSpeechError(NO_SPEECH_MESSAGE)
 
         minutes = self._provider.generate_transcript(gcs_uri, model_id=model_id, cast_names=cast or None)
+        if minutes and minutes.strip().strip("`").strip() == NO_SPEECH_MARKER:
+            raise NoSpeechError(NO_SPEECH_MESSAGE)
         if not minutes:
             raise ValueError("Failed to make transcript.")
         return TranscriptionResult(

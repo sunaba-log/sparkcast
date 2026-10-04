@@ -82,6 +82,8 @@ class AudioAnalyzer(TranscriptProvider):
 5:00 CCC
 12:54 DDD
 17:11 EEE
+
+音声に会話が含まれていない(無音・雑音だけ)場合は、議事録を作らず、NO_SPEECH とだけ返して下さい。
 """
         if cast_names:
             prompt += f"登場人物は{'、'.join(cast_names)}です。\n"
