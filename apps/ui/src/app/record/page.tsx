@@ -22,6 +22,11 @@ export default async function RecordPage() {
 
   return (
     <div className="max-w-3xl">
+      <div className="flex items-center text-xs text-gray-500 gap-2 mb-4">
+        <span>ホーム</span>
+        <span>&gt;</span>
+        <span className="font-medium text-gray-800">収録</span>
+      </div>
       <h1 className="text-2xl font-bold text-gray-900">収録</h1>
       <p className="mt-1 text-sm text-gray-500">
         収録ルームを作って招待 URL を送ると、ゲストはアカウントなしでブラウザから参加できます。

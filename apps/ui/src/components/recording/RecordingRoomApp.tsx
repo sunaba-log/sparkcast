@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RecordingController } from "@/lib/recording/controller";
 import type { JoinResponse, RecordingSessionView } from "@/lib/recording/types";
@@ -148,8 +149,20 @@ export function RecordingRoomApp(props: Props) {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {mode === "host" && (
+        <div className="flex items-center text-xs text-gray-500 gap-2 mb-4">
+          <span>ホーム</span>
+          <span>&gt;</span>
+          <Link href="/record" className="hover:text-brand hover:underline">
+            収録
+          </Link>
+          <span>&gt;</span>
+          <span className="font-medium text-gray-800">収録ルーム</span>
+        </div>
+      )}
       <header className="mb-5">
-        <p className="text-xs font-bold text-brand tracking-wide">収録ルーム</p>
+        {/* ホストはパンくずに「収録ルーム」と出ているので、ゲストにだけ出す */}
+        {mode === "guest" && <p className="text-xs font-bold text-brand tracking-wide">収録ルーム</p>}
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{props.title || "収録"}</h1>
       </header>
 
