@@ -1,5 +1,6 @@
 # ルートの Makefile / CD が生成する環境変数ファイル
 .env
+.env.local
 
 # Terraform（infra/ 一元管理）。.terraform.lock.hcl は追跡する。
 .terraform/
@@ -14,7 +15,21 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# node
+node_mudules
+ui/node_modules/
+ui/next-env.d.ts
+ui/tsconfig.tsbuildinfo
+
+# python
+__pycache__
+*.egg-info/
+
 # next
+.next/
 
 # mac
 .DS_Store
+
+# binary
+.coverage
