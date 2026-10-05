@@ -243,10 +243,10 @@ export function RoomView({
                 ? "入室を締め切っています。新しいゲストは入れません（入室済みの人は入り直せます）。"
                 : "招待 URL を知っている人は誰でも入室できます。"}
             </p>
+            {/* 押している間も disabled にしない（焦点が外れるため。二度押しは run が止める）。
+                文言が状態を表すので aria-pressed は付けない（「受付を再開、押されています」と逆に聞こえる） */}
             <button
               type="button"
-              disabled={busy}
-              aria-pressed={entryLocked}
               onClick={() =>
                 void run(async () => {
                   const result = (await hostAction(sessionId, "entry", { locked: !entryLocked })) as { entryLocked?: boolean };
