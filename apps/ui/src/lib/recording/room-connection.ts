@@ -26,6 +26,8 @@ type Listener = {
 const RECONNECT_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 15_000];
 const PING_INTERVAL_MS = 15_000;
 const PING_BURST = 5;
+// これだけ何も届かなければ、接続が死んでいる（回線断を OS が知らせるのは数分後のことがある）とみなしてつなぎ直す
+const SILENCE_TIMEOUT_MS = 35_000;
 
 export class RoomConnection {
   readonly clock = new ClockSync();
@@ -35,6 +37,8 @@ export class RoomConnection {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private status: ConnectionStatus = "connecting";
+  private lastMessageAt = 0;
+  private removeNetworkListeners: (() => void) | null = null;
 
   constructor(
     private readonly baseUrl: string,
@@ -45,7 +49,38 @@ export class RoomConnection {
 
   connect() {
     this.stopped = false;
+    this.listenToNetwork();
     this.open();
+  }
+
+  // ブラウザが回線断・復帰を知らせたら、待たずに切り替える
+  private listenToNetwork() {
+    if (typeof window === "undefined" || this.removeNetworkListeners) return;
+    const onOffline = () => this.dropConnection();
+    const onOnline = () => {
+      if (this.stopped || this.status !== "reconnecting") return;
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      this.open();
+    };
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    this.removeNetworkListeners = () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }
+
+  // 死んだ接続を捨ててつなぎ直す（close の完了は待たない。死んだ接続では close イベントがなかなか来ない）
+  private dropConnection() {
+    const ws = this.ws;
+    if (!ws || this.stopped) return;
+    this.handleClose(ws, 1006);
+    try {
+      ws.close();
+    } catch {
+      // 無視
+    }
   }
 
   updateToken(token: string) {
@@ -65,6 +100,8 @@ export class RoomConnection {
 
   close() {
     this.stopped = true;
+    this.removeNetworkListeners?.();
+    this.removeNetworkListeners = null;
     this.clearTimers();
     this.ws?.close(1000, "leave");
     this.ws = null;
@@ -88,6 +125,7 @@ export class RoomConnection {
 
   private handleMessage(data: unknown) {
     if (typeof data !== "string") return;
+    this.lastMessageAt = Date.now();
     let message: ServerMessage;
     try {
       message = JSON.parse(data) as ServerMessage;
@@ -128,6 +166,7 @@ export class RoomConnection {
 
   private handleClose(ws: WebSocket, code: number) {
     if (ws !== this.ws) return;
+    this.ws = null;
     this.clearTimers();
     if (this.stopped) return;
     const reasons: Partial<Record<number, EndReason>> = {
@@ -165,7 +204,14 @@ export class RoomConnection {
       }
     };
     burst();
-    this.pingTimer = setInterval(burst, PING_INTERVAL_MS);
+    this.lastMessageAt = Date.now();
+    this.pingTimer = setInterval(() => {
+      if (Date.now() - this.lastMessageAt > SILENCE_TIMEOUT_MS) {
+        this.dropConnection();
+        return;
+      }
+      burst();
+    }, PING_INTERVAL_MS);
   }
 
   private clearTimers() {
