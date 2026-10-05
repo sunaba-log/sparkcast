@@ -4,6 +4,9 @@
   2026-10 時点で実際に試した結果、Chirp 2 の ja-JP は us-central1 で提供終了・asia-southeast1 で結果が空、
   Chirp 3 は全文が 1 件にまとまり時刻が付かなかったため使わない。
 - 60 秒を超える音声は BatchRecognize、短い音声は Recognize(どちらも GCS の URI を渡す)。
+- BatchRecognize は、急がない処理(ダイナミックバッチ。1 分 $0.003、通常の約 5 分の 1)にできる。
+  結果が出るまでの時間に保証は無いので、結果は GCS に書かせて、長めに待つ(2026-10 の dev の計測では
+  60 分の音声で通常と同じ約 16.5 分、結果も同じだった)。
 - 単語の時刻から、句点やポーズで区切った発話(TranscriptSegment)にまとめる。
 """
 
@@ -12,9 +15,11 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+import uuid
 from dataclasses import dataclass
 
 from google.api_core.client_options import ClientOptions
+from google.cloud import storage
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech
 
@@ -183,8 +188,19 @@ class ChirpTranscriber:
         model: str = "long",
         language_code: str = "ja-JP",
         client: SpeechClient | None = None,
+        dynamic_batch_output: str | None = None,
+        storage_client: storage.Client | None = None,
+        timeout_seconds: float = 3600,
     ) -> None:
-        """Create the client for the regional endpoint."""
+        """Create the client for the regional endpoint.
+
+        dynamic_batch_output(gs://bucket/prefix)を渡すと、BatchRecognize をダイナミックバッチにし、
+        結果をその下に書かせて読む。
+        """
+        self.dynamic_batch_output = dynamic_batch_output.rstrip("/") if dynamic_batch_output else None
+        # BatchRecognize の結果を待つ上限(ダイナミックバッチは遅れることがあるので長めにする)
+        self.timeout_seconds = timeout_seconds
+        self._storage = storage_client
         self.recognizer = f"projects/{project_id}/locations/{location}/recognizers/_"
         self.client = client or SpeechClient(
             client_options=ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")
@@ -199,7 +215,7 @@ class ChirpTranscriber:
             ),
         )
 
-    def transcribe(self, files: dict[str, float], timeout: float = 3600) -> dict[str, list[TranscriptSegment]]:
+    def transcribe(self, files: dict[str, float], timeout: float | None = None) -> dict[str, list[TranscriptSegment]]:
         """GCS の音声(URI → 長さ秒)をまとめて認識し、URI ごとの発話を返す."""
         output: dict[str, list[TranscriptSegment]] = {}
         long_files = [uri for uri, seconds in files.items() if seconds > BATCH_MIN_SECONDS]
@@ -207,23 +223,11 @@ class ChirpTranscriber:
 
         # 結果を応答で受け取る(inline)設定は 1 リクエスト 1 ファイルまでなので、
         # ファイルごとにリクエストを出してから、まとめて待つ(話者ごとの認識が並行に進む)
-        operations = {
-            uri: self.client.batch_recognize(
-                request=cloud_speech.BatchRecognizeRequest(
-                    recognizer=self.recognizer,
-                    config=self.config,
-                    files=[cloud_speech.BatchRecognizeFileMetadata(uri=uri)],
-                    recognition_output_config=cloud_speech.RecognitionOutputConfig(
-                        inline_response_config=cloud_speech.InlineOutputConfig(),
-                    ),
-                )
-            )
-            for uri in long_files
-        }
+        operations = {uri: self.client.batch_recognize(request=self._batch_request(uri)) for uri in long_files}
         if operations:
             logger.info("BatchRecognize %d file(s)", len(operations))
             for uri, operation in operations.items():
-                response = operation.result(timeout=timeout)
+                response = operation.result(timeout=timeout or self.timeout_seconds)
                 file_result = response.results.get(uri)
                 if file_result is None:
                     message = f"Speech-to-Text returned no result for {uri}"
@@ -231,7 +235,7 @@ class ChirpTranscriber:
                 if file_result.error and file_result.error.message:
                     message = f"Speech-to-Text failed for {uri}: {file_result.error.message}"
                     raise RuntimeError(message)
-                output[uri] = results_to_segments(list(file_result.transcript.results))
+                output[uri] = results_to_segments(self._file_results(file_result))
 
         for uri in short_files:
             response = self.client.recognize(
@@ -239,3 +243,39 @@ class ChirpTranscriber:
             )
             output[uri] = results_to_segments(list(response.results))
         return output
+
+    def _batch_request(self, uri: str) -> cloud_speech.BatchRecognizeRequest:
+        if self.dynamic_batch_output:
+            # 結果はファイルごとに別の場所へ(同じ名前の音声が重なっても混ざらないように)
+            output_uri = f"{self.dynamic_batch_output}/{uuid.uuid4().hex}/"
+            return cloud_speech.BatchRecognizeRequest(
+                recognizer=self.recognizer,
+                config=self.config,
+                files=[cloud_speech.BatchRecognizeFileMetadata(uri=uri)],
+                processing_strategy=cloud_speech.BatchRecognizeRequest.ProcessingStrategy.DYNAMIC_BATCHING,
+                recognition_output_config=cloud_speech.RecognitionOutputConfig(
+                    gcs_output_config=cloud_speech.GcsOutputConfig(uri=output_uri),
+                ),
+            )
+        # 結果を応答で受け取る(inline)設定は 1 リクエスト 1 ファイルまで
+        return cloud_speech.BatchRecognizeRequest(
+            recognizer=self.recognizer,
+            config=self.config,
+            files=[cloud_speech.BatchRecognizeFileMetadata(uri=uri)],
+            recognition_output_config=cloud_speech.RecognitionOutputConfig(
+                inline_response_config=cloud_speech.InlineOutputConfig(),
+            ),
+        )
+
+    def _file_results(
+        self, file_result: cloud_speech.BatchRecognizeFileResult
+    ) -> list[cloud_speech.SpeechRecognitionResult]:
+        """ファイルごとの認識結果。GCS に書かせたときはそこから読む."""
+        storage_result = getattr(file_result, "cloud_storage_result", None)
+        result_uri = storage_result.uri if storage_result else ""
+        if not result_uri:
+            return list(file_result.transcript.results)
+        bucket_name, _, name = result_uri.removeprefix("gs://").partition("/")
+        client = self._storage or storage.Client()
+        text = client.bucket(bucket_name).blob(name).download_as_text()
+        return list(cloud_speech.BatchRecognizeResults.from_json(text, ignore_unknown_fields=True).results)

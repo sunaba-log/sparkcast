@@ -57,6 +57,9 @@ class PodcastEnvConfig:
     speech_enabled: bool = True
     speech_location: str = "asia-northeast1"
     speech_model: str = "long"
+    # 急がない処理(ダイナミックバッチ、1 分 $0.003)にするか。結果は作業用バケットに書かせる
+    speech_dynamic_batch: bool = False
+    speech_timeout_seconds: float = 3600
     work_bucket: str | None = None
     # チャット用の索引の作り直し(UI の URL と、定期実行と同じ CRON_SECRET)。無ければ毎朝の定期実行だけ
     app_base_url: str | None = None
@@ -96,6 +99,8 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     speech_enabled = environ.get("SPEECH_ENABLED", "true").lower() != "false"
     speech_location = environ.get("SPEECH_LOCATION", "asia-northeast1")
     speech_model = environ.get("SPEECH_MODEL", "long")
+    speech_dynamic_batch = environ.get("SPEECH_DYNAMIC_BATCH", "false").lower() == "true"
+    speech_timeout_seconds = float(environ.get("SPEECH_TIMEOUT_SECONDS", "3600"))
     work_bucket = environ.get("WORK_BUCKET") or None
     app_base_url = environ.get("APP_BASE_URL") or None
     cron_secret = environ.get("CRON_SECRET") or None
@@ -124,6 +129,8 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         speech_enabled=speech_enabled,
         speech_location=speech_location,
         speech_model=speech_model,
+        speech_dynamic_batch=speech_dynamic_batch,
+        speech_timeout_seconds=speech_timeout_seconds,
         work_bucket=work_bucket,
         app_base_url=app_base_url,
         cron_secret=cron_secret,
@@ -145,7 +152,14 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("AI_MODEL_ID: %s", config.ai_model_id)
     logger.info("R2_CUSTOM_DOMAIN: %s", config.r2_custom_domain)
     logger.info("SNS_PROMOTION_COUNT: %s", config.sns_promotion_count)
-    logger.info("SPEECH_ENABLED: %s (%s %s)", config.speech_enabled, config.speech_model, config.speech_location)
+    logger.info(
+        "SPEECH_ENABLED: %s (%s %s, dynamic batch %s, timeout %ss)",
+        config.speech_enabled,
+        config.speech_model,
+        config.speech_location,
+        config.speech_dynamic_batch,
+        config.speech_timeout_seconds,
+    )
     logger.info("WORK_BUCKET: %s", config.work_bucket)
     logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
     logger.info("###########################\n")
@@ -239,7 +253,13 @@ def process_podcast_workflow() -> None:
             transcript_provider=audio_analyzer,
             episode_repository=episode_repository,
             speech=ChirpTranscriber(
-                project_id=config.project_id, location=config.speech_location, model=config.speech_model
+                project_id=config.project_id,
+                location=config.speech_location,
+                model=config.speech_model,
+                dynamic_batch_output=f"gs://{config.work_bucket}/transcribe/results"
+                if config.speech_dynamic_batch and config.work_bucket
+                else None,
+                timeout_seconds=config.speech_timeout_seconds,
             )
             if config.speech_enabled
             else None,

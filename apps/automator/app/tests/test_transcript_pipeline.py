@@ -8,6 +8,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+from google.cloud.speech_v2.types import cloud_speech
 
 from domain.interfaces import RecordingSpeaker, RecordingSpeakers
 from domain.models.transcript import (
@@ -223,6 +224,69 @@ def test_transcriber_uses_batch_for_long_audio_and_sync_for_short_audio() -> Non
     assert client.batch_requests[0].recognizer == "projects/p/locations/asia-northeast1/recognizers/_"
     assert output["gs://b/long.flac"][0].text == "長い。"
     assert output["gs://b/short.flac"][0].start == 1.0
+
+
+class _DynamicSpeechClient(_FakeSpeechClient):
+    def batch_recognize(self, request):
+        self.batch_requests.append(request)
+        output = request.recognition_output_config.gcs_output_config.uri
+        results = {
+            file.uri: SimpleNamespace(
+                error=None,
+                cloud_storage_result=SimpleNamespace(uri=f"{output}result.json"),
+                transcript=SimpleNamespace(results=[]),
+            )
+            for file in request.files
+        }
+        return SimpleNamespace(result=lambda timeout: self.timeouts.append(timeout) or SimpleNamespace(results=results))
+
+
+class _FakeStorage:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.read = []
+
+    def bucket(self, name):
+        storage = self
+
+        class _Blob:
+            def __init__(self, blob_name):
+                self.blob_name = blob_name
+
+            def download_as_text(self):
+                storage.read.append(f"gs://{name}/{self.blob_name}")
+                return storage.text
+
+        return SimpleNamespace(blob=_Blob)
+
+
+def test_dynamic_batch_writes_results_to_gcs_and_reads_them_back() -> None:
+    client = _DynamicSpeechClient()
+    client.timeouts = []
+    results_json = (
+        '{"results": [{"alternatives": [{"transcript": "長い。", "words": '
+        '[{"word": "長い。", "startOffset": "70s", "endOffset": "71s"}]}], "resultEndOffset": "72s"}]}'
+    )
+    store = _FakeStorage(results_json)
+    transcriber = ChirpTranscriber(
+        project_id="p",
+        client=client,  # type: ignore[arg-type]
+        dynamic_batch_output="gs://work/transcribe/results/",
+        storage_client=store,  # type: ignore[arg-type]
+        timeout_seconds=18000,
+    )
+    output = transcriber.transcribe({"gs://b/a.flac": 3600, "gs://b/b.flac": 3600})
+
+    first, second = client.batch_requests
+    assert first.processing_strategy == cloud_speech.BatchRecognizeRequest.ProcessingStrategy.DYNAMIC_BATCHING
+    # 結果の置き場はファイルごとに別
+    assert first.recognition_output_config.gcs_output_config.uri.startswith("gs://work/transcribe/results/")
+    assert (
+        first.recognition_output_config.gcs_output_config.uri != second.recognition_output_config.gcs_output_config.uri
+    )
+    assert client.timeouts == [18000, 18000]
+    assert [(s.start, s.text) for s in output["gs://b/a.flac"]] == [(70.0, "長い。")]
+    assert all(uri.startswith("gs://work/transcribe/results/") for uri in store.read)
 
 
 # ---- 話者ごとの結合と回り込みの除去 ----
