@@ -432,6 +432,44 @@ def test_uploaded_episode_assigns_speakers_with_gemini() -> None:
     assert result.meta["speaker_source"] == "gemini"
 
 
+def test_speaker_assignment_is_retried_when_the_model_returns_nothing() -> None:
+    uri = "gs://in/podcasts/1/episodes/2/source/a.m4a"
+    provider = _Provider()
+    calls = []
+    original = provider.assign_speakers
+
+    def flaky(*args, **kwargs):
+        calls.append(1)
+        if len(calls) < 3:
+            raise ValueError("No speaker assignments received from the model.")
+        return original(*args, **kwargs)
+
+    provider.assign_speakers = flaky  # type: ignore[method-assign]
+    result = _service(provider, _Repository(), _Speech({uri: [TranscriptSegment(0, 1, "a")]})).run(
+        gcs_uri=uri, podcast_id="1", episode_id="2", duration_seconds=90, model_id="m"
+    )
+    assert len(calls) == 3
+    assert [s.speaker for s in result.segments] == ["小野"]
+
+
+def test_unknown_speakers_are_kept_after_all_attempts_fail() -> None:
+    uri = "gs://in/podcasts/1/episodes/2/source/a.m4a"
+    provider = _Provider()
+    calls = []
+
+    def broken(*args, **kwargs):
+        calls.append(1)
+        raise ValueError("No speaker assignments received from the model.")
+
+    provider.assign_speakers = broken  # type: ignore[method-assign]
+    result = _service(provider, _Repository(), _Speech({uri: [TranscriptSegment(0, 1, "a")]})).run(
+        gcs_uri=uri, podcast_id="1", episode_id="2", duration_seconds=90, model_id="m"
+    )
+    assert len(calls) == 3
+    assert result.segments[0].speaker == "不明"
+    assert result.minutes == "minutes"
+
+
 def test_falls_back_to_gemini_audio_minutes_when_speech_fails() -> None:
     provider = _Provider()
     result = _service(provider, _Repository(), _Speech(error=RuntimeError("quota"))).run(

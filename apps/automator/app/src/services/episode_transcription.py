@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 
 ENGINE = "speech_v2_long"
 
+# 話者の推定(Gemini)を試す回数
+SPEAKER_ATTEMPTS = 3
+
 # 音声に会話が無いとき、Gemini に議事録の代わりに返させる印(ai_analyzer.generate_transcript と揃える)
 NO_SPEECH_MARKER = "NO_SPEECH"
 NO_SPEECH_MESSAGE = (
@@ -189,8 +192,12 @@ class EpisodeTranscription:
         segments = self._speech.transcribe({speech_uri: duration_seconds}).get(speech_uri, [])
         if not segments:
             return segments
-        try:
-            return self._provider.assign_speakers(gcs_uri, segments, cast or None, model_id)
-        except Exception:
-            self._logger.exception("Speaker assignment failed; keeping unknown speakers")
-            return segments
+        # Gemini はときどき空の応答を返す(dev の 60 分の音声で 3 回に 1 回)。失敗すると全員の話者が
+        # 不明になり議事録から名前が消えるので、何度か試す
+        for attempt in range(1, SPEAKER_ATTEMPTS + 1):
+            try:
+                return self._provider.assign_speakers(gcs_uri, segments, cast or None, model_id)
+            except Exception:
+                self._logger.exception("Speaker assignment failed (attempt %d/%d)", attempt, SPEAKER_ATTEMPTS)
+        self._logger.error("Speaker assignment failed; keeping unknown speakers")
+        return segments
