@@ -12,6 +12,7 @@ import pytest
 from domain.interfaces import RecordingSpeaker, RecordingSpeakers
 from domain.models.transcript import (
     TranscriptSegment,
+    drop_empty_sections,
     extract_topics,
     format_timestamp,
     parse_timestamp,
@@ -63,6 +64,24 @@ def test_extract_topics_from_minutes() -> None:
         {"time": "0:03", "title": "ブラウザ収録"},
         {"time": "1:02:36", "title": "文字起こし"},
     ]
+
+
+def test_extract_topics_from_the_new_minutes_format() -> None:
+    minutes = (
+        "## 要約\n収録ルームの話。\n\n## 【目次】\n0:00 近況\n2:10 チャットの感想\n\n"
+        "## 話題ごとのまとめ\n\n### 0:00〜2:10 近況\n- けんたは実装済み\n\n### 2:10〜5:40 チャットの感想\n- 便利\n"
+    )
+    assert extract_topics(minutes) == [
+        {"time": "0:00", "title": "近況"},
+        {"time": "2:10", "title": "チャットの感想"},
+    ]
+
+
+def test_drop_empty_sections() -> None:
+    minutes = "## 要約\n話した。\n\n## 決定事項\nなし\n\n## ToDo\n- 特になし\n\n## 次回に向けて\n- 配色の話\n"
+    assert drop_empty_sections(minutes) == "## 要約\n話した。\n\n## 次回に向けて\n- 配色の話"
+    # 見出しの下に中身が無いだけの節や、ふつうの本文は消さない
+    assert drop_empty_sections("## 要約\nなしで進める案を話した。\n") == "## 要約\nなしで進める案を話した。"
 
 
 def test_split_cast_names() -> None:

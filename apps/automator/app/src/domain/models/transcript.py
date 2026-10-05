@@ -54,6 +54,29 @@ def render_transcript(segments: list[TranscriptSegment]) -> str:
 _TOC_LINE = re.compile(r"^\s*[-*・]?\s*\[?((?:\d{1,2}:)?\d{1,2}:\d{2})\]?\s*[-\u2013:\uff1a]?\s*(.+?)\s*$")
 
 
+_EMPTY_BODY = re.compile(r"^[-*・\s]*(なし|特になし|該当なし|ありません|特にありません|なし。|特になし。)\s*$")
+
+
+def drop_empty_sections(minutes: str) -> str:
+    """中身が「なし」だけの見出し(## 決定事項 など)を取り除く.
+
+    モデルは「該当が無い節は書かない」と指示しても「なし」と書くことがあり、読む人にも検索にも雑音になる。
+    """
+    blocks: list[list[str]] = [[]]
+    for line in minutes.splitlines():
+        if line.startswith("## "):
+            blocks.append([line])
+        else:
+            blocks[-1].append(line)
+    kept: list[str] = []
+    for block in blocks:
+        body = [line for line in block[1:] if line.strip()]
+        if block and block[0].startswith("## ") and body and all(_EMPTY_BODY.match(line) for line in body):
+            continue
+        kept.extend(block)
+    return "\n".join(kept).strip()
+
+
 def extract_topics(minutes: str) -> list[dict[str, str]]:
     """議事録の【目次】から `{time, title}` を取り出す(見つからなければ空)."""
     topics: list[dict[str, str]] = []
