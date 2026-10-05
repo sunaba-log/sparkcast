@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sparkcast 公開前レビュー設定</title>
+<style>
+:root{--bg:#f7f7f8;--panel:#fff;--text:#18181b;--muted:#71717a;--border:#e4e4e7;--accent:#111827}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}.top,.section-head,.custom-item{display:flex;justify-content:space-between;gap:16px;align-items:center}
+h1{font-size:24px;margin:0 0 6px}h2{font-size:18px;margin:0}.muted{color:var(--muted);font-size:14px}.switch{display:flex;gap:10px;align-items:center;font-weight:700}.switch input{width:20px;height:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-top:16px}.section-head{align-items:end;margin-bottom:12px}
+.table-wrap{overflow-x:auto}table{width:100%;min-width:780px;border-collapse:collapse}th,td{padding:13px 10px;border-top:1px solid var(--border);text-align:left;font-size:14px}thead th{border-top:none;background:#fafafa;color:var(--muted)}
+select,input[type=text]{min-height:42px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px 10px;font-size:16px;width:100%}
+button{min-height:42px;border:none;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:white}.secondary{background:white;border:1px solid var(--border)}
+.badge{display:inline-block;background:#f4f4f5;border-radius:999px;padding:4px 8px;font-size:12px;color:#52525b}.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.chip{background:#f4f4f5;border-radius:8px;padding:5px 8px;font-size:13px}
+.custom-item{align-items:flex-start;border-top:1px solid var(--border);padding:14px 0}.custom-item:first-child{border-top:none}.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}.label{font-size:13px;font-weight:700;margin-bottom:6px}
+.hidden{display:none}.disabled{opacity:.45;pointer-events:none}.actions{display:flex;gap:8px;flex-wrap:wrap}.footer{display:flex;justify-content:flex-end;margin-top:18px}.status{text-align:right;color:var(--muted);font-size:14px;margin-top:8px}.note{background:#fafafa;border:1px dashed var(--border);padding:12px;border-radius:10px;font-size:13px;color:var(--muted);margin-top:14px}
+@media(max-width:760px){.top,.section-head,.custom-item{align-items:flex-start;flex-direction:column}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>Sparkcast 公開前レビュー</h1><p class="muted">公開前に収録内容を確認し、問題箇所と推奨する対応を表示します。</p></div>
+    <label class="switch"><input id="master" type="checkbox" checked><span>有効</span></label>
+  </div>
+
+  <div id="content">
+    <div class="card">
+      <div class="section-head">
+        <div><h2>標準ポリシー</h2><p class="muted">初期値には推奨設定が入っています。必要に応じて変更できます。</p></div>
+        <span class="badge">推奨設定を初期値に使用</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>有効</th><th>ポリシー</th><th>検知対象</th><th>対応</th><th>実行方法</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox" checked></td><td><strong>個人情報</strong></td><td>電話番号、住所、メール</td>
+              <td><select class="action" data-default="無音化"></select></td>
+              <td><select><option selected>確認してから実行</option><option>自動実行</option></select></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td><td><strong>機密情報</strong></td><td>顧客名、案件名、社内情報</td>
+              <td><select class="action" data-default="無音化"></select></td>
+              <td><select><option selected>確認してから実行</option><option>自動実行</option></select></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td><td><strong>事実確認</strong></td><td>数字、日付、固有名詞、事実の断定</td>
+              <td><select class="action" data-default="概要欄に注釈"></select></td>
+              <td><select><option selected>確認してから実行</option><option>自動実行</option></select></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td><td><strong>第三者リスク</strong></td><td>批判、誹謗中傷・名誉毀損リスク</td>
+              <td><select class="action" data-default="通知のみ"></select></td>
+              <td><select><option selected>確認してから実行</option><option>自動実行</option></select></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td><td><strong>著作権リスク</strong></td><td>長い引用、歌詞、音楽など</td>
+              <td><select class="action" data-default="通知のみ"></select></td>
+              <td><select><option selected>確認してから実行</option><option>自動実行</option></select></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">実行方法と対応の選択肢は、すべてのポリシーで共通です。</div>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <div><h2>カスタムポリシー</h2><p class="muted">自分だけの公開ルールを追加できます。</p></div>
+        <button id="add" class="primary" type="button">＋ ポリシーを追加</button>
+      </div>
+      <div id="customList">
+        <div class="custom-item">
+          <div><strong>勤務先名チェック</strong><div class="chips"><span class="chip">Cisco</span><span class="chip">シスコ</span><span class="chip">ユーザベース</span></div></div>
+          <div><span class="muted">確認してから実行 → </span><strong>無音化</strong></div>
+        </div>
+      </div>
+
+      <div id="editor" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+        <div class="row">
+          <div><div class="label">ポリシー名</div><input id="name" type="text" placeholder="例：家族情報チェック"></div>
+          <div><div class="label">対応</div><select id="customAction"></select></div>
+          <div><div class="label">実行方法</div><select id="customMode"><option>確認してから実行</option><option>自動実行</option></select></div>
+        </div>
+        <div style="margin-top:14px"><div class="label">検知する言葉</div><input id="words" type="text" placeholder="例：妻の名前, 子どもの名前"></div>
+        <div class="actions" style="margin-top:14px"><button id="saveCustom" class="primary" type="button">追加</button><button id="cancel" class="secondary" type="button">キャンセル</button></div>
+        <p id="message" class="muted" style="margin-top:10px"></p>
+      </div>
+    </div>
+
+    <div class="footer"><button id="saveAll" class="primary" type="button">設定を保存</button></div>
+    <div id="status" class="status"></div>
+  </div>
+</div>
+<script>
+(() => {
+  const actions = ["通知のみ","無音化","カット","ビープ音","概要欄に注釈","AI音声で注釈"];
+
+  document.querySelectorAll("select.action").forEach(select => {
+    const def = select.dataset.default;
+    actions.forEach(a => {
+      const o = document.createElement("option");
+      o.textContent = a;
+      o.value = a;
+      if (a === def) o.selected = true;
+      select.appendChild(o);
+    });
+  });
+
+  const customAction = document.getElementById("customAction");
+  actions.forEach(a => {
+    const o = document.createElement("option");
+    o.textContent = a;
+    o.value = a;
+    customAction.appendChild(o);
+  });
+  customAction.value = "無音化";
+
+  const master=document.getElementById("master"), content=document.getElementById("content");
+  master.addEventListener("change",()=>content.classList.toggle("disabled",!master.checked));
+
+  const editor=document.getElementById("editor");
+  document.getElementById("add").addEventListener("click",()=>{
+    editor.classList.remove("hidden");
+    document.getElementById("name").focus();
+  });
+  document.getElementById("cancel").addEventListener("click",()=>editor.classList.add("hidden"));
+
+  document.getElementById("saveCustom").addEventListener("click",()=>{
+    const name=document.getElementById("name").value.trim();
+    const raw=document.getElementById("words").value.trim();
+    const mode=document.getElementById("customMode").value;
+    const action=customAction.value;
+    const words=raw.split(",").map(v=>v.trim()).filter(Boolean).slice(0,10);
+    const msg=document.getElementById("message");
+    if(!name||!words.length){msg.textContent="ポリシー名と検知する言葉を入力してください。";return;}
+    const item=document.createElement("div"); item.className="custom-item";
+    const left=document.createElement("div");
+    const strong=document.createElement("strong"); strong.textContent=name; left.appendChild(strong);
+    const chips=document.createElement("div"); chips.className="chips";
+    words.forEach(w=>{const c=document.createElement("span");c.className="chip";c.textContent=w;chips.appendChild(c);});
+    left.appendChild(chips);
+    const right=document.createElement("div");
+    const m=document.createElement("span");m.className="muted";m.textContent=mode+" → ";
+    const a=document.createElement("strong");a.textContent=action;
+    right.appendChild(m);right.appendChild(a);
+    item.appendChild(left);item.appendChild(right);
+    document.getElementById("customList").appendChild(item);
+    document.getElementById("name").value="";
+    document.getElementById("words").value="";
+    msg.textContent="";
+    editor.classList.add("hidden");
+  });
+
+  document.getElementById("saveAll").addEventListener("click",()=>{
+    const s=document.getElementById("status");
+    s.textContent="設定を保存しました。";
+    setTimeout(()=>s.textContent="",2200);
+  });
+})();
+</script>
+</body>
+</html>
