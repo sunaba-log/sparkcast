@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from infrastructure.ai_analyzer import AudioAnalyzer
 from infrastructure.episode_repository import PostgresEpisodeRepository
+from infrastructure.knowledge_reindexer import HttpKnowledgeReindexer
 from infrastructure.notifier import Notifier
 from infrastructure.secret_manager import SecretManagerClient
 from infrastructure.speech_transcriber import ChirpTranscriber
@@ -57,6 +58,9 @@ class PodcastEnvConfig:
     speech_location: str = "asia-northeast1"
     speech_model: str = "long"
     work_bucket: str | None = None
+    # チャット用の索引の作り直し(UI の URL と、定期実行と同じ CRON_SECRET)。無ければ毎朝の定期実行だけ
+    app_base_url: str | None = None
+    cron_secret: str | None = None
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -93,6 +97,8 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     speech_location = environ.get("SPEECH_LOCATION", "asia-northeast1")
     speech_model = environ.get("SPEECH_MODEL", "long")
     work_bucket = environ.get("WORK_BUCKET") or None
+    app_base_url = environ.get("APP_BASE_URL") or None
+    cron_secret = environ.get("CRON_SECRET") or None
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -119,6 +125,8 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         speech_location=speech_location,
         speech_model=speech_model,
         work_bucket=work_bucket,
+        app_base_url=app_base_url,
+        cron_secret=cron_secret,
     )
 
 
@@ -139,6 +147,7 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("SNS_PROMOTION_COUNT: %s", config.sns_promotion_count)
     logger.info("SPEECH_ENABLED: %s (%s %s)", config.speech_enabled, config.speech_model, config.speech_location)
     logger.info("WORK_BUCKET: %s", config.work_bucket)
+    logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
     logger.info("###########################\n")
 
 
@@ -239,6 +248,9 @@ def process_podcast_workflow() -> None:
             audio_preparer=GcsSpeechAudioPreparer(config.work_bucket) if config.work_bucket else None,
             logger=logger,
         ),
+        knowledge_reindexer=HttpKnowledgeReindexer(base_url=config.app_base_url, secret=config.cron_secret)
+        if config.app_base_url and config.cron_secret
+        else None,
     )
     usecase.run(
         ProcessPodcastWorkflowInput(

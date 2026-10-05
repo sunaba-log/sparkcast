@@ -160,6 +160,7 @@ def _workflow(
     repository: _EpisodeRepository,
     firestore: _FirestoreManager,
     transcript_provider: _TranscriptProvider | None = None,
+    knowledge_reindexer=None,
 ) -> ProcessPodcastWorkflow:
     return ProcessPodcastWorkflow(
         transcript_provider=transcript_provider or _TranscriptProvider(),
@@ -172,7 +173,54 @@ def _workflow(
         firestore_manager=firestore,
         episode_repository=repository,
         logger=logging.getLogger("test-workflow"),
+        knowledge_reindexer=knowledge_reindexer,
     )
+
+
+class _Reindexer:
+    def __init__(self, repository: _EpisodeRepository, error: Exception | None = None) -> None:
+        self.repository = repository
+        self.error = error
+        self.calls: list[tuple[str, bool]] = []
+
+    def reindex(self, podcast_id: str) -> None:
+        # 索引は完了したエピソードだけが対象なので、完了にしたあとで呼ばれること
+        self.calls.append((podcast_id, self.repository.completed is not None))
+        if self.error:
+            raise self.error
+
+
+def test_workflow_reindexes_chat_knowledge_after_completion() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository)
+
+    _workflow(repository=repository, firestore=_FirestoreManager(), knowledge_reindexer=reindexer).run(_request())
+
+    assert reindexer.calls == [("1", True)]
+
+
+def test_reindex_failure_does_not_fail_the_episode() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository, error=TimeoutError("slow"))
+
+    _workflow(repository=repository, firestore=_FirestoreManager(), knowledge_reindexer=reindexer).run(_request())
+
+    assert repository.completed is not None
+    assert repository.failed is None
+
+
+def test_failed_episode_is_not_reindexed() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository)
+    workflow = _workflow(
+        repository=repository,
+        firestore=_FirestoreManager(),
+        transcript_provider=_TranscriptProvider(transcript=""),
+        knowledge_reindexer=reindexer,
+    )
+    with pytest.raises(ValueError, match="Failed to make transcript"):
+        workflow.run(_request())
+    assert reindexer.calls == []
 
 
 def test_workflow_uses_object_path_ids_for_cloud_sql_and_firestore() -> None:

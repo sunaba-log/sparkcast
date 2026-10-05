@@ -37,6 +37,7 @@ issue: https://github.com/sunaba-log/sparkcast/issues/166
   - UI の一覧は `transcripts` を読まない（件数が多いため）。文字起こしタブを開いたときだけ読む。
 - **音声認識に失敗したとき**（クォータ・障害）は、従来どおり Gemini に音声から議事録を作らせて処理を止めない。`transcript_meta.engine = gemini_audio` で区別できる。`SPEECH_ENABLED=false` で従来方式に戻せる。
 - **音声認識が成功して発話が 1 つも無いとき**（無音・ミュートのまま収録した など）は、Gemini に回さずエピソードを失敗にする（「音声から発話を聞き取れませんでした」）。Gemini に無音を渡すと「音声記録が提供されていません」という返事が議事録になり、そのままタイトル・SNS 投稿・RSS まで作られてしまうため。Gemini の経路でも、会話が無ければ `NO_SPEECH` と返させて同じく失敗にする。
+- **チャット用の索引は、エピソードが完成した時点でその番組の分を作り直す。** 毎朝 4 時の定期実行だけだと、できたばかりのエピソードについてチャットで聞いても翌朝まで答えられないため。automator が完了を記録したあと、UI の `/api/cron/reindex-minutes?podcastId=N` を定期実行と同じ `CRON_SECRET` で呼ぶ（Job の env は `APP_BASE_URL` と `CRON_SECRET`）。失敗してもエピソードは失敗にせず、定期実行で追いつく。
 
 ## Consequences
 

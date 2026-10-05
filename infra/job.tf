@@ -42,10 +42,13 @@ module "cloud_run_job" {
     WORK_BUCKET     = google_storage_bucket.work.name
     SPEECH_LOCATION = "asia-northeast1"
     SPEECH_MODEL    = "long"
+    # エピソードが完成したらチャット用の索引をすぐ作り直してもらう（#166。認証は定期実行と同じ CRON_SECRET）
+    APP_BASE_URL = local.app_base_url
   }
 
   secret_environment_variables = {
     DATABASE_URL = var.database_url_secret_name
+    CRON_SECRET  = data.google_secret_manager_secret.cron_secret.secret_id
   }
 
   depends_on = [

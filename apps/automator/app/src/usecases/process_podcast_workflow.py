@@ -33,6 +33,13 @@ class PodcastFeedManager(Protocol):
         """Return serialized RSS XML."""
 
 
+class KnowledgeReindexer(Protocol):
+    """チャット用の索引を、番組を指定して作り直してもらう."""
+
+    def reindex(self, podcast_id: str) -> None:
+        """作り直してもらう(失敗したら例外)."""
+
+
 class PodcastFeedManagerFactory(Protocol):
     """Factory for RSS manager creation from source XML."""
 
@@ -86,11 +93,14 @@ class ProcessPodcastWorkflow:
         episode_repository: EpisodeRepository,
         logger: logging.Logger,
         transcription: EpisodeTranscription | None = None,
+        knowledge_reindexer: KnowledgeReindexer | None = None,
     ) -> None:
         """Initialize use case dependencies.
 
         transcription を渡さないときは音声認識を使わず、Gemini に音声から議事録を作らせる(従来の方式)。
+        knowledge_reindexer を渡すと、完成したエピソードをすぐチャットで聞けるよう索引を作り直してもらう。
         """
+        self._knowledge_reindexer = knowledge_reindexer
         self._transcript_provider = transcript_provider
         self._object_storage = object_storage
         self._blob_source = blob_source
@@ -284,6 +294,7 @@ class ProcessPodcastWorkflow:
                 audio_url=public_url,
                 duration_seconds=_duration_to_seconds(duration_str),
             )
+            self._reindex_knowledge(episode_ref.podcast_id)
             self._logger.info("\n## Notifying Discord (Success)... ##")
             self._notifier.send_discord_message(
                 message=f"Podcast Episode Published Successfully:\nTitle: {summary.title}\nURL: {public_url}"
@@ -300,6 +311,19 @@ class ProcessPodcastWorkflow:
                 self._logger.exception("Failed to persist episode failure state")
             self._notifier.send_discord_message(message=f"Podcast Processing Failed:\nError: {err}")
             raise
+
+    def _reindex_knowledge(self, podcast_id: str) -> None:
+        """チャット用の索引を作り直してもらう(完了にしたあと。索引は完了したエピソードだけを対象にする).
+
+        失敗してもエピソードは完成しているので失敗にしない(毎朝の定期実行で追いつく)。
+        """
+        if self._knowledge_reindexer is None:
+            return
+        try:
+            self._knowledge_reindexer.reindex(podcast_id)
+            self._logger.info("Reindexed chat knowledge for podcast %s", podcast_id)
+        except Exception:
+            self._logger.exception("Failed to reindex chat knowledge; the daily job will catch up")
 
 
 def _duration_to_seconds(duration: str) -> int | None:
