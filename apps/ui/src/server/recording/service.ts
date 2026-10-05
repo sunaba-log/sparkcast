@@ -210,6 +210,9 @@ export async function joinAsGuest(
   if (session.status === "uploading") {
     throw new RecordingError("CLOSED", "収録はすでに終了しています");
   }
+  if (session.entryLocked) {
+    throw new RecordingError("CLOSED", "このルームは入室を締め切っています。ホストに確認してください");
+  }
 
   const client = (await deps.pool.connect()) as PoolClient;
   try {

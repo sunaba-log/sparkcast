@@ -49,6 +49,7 @@ function session(overrides: Partial<RecordingSession> = {}): RecordingSession {
     error: null,
     expiresAt: new Date(Date.now() + 3600_000),
     createdAt: new Date(),
+    entryLocked: false,
     ...overrides,
   };
 }
@@ -149,6 +150,36 @@ describe("joinAsGuest", () => {
         rejoinKey: await tokens.createRejoinKey(GUEST_ID, SECRET),
       }),
     ).rejects.toMatchObject({ code: "REMOVED" });
+  });
+
+  it("does not accept new guests while entry is locked, but lets joined guests back in", async () => {
+    vi.mocked(repository.getRecordingSession).mockResolvedValue(session({ status: "recording", entryLocked: true }));
+    await expect(
+      service.joinAsGuest(deps(), {
+        sessionId: SESSION_ID,
+        inviteKey: await tokens.createInviteKey(SESSION_ID, SECRET),
+        displayName: "あとから来た人",
+        consent: true,
+      }),
+    ).rejects.toMatchObject({ code: "CLOSED", message: expect.stringContaining("締め切って") });
+
+    vi.mocked(repository.getParticipant).mockResolvedValue({
+      participantId: GUEST_ID,
+      sessionId: SESSION_ID,
+      displayName: "ゲスト",
+      role: "guest",
+      userId: null,
+      removedAt: null,
+    });
+    const rejoined = await service.joinAsGuest(deps(), {
+      sessionId: SESSION_ID,
+      inviteKey: await tokens.createInviteKey(SESSION_ID, SECRET),
+      displayName: "ゲスト",
+      consent: true,
+      participantId: GUEST_ID,
+      rejoinKey: await tokens.createRejoinKey(GUEST_ID, SECRET),
+    });
+    expect(rejoined.participantId).toBe(GUEST_ID);
   });
 
   it("does not accept new guests after the recording stopped", async () => {

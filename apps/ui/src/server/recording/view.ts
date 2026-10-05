@@ -33,6 +33,7 @@ export async function buildSessionView(
     error: session.error,
     expiresAt: session.expiresAt.toISOString(),
     createdAt: session.createdAt.toISOString(),
+    entryLocked: session.entryLocked,
     invitePath,
     participants: participants.map((participant) => ({
       participantId: participant.participantId,

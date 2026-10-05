@@ -2,7 +2,17 @@ import { BehaviorSubject, of, type Subscription } from "rxjs";
 import type { PartyTracks as PartyTracksType, TrackMetadata } from "partytracks/client";
 import { openChunkStore, chunkId, type ChunkStore } from "@/lib/recording/chunk-store";
 import { LevelMonitor } from "@/lib/recording/levels";
-import type { MicState, RecorderState, RoomState } from "@/lib/recording/protocol";
+import { VoiceWarnings, type VoiceWarning } from "@/lib/recording/voice-warnings";
+import {
+  CHAT_MAX_LENGTH,
+  type ChatMessage,
+  type MicState,
+  type RecorderState,
+  type RoomState,
+} from "@/lib/recording/protocol";
+
+// 画面に残すチャットの件数
+const CHAT_KEEP = 200;
 import { createTrackRecorder, type RecordedChunk, type TrackRecorder } from "@/lib/recording/recorder";
 import { RoomConnection, type ConnectionStatus, type EndReason } from "@/lib/recording/room-connection";
 import type { JoinResponse } from "@/lib/recording/types";
@@ -30,6 +40,11 @@ export type ControllerSnapshot = {
   persistentStorage: boolean;
   wakeLock: boolean;
   levels: Record<string, number>;
+  // 自分の声の警告（音が割れている・ミュートのまま話している）
+  voiceWarning: VoiceWarning | null;
+  // 収録中のテキストチャット（ルームを閉じたら消える）
+  chat: ChatMessage[];
+  chatError: string | null;
   error: string | null;
 };
 
@@ -37,18 +52,24 @@ export type ControllerOptions = {
   join: JoinResponse;
   micTrack: MediaStreamTrack;
   micDeviceId: string | null;
+  // ヘッドホン（イヤホン）を使うか。使うならエコー除去を切る
+  headphones: boolean;
   // 期限切れ前のトークン更新（ホストは join API、ゲストは再入室キーで取り直す）
   refreshJoin: () => Promise<JoinResponse>;
   audioContainer: HTMLElement;
 };
 
-export const MIC_CONSTRAINTS: MediaTrackConstraints = {
-  channelCount: 1,
-  sampleRate: 48_000,
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: false,
-};
+// マイクの設定。ヘッドホンなら相手の声がマイクに回り込まないので、声を削るエコー除去を切る
+// （スピーカーで聞くときだけ必要。Riverside・Zencastr も同じ勧め方）
+export function micConstraints(headphones: boolean): MediaTrackConstraints {
+  return {
+    channelCount: 1,
+    sampleRate: 48_000,
+    echoCancellation: !headphones,
+    noiseSuppression: true,
+    autoGainControl: false,
+  };
+}
 
 type Pulled = {
   key: string;
@@ -76,6 +97,9 @@ export class RecordingController {
   private localRecorderStarting = false;
   private backupRecorders = new Map<string, { trackId: string; recorder: TrackRecorder }>();
   private levels = new LevelMonitor();
+  private voice = new VoiceWarnings();
+  // 自分のメーター用のマイクの写し。ミュート（enabled=false）中も声を測れるようにする
+  private meterTrack: MediaStreamTrack | null = null;
   private timers: ReturnType<typeof setInterval>[] = [];
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private wakeLock: WakeLockSentinel | null = null;
@@ -105,6 +129,9 @@ export class RecordingController {
       persistentStorage: false,
       wakeLock: false,
       levels: {},
+      voiceWarning: null,
+      chat: [],
+      chatError: null,
       error: null,
     };
     this.connection = new RoomConnection(options.join.realtimeBaseUrl, options.join.sessionId, options.join.token, {
@@ -115,6 +142,16 @@ export class RecordingController {
         }
       },
       onState: (room) => this.handleRoomState(room),
+      onChat: (messages, history) => {
+        if (history) {
+          this.update({ chat: messages });
+          return;
+        }
+        const known = new Set(this.snapshot.chat.map((message) => message.id));
+        const fresh = messages.filter((message) => !known.has(message.id));
+        if (fresh.length > 0) this.update({ chat: [...this.snapshot.chat, ...fresh].slice(-CHAT_KEEP), chatError: null });
+      },
+      onChatError: (message) => this.update({ chatError: message }),
       onEnded: (ended) => this.handleEnded(ended),
     });
   }
@@ -159,7 +196,7 @@ export class RecordingController {
 
     this.connection.connect();
     this.watchMic(this.micTrack);
-    this.levels.set(this.join.participantId, this.micTrack);
+    this.meterSelf(this.micTrack);
     await this.startCall();
     this.installPageHandlers();
     await this.acquireWakeLock();
@@ -167,8 +204,15 @@ export class RecordingController {
 
     this.timers.push(
       setInterval(() => {
+        const samples = this.levels.readDetailed();
+        const levels: Record<string, number> = {};
+        for (const [key, sample] of Object.entries(samples)) levels[key] = sample.level;
+        const self = samples[this.join.participantId];
+        // ミュート中の自分のメーターは 0 にする（測るのは警告のため）
+        if (self && this.snapshot.muted) levels[this.join.participantId] = 0;
         this.update({
-          levels: this.levels.read(),
+          levels,
+          voiceWarning: self ? this.voice.update({ ...self, muted: this.snapshot.muted }, Date.now()) : null,
           clock: { offsetMs: this.connection.clock.offsetMs, rttMs: this.connection.clock.bestRttMs },
         });
       }, 120),
@@ -186,6 +230,7 @@ export class RecordingController {
     for (const pulled of this.pulled.values()) this.removePull(pulled);
     this.pulled.clear();
     this.levels.close();
+    this.meterTrack?.stop();
     for (const timer of this.timers) clearInterval(timer);
     if (this.refreshTimer) clearTimeout(this.refreshTimer);
     for (const cleanup of this.cleanupFns) cleanup();
@@ -199,6 +244,15 @@ export class RecordingController {
     this.micTrack.enabled = !muted;
     this.update({ muted, mic: muted ? "muted" : this.micTrack.muted ? "interrupted" : "live" });
     this.reportStatus();
+  }
+
+  // チャットを送る（つながっていないときは送れない）
+  sendChat(text: string): boolean {
+    const trimmed = text.trim();
+    if (!trimmed || this.snapshot.connection !== "open") return false;
+    this.update({ chatError: null });
+    this.connection.send({ type: "chat", text: trimmed.slice(0, CHAT_MAX_LENGTH) });
+    return true;
   }
 
   // マイクがほかのタブやアプリに取られて止まったとき、ユーザー操作で取り直す
@@ -464,6 +518,13 @@ export class RecordingController {
     });
   }
 
+  private meterSelf(track: MediaStreamTrack) {
+    this.meterTrack?.stop();
+    this.meterTrack = track.clone();
+    this.meterTrack.enabled = true;
+    this.levels.set(this.join.participantId, this.meterTrack);
+  }
+
   private reacquiring = false;
 
   private async reacquireMic() {
@@ -472,7 +533,7 @@ export class RecordingController {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          ...MIC_CONSTRAINTS,
+          ...micConstraints(this.options.headphones),
           ...(this.options.micDeviceId ? { deviceId: { ideal: this.options.micDeviceId } } : {}),
         },
       });
@@ -484,7 +545,7 @@ export class RecordingController {
       this.micTrack = track;
       this.mic$.next(track);
       this.watchMic(track);
-      this.levels.set(this.join.participantId, track);
+      this.meterSelf(track);
       this.update({ mic: this.snapshot.muted ? "muted" : "live" });
       if (this.snapshot.room?.status === "recording") await this.ensureLocalRecorder();
       this.reportStatus();

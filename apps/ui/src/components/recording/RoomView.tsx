@@ -7,6 +7,8 @@ import {
   CircleDot,
   Copy,
   Loader2,
+  Lock,
+  LockOpen,
   LogOut,
   Mic,
   MicOff,
@@ -19,6 +21,7 @@ import type { ControllerSnapshot, RecordingController } from "@/lib/recording/co
 import type { ParticipantView } from "@/lib/recording/protocol";
 import type { RecordingSessionView } from "@/lib/recording/types";
 import { LevelBar } from "@/components/recording/LevelBar";
+import { RoomChat } from "@/components/recording/RoomChat";
 
 const ENDED_MESSAGES = {
   kicked: "ホストによってルームから退出しました。",
@@ -84,6 +87,7 @@ export function RoomView({
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
   const [micRetrying, setMicRetrying] = useState(false);
+  const [entryLocked, setEntryLocked] = useState(initialView?.entryLocked ?? false);
   // 開始・停止・退出・エピソード化の二度押しを止める（state の反映を待たずに効く）
   const runningRef = useRef(false);
   // 開始・停止で押したボタンが消えると焦点が body に落ちるので、その状態になったら次の操作へ移す
@@ -181,6 +185,25 @@ export function RoomView({
         </div>
       )}
 
+      {/* 自分の声の警告（録った音は後から直せないので、その場で知らせる） */}
+      {snapshot.voiceWarning === "muted-speech" && (
+        <div role="alert" className="flex flex-col gap-2 rounded-xs border border-yellow-300 bg-yellow-50 p-3 text-sm sm:flex-row sm:items-center">
+          <p className="flex-1 text-yellow-800">ミュート中です。話している声は録音されていません。</p>
+          <button
+            type="button"
+            onClick={() => controller.setMuted(false)}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-2 border border-yellow-400 text-yellow-800 rounded-xs bg-white hover:bg-yellow-100"
+          >
+            <Mic className="w-4 h-4" /> ミュートを解除
+          </button>
+        </div>
+      )}
+      {snapshot.voiceWarning === "clipping" && (
+        <p role="alert" className="rounded-xs border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+          音が割れています。マイクから少し離れるか、マイクの入力音量を下げてください（割れた音は後から直せません）。
+        </p>
+      )}
+
       {/* 自分のマイクが止まった（ほかのタブやアプリに取られた・機器が外れた） */}
       {!snapshot.muted && (snapshot.mic === "interrupted" || snapshot.mic === "ended") && (
         <div role="alert" className="flex flex-col gap-2 rounded-xs border border-red-200 bg-red-50 p-3 text-sm sm:flex-row sm:items-center">
@@ -214,6 +237,28 @@ export function RoomView({
       {/* 招待 URL（ホスト） */}
       {isHost && inviteUrl && status !== "stopped" && (
         <div className="border border-brand/20 rounded-xs bg-white/60 p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-gray-700">
+              {entryLocked
+                ? "入室を締め切っています。新しいゲストは入れません（入室済みの人は入り直せます）。"
+                : "招待 URL を知っている人は誰でも入室できます。"}
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              aria-pressed={entryLocked}
+              onClick={() =>
+                void run(async () => {
+                  const result = (await hostAction(sessionId, "entry", { locked: !entryLocked })) as { entryLocked?: boolean };
+                  setEntryLocked(result.entryLocked ?? !entryLocked);
+                })
+              }
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xs border whitespace-nowrap disabled:opacity-40 ${entryLocked ? "border-gray-300 text-gray-700 bg-white hover:bg-gray-50" : "border-brand text-brand bg-white hover:bg-brand-light"}`}
+            >
+              {entryLocked ? <LockOpen className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              {entryLocked ? "受付を再開" : "入室を締め切る"}
+            </button>
+          </div>
           <label htmlFor="invite-url" className="block text-sm font-medium text-gray-700">
             招待 URL（ゲストに送ってください）
           </label>
@@ -315,6 +360,14 @@ export function RoomView({
       {isHost && status === "idle" && others.length === 0 && (
         <p className="text-xs text-gray-500">ゲストが入室すると「収録を開始」が押せます。</p>
       )}
+
+      <RoomChat
+        controller={controller}
+        messages={snapshot.chat}
+        selfPid={self.pid}
+        error={snapshot.chatError}
+        connected={snapshot.connection === "open"}
+      />
 
       {/* 収録後 */}
       {status === "stopped" && (

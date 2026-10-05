@@ -1,6 +1,7 @@
 import { ClockSync, localNow } from "@/lib/recording/clock";
 import {
   CLOSE_CODES,
+  type ChatMessage,
   type ClientMessage,
   type RoomState,
   type ServerMessage,
@@ -17,6 +18,9 @@ type Listener = {
   onStatus?: (status: ConnectionStatus) => void;
   onEnded?: (reason: EndReason) => void;
   onWelcome?: (self: { pid: string; name: string; role: "host" | "guest" }) => void;
+  // 入室時は直近の履歴（history）、そのあとは 1 件ずつ
+  onChat?: (messages: ChatMessage[], history: boolean) => void;
+  onChatError?: (message: string) => void;
 };
 
 const RECONNECT_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 15_000];
@@ -96,10 +100,17 @@ export class RoomConnection {
         this.setStatus("open");
         this.listener.onWelcome?.(message.self);
         this.listener.onState?.(message.state);
+        this.listener.onChat?.(message.chat ?? [], true);
         this.startPinging();
         return;
       case "state":
         this.listener.onState?.(message.state);
+        return;
+      case "chat":
+        this.listener.onChat?.([message.message], false);
+        return;
+      case "error":
+        if (message.code.startsWith("chat_")) this.listener.onChatError?.(message.message);
         return;
       case "pong":
         this.clock.addSample({ t0: message.t0, t1: localNow(), serverTime: message.serverTime });

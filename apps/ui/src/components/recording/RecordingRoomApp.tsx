@@ -21,7 +21,7 @@ type Props =
       // 入室できる（期限内で、終わっていない）か。期限を過ぎた収録は入室せずにエピソード化できる
       canEnterRoom: boolean;
       inviteKey?: undefined;
-      acceptsNewGuests?: undefined;
+      newGuestsClosed?: undefined;
     }
   | {
       mode: "guest";
@@ -30,8 +30,9 @@ type Props =
       initialName: string;
       realtimeBaseUrl: string;
       inviteKey: string;
-      // 新しいゲストを受け付けるか。収録の停止後は、前に入室した端末だけが（未送信の録音を送るために）入り直せる
-      acceptsNewGuests: boolean;
+      // 新しいゲストを受け付けない理由（null なら受け付ける）。収録の停止後や締め切り中も、
+      // 前に入室した端末だけは（未送信の録音を送るために）入り直せる
+      newGuestsClosed: "ended" | "locked" | null;
       initialView?: undefined;
       canEnterRoom?: undefined;
     };
@@ -78,7 +79,7 @@ export function RecordingRoomApp(props: Props) {
         ? "prejoin"
         : "post"
       : // 前に入室した端末かどうかは localStorage を読むまで分からない（読む前にマイクを求めない）
-        props.acceptsNewGuests
+        props.newGuestsClosed === null
         ? "prejoin"
         : "checking",
   );
@@ -126,6 +127,7 @@ export function RecordingRoomApp(props: Props) {
         join,
         micTrack: result.track,
         micDeviceId: result.deviceId,
+        headphones: result.headphones,
         refreshJoin: () => requestJoin(result.displayName),
         audioContainer: audioContainer.current!,
       });
@@ -168,8 +170,17 @@ export function RecordingRoomApp(props: Props) {
 
       {stage === "closed" && (
         <div className="border border-brand/20 rounded-xs bg-white/60 p-6 text-center space-y-2">
-          <p className="text-gray-800">収録はすでに終了しています。</p>
-          <p className="text-sm text-gray-500">新しい招待 URL をホストから受け取ってください。</p>
+          {props.newGuestsClosed === "locked" ? (
+            <>
+              <p className="text-gray-800">このルームは入室を締め切っています。</p>
+              <p className="text-sm text-gray-500">参加する予定の方は、ホストに締め切りを解いてもらってください。</p>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-800">収録はすでに終了しています。</p>
+              <p className="text-sm text-gray-500">新しい招待 URL をホストから受け取ってください。</p>
+            </>
+          )}
         </div>
       )}
 

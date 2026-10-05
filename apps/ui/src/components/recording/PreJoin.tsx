@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Headphones, Mic, RotateCw, Wifi } from "lucide-react";
 import { LevelMonitor } from "@/lib/recording/levels";
-import { MIC_CONSTRAINTS } from "@/lib/recording/controller";
+import { micConstraints } from "@/lib/recording/controller";
 import { LevelBar } from "@/components/recording/LevelBar";
 import { detectMicEnvironment, micHelpFor, type MicHelp } from "@/lib/recording/mic-help";
 
@@ -11,7 +11,18 @@ export type PreJoinResult = {
   displayName: string;
   track: MediaStreamTrack;
   deviceId: string | null;
+  headphones: boolean;
 };
+
+const HEADPHONES_KEY = "sparkcast-recording:headphones";
+
+function loadHeadphones(): boolean {
+  try {
+    return localStorage.getItem(HEADPHONES_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 type NetworkCheck = { state: "checking" } | { state: "ok"; rttMs: number } | { state: "slow"; rttMs: number } | { state: "error" };
 
@@ -37,6 +48,8 @@ export function PreJoin({
   const [micError, setMicError] = useState<MicHelp | null>(null);
   // 「もう一度試す」で増やし、マイクを取り直す
   const [micAttempt, setMicAttempt] = useState(0);
+  // 前回の選択を引き継ぐ（描画後にしか読めないので、初めは使わない扱い）
+  const [headphones, setHeadphones] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
@@ -58,7 +71,7 @@ export function PreJoin({
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { ...MIC_CONSTRAINTS, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) },
+          audio: { ...micConstraints(headphones), ...(deviceId ? { deviceId: { exact: deviceId } } : {}) },
         });
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
@@ -84,7 +97,21 @@ export function PreJoin({
     return () => {
       cancelled = true;
     };
-  }, [deviceId, micAttempt]);
+  }, [deviceId, micAttempt, headphones]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (loadHeadphones()) setHeadphones(true);
+  }, []);
+
+  function changeHeadphones(value: boolean) {
+    setHeadphones(value);
+    try {
+      localStorage.setItem(HEADPHONES_KEY, value ? "1" : "0");
+    } catch {
+      // 保存できなくても、この入室では選んだとおりに使う
+    }
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setLevel(monitorRef.current?.read().self ?? 0), 100);
@@ -126,7 +153,7 @@ export function PreJoin({
     const track = trackRef.current;
     if (!track) return;
     handedOff.current = true;
-    onJoin({ displayName: displayName.trim(), track, deviceId });
+    onJoin({ displayName: displayName.trim(), track, deviceId, headphones });
   }
 
   return (
@@ -194,10 +221,28 @@ export function PreJoin({
 
       <div className="flex gap-2 rounded-xs border border-brand/20 bg-brand-light/60 p-3 text-sm text-gray-700">
         <Headphones className="w-5 h-5 text-brand shrink-0" />
-        <p>
-          ヘッドホン（イヤホン）の使用をおすすめします。スピーカーだと相手の声がマイクに入り、音質が落ちます。
-          収録中は画面を閉じたり、他のアプリに切り替えたりしないでください。
-        </p>
+        <div className="space-y-2">
+          <p>
+            ヘッドホン（イヤホン）の使用をおすすめします。スピーカーだと相手の声がマイクに入り、音質が落ちます。
+            収録中は画面を閉じたり、他のアプリに切り替えたりしないでください。
+          </p>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={headphones}
+              onChange={(event) => changeHeadphones(event.target.checked)}
+              className="mt-1 accent-brand"
+            />
+            <span>
+              ヘッドホン（イヤホン）を使う
+              <span className="block text-xs text-gray-500">
+                {headphones
+                  ? "エコー除去を切って、声をそのまま録ります。"
+                  : "スピーカーで聞く前提で、相手の声がマイクに入らないようエコー除去をかけます（声が少しこもります）。"}
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 text-sm">

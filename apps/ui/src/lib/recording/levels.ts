@@ -50,15 +50,26 @@ export class LevelMonitor {
   // 0〜1 の目安（-60dBFS〜0dBFS を線形に割り当て）
   read(): Record<string, number> {
     const levels: Record<string, number> = {};
+    for (const [key, sample] of Object.entries(this.readDetailed())) levels[key] = sample.level;
+    return levels;
+  }
+
+  // level に加えて、ピーク（0〜1 の振幅。1 に近いほど音が割れている）も返す
+  readDetailed(): Record<string, { level: number; peak: number }> {
+    const samples: Record<string, { level: number; peak: number }> = {};
     for (const [key, { analyser }] of this.nodes) {
       analyser.getFloatTimeDomainData(this.buffer);
       let sum = 0;
-      for (const value of this.buffer) sum += value * value;
+      let peak = 0;
+      for (const value of this.buffer) {
+        sum += value * value;
+        peak = Math.max(peak, Math.abs(value));
+      }
       const rms = Math.sqrt(sum / this.buffer.length);
       const db = 20 * Math.log10(rms || 1e-8);
-      levels[key] = Math.max(0, Math.min(1, (db + 60) / 60));
+      samples[key] = { level: Math.max(0, Math.min(1, (db + 60) / 60)), peak };
     }
-    return levels;
+    return samples;
   }
 
   close() {

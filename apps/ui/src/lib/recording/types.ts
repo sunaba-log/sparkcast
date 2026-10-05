@@ -36,6 +36,8 @@ export type RecordingSessionView = {
   error: string | null;
   expiresAt: string;
   createdAt: string;
+  // 入室の締め切り（新しいゲストを入れない）
+  entryLocked: boolean;
   invitePath: string;
   participants: {
     participantId: string;

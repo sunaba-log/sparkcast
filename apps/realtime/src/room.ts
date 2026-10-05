@@ -1,7 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import {
+  CHAT_MAX_LENGTH,
   CLOSE_CODES,
+  type ChatMessage,
   type ClientMessage,
   type MicState,
   type ParticipantView,
@@ -41,6 +43,11 @@ export type Manifest = {
 };
 
 type Attachment = { pid: string; role: "host" | "guest"; name: string; exp: number } | null;
+
+// チャット：入り直した人に見せる件数と、1 人あたりの送信の上限（10 秒に 5 件）
+const CHAT_HISTORY = 100;
+const CHAT_RATE_WINDOW_MS = 10_000;
+const CHAT_RATE_LIMIT = 5;
 
 // 1 人の端末から受け付ける録音の総量（3 時間×WAV フォールバックでも収まる上限）
 export const MAX_BYTES_PER_UPLOADER = 2 * 1024 * 1024 * 1024;
@@ -87,6 +94,13 @@ export class Room extends DurableObject<Env> {
         flushed INTEGER NOT NULL DEFAULT 0,
         kicked INTEGER NOT NULL DEFAULT 0,
         last_seen_ms INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS chat (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pid TEXT NOT NULL,
+        name TEXT NOT NULL,
+        text TEXT NOT NULL,
+        at INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS sfu_sessions (
         sfu_session_id TEXT PRIMARY KEY,
@@ -263,6 +277,10 @@ export class Room extends DurableObject<Env> {
         this.sql.exec("UPDATE participants SET name = ? WHERE pid = ?", claims.name, attachment.pid);
         return;
       }
+      case "chat": {
+        this.postChat(ws, attachment, message.text);
+        return;
+      }
       case "track": {
         if (!this.ownsSfuSession(attachment.pid, String(message.sessionId))) return;
         this.sql.exec(
@@ -369,8 +387,58 @@ export class Room extends DurableObject<Env> {
       self: { pid: claims.pid, name: claims.name, role: claims.role },
       serverTime: Date.now(),
       state: this.roomState(),
+      chat: this.recentChat(),
     });
     this.broadcast();
+  }
+
+  // ---- チャット ----
+
+  private recentChat(): ChatMessage[] {
+    return this.sql
+      .exec<ChatMessage>(`SELECT id, pid, name, text, at FROM chat ORDER BY id DESC LIMIT ${CHAT_HISTORY}`)
+      .toArray()
+      .reverse();
+  }
+
+  private postChat(ws: WebSocket, attachment: NonNullable<Attachment>, raw: unknown) {
+    const text = String(raw ?? "").trim();
+    if (!text) return;
+    if (text.length > CHAT_MAX_LENGTH) {
+      this.send(ws, { type: "error", code: "chat_too_long", message: `チャットは ${CHAT_MAX_LENGTH} 文字までです` });
+      return;
+    }
+    const now = Date.now();
+    const recent = this.sql
+      .exec<{ count: number }>("SELECT COUNT(*) AS count FROM chat WHERE pid = ? AND at > ?", attachment.pid, now - CHAT_RATE_WINDOW_MS)
+      .one().count;
+    if (recent >= CHAT_RATE_LIMIT) {
+      this.send(ws, { type: "error", code: "chat_rate_limited", message: "送信が続いています。少し待ってから送ってください" });
+      return;
+    }
+    const row = this.sql
+      .exec<{ id: number }>(
+        "INSERT INTO chat (pid, name, text, at) VALUES (?, ?, ?, ?) RETURNING id",
+        attachment.pid,
+        attachment.name,
+        text,
+        now,
+      )
+      .one();
+    // 古いものは消す（入り直した人に見せる分だけ残す）
+    this.sql.exec("DELETE FROM chat WHERE id <= ?", row.id - CHAT_HISTORY);
+    const payload = JSON.stringify({
+      type: "chat",
+      message: { id: row.id, pid: attachment.pid, name: attachment.name, text, at: now },
+    } satisfies ServerMessage);
+    for (const socket of this.ctx.getWebSockets()) {
+      if (!socket.deserializeAttachment()) continue;
+      try {
+        socket.send(payload);
+      } catch {
+        // 無視
+      }
+    }
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -523,6 +591,8 @@ export class Room extends DurableObject<Env> {
       }
     }
     this.sql.exec("UPDATE participants SET connected = 0");
+    // チャットは収録のあとまで残さない（通信の内容を必要以上に保存しない）
+    this.sql.exec("DELETE FROM chat");
     await this.ctx.storage.deleteAlarm();
   }
 

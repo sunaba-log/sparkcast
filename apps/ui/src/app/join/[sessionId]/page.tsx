@@ -47,7 +47,7 @@ export default async function JoinPage({
       mode="guest"
       sessionId={sessionId}
       inviteKey={k}
-      acceptsNewGuests={session.status !== "uploading"}
+      newGuestsClosed={session.status === "uploading" ? "ended" : session.entryLocked ? "locked" : null}
       title={session.title}
       initialName=""
       realtimeBaseUrl={getRealtimeBaseUrl()}

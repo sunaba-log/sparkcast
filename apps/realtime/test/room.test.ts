@@ -165,6 +165,31 @@ describe("room", () => {
     expect(late.status).toBe(410);
   });
 
+  it("relays chat to everyone and shows recent chat to people who join later", async () => {
+    const host = await join(HOST, "host");
+    const guest = await join(GUEST, "guest");
+    await guest.next((m) => m.type === "welcome");
+    guest.send({ type: "chat", text: "  音が途切れました  " });
+    const received = await host.next((m) => m.type === "chat");
+    expect(received.message).toMatchObject({ pid: GUEST, name: "ゲスト", text: "音が途切れました" });
+    await guest.next((m) => m.type === "chat");
+
+    const late = await join(GUEST2, "guest");
+    const welcome = await late.next((m) => m.type === "welcome");
+    expect(welcome.chat.map((m: Message) => m.text)).toEqual(["音が途切れました"]);
+  });
+
+  it("limits chat length and rate", async () => {
+    const guest = await join(GUEST, "guest");
+    await guest.next((m) => m.type === "welcome");
+    guest.send({ type: "chat", text: "あ".repeat(501) });
+    expect((await guest.next((m) => m.type === "error")).code).toBe("chat_too_long");
+    for (let i = 0; i < 6; i += 1) guest.send({ type: "chat", text: `メッセージ${i}` });
+    expect((await guest.next((m) => m.type === "error" && m.code === "chat_rate_limited")).code).toBe("chat_rate_limited");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(guest.messages.filter((m) => m.type === "chat")).toHaveLength(5);
+  });
+
   it("reports participant status to others", async () => {
     const host = await join(HOST, "host");
     const guest = await join(GUEST, "guest");

@@ -23,6 +23,8 @@ export type RecordingSession = {
   error: string | null;
   expiresAt: Date;
   createdAt: Date;
+  // 入室の締め切り（新しいゲストを入れない）
+  entryLocked: boolean;
 };
 
 export type RecordingParticipant = {
@@ -57,6 +59,7 @@ type SessionRow = {
   error: string | null;
   expires_at: Date;
   created_at: Date;
+  entry_locked: boolean;
 };
 
 type ParticipantRow = {
@@ -69,7 +72,7 @@ type ParticipantRow = {
 };
 
 const SESSION_COLUMNS = `session_id, podcast_id, host_user_id, title, status, max_participants,
-  recording_started_at_ms, recording_stopped_at_ms, episode_id, error, expires_at, created_at`;
+  recording_started_at_ms, recording_stopped_at_ms, episode_id, error, expires_at, created_at, entry_locked`;
 
 const PARTICIPANT_COLUMNS = `participant_id, session_id, display_name, role, user_id, removed_at`;
 
@@ -92,6 +95,7 @@ function toSession(row: SessionRow): RecordingSession {
     error: row.error,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
+    entryLocked: row.entry_locked,
   };
 }
 
@@ -397,6 +401,22 @@ export async function expireStaleRecordingSessions(
     [mixingTimeoutMinutes],
   );
   return { ...settled, failed: failed.rowCount ?? 0 };
+}
+
+// 入室の締め切りを切り替える（終わったルームは対象外）
+export async function setEntryLocked(
+  db: Queryable,
+  sessionId: string,
+  locked: boolean,
+): Promise<RecordingSession | null> {
+  const result = await db.query<SessionRow>(
+    `UPDATE recording_sessions
+     SET entry_locked = $2, updated_at = now()
+     WHERE session_id = $1 AND status IN ('waiting', 'recording', 'uploading')
+     RETURNING ${SESSION_COLUMNS}`,
+    [sessionId, locked],
+  );
+  return result.rows[0] ? toSession(result.rows[0]) : null;
 }
 
 // 収録一覧の札に使う、エピソードの処理状態

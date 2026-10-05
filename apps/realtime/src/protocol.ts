@@ -32,11 +32,17 @@ export type RoomState = {
   participants: ParticipantView[];
 };
 
+// 収録中のテキストチャット（ルームを閉じたら消す）
+export type ChatMessage = { id: number; pid: string; name: string; text: string; at: number };
+
+export const CHAT_MAX_LENGTH = 500;
+
 export type ClientMessage =
   | { type: "auth"; token: string }
   | { type: "refresh"; token: string }
   | { type: "ping"; t0: number }
   | { type: "track"; sessionId: string; trackName: string }
+  | { type: "chat"; text: string }
   | {
       type: "status";
       mic: MicState;
@@ -51,9 +57,12 @@ export type ServerMessage =
       self: { pid: string; name: string; role: "host" | "guest" };
       serverTime: number;
       state: RoomState;
+      // 入り直した人のための直近のチャット
+      chat: ChatMessage[];
     }
   | { type: "state"; state: RoomState; serverTime: number }
   | { type: "pong"; t0: number; serverTime: number }
+  | { type: "chat"; message: ChatMessage }
   | { type: "kicked" }
   | { type: "closed" }
   | { type: "error"; code: string; message: string };
