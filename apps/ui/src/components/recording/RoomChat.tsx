@@ -47,10 +47,14 @@ export function RoomChat({
         {messages.length === 0 && <li className="text-xs text-gray-400">まだメッセージはありません。</li>}
         {messages.map((message) => (
           <li key={message.id} className="break-words">
-            <span className={`font-semibold mr-1.5 ${message.pid === selfPid ? "text-brand" : "text-gray-800"}`}>
+            {/* 名前と時刻は折り返さない（長い名前は省略し、時刻が 2 行に割れないように） */}
+            <span
+              className={`inline-block max-w-[60%] align-bottom truncate font-semibold mr-1.5 ${message.pid === selfPid ? "text-brand" : "text-gray-800"}`}
+              title={message.name}
+            >
               {message.name}
             </span>
-            <span className="mr-1.5 text-[11px] text-gray-400 tabular-nums">{TIME.format(message.at)}</span>
+            <span className="mr-1.5 whitespace-nowrap text-[11px] text-gray-400 tabular-nums">{TIME.format(message.at)}</span>
             <span className="text-gray-800 whitespace-pre-wrap">{message.text}</span>
           </li>
         ))}
