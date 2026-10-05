@@ -4,11 +4,27 @@ export class LevelMonitor {
   private context: AudioContext | null = null;
   private nodes = new Map<string, { source: MediaStreamAudioSourceNode; analyser: AnalyserNode; trackId: string }>();
   private buffer = new Float32Array(1024);
+  private removeGestureListeners: (() => void) | null = null;
 
   private ensureContext(): AudioContext {
-    if (!this.context) this.context = new AudioContext();
+    if (!this.context) {
+      this.context = new AudioContext();
+      this.listenForGesture();
+    }
     if (this.context.state === "suspended") void this.context.resume().catch(() => undefined);
     return this.context;
+  }
+
+  // Safari などは、クリックの処理の中で作られなかった AudioContext を止めたままにする（メーターが動かない）。
+  // 画面への操作があるたびに再開を試みる
+  private listenForGesture() {
+    if (typeof document === "undefined" || this.removeGestureListeners) return;
+    const resume = () => this.resume();
+    const events = ["pointerdown", "keydown", "touchend"] as const;
+    for (const event of events) document.addEventListener(event, resume, { capture: true, passive: true });
+    this.removeGestureListeners = () => {
+      for (const event of events) document.removeEventListener(event, resume, { capture: true });
+    };
   }
 
   resume() {
@@ -46,6 +62,8 @@ export class LevelMonitor {
   }
 
   close() {
+    this.removeGestureListeners?.();
+    this.removeGestureListeners = null;
     for (const { source } of this.nodes.values()) source.disconnect();
     this.nodes.clear();
     void this.context?.close().catch(() => undefined);

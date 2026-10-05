@@ -201,6 +201,12 @@ export class RecordingController {
     this.reportStatus();
   }
 
+  // マイクがほかのタブやアプリに取られて止まったとき、ユーザー操作で取り直す
+  async retryMic() {
+    this.levels.resume();
+    await this.reacquireMic();
+  }
+
   // 自動再生が止められたとき、ユーザー操作で再生し直す
   async unlockAudio() {
     this.levels.resume();

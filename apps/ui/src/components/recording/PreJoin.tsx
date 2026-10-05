@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Headphones, Mic, Wifi } from "lucide-react";
+import { Headphones, Mic, RotateCw, Wifi } from "lucide-react";
 import { LevelMonitor } from "@/lib/recording/levels";
 import { MIC_CONSTRAINTS } from "@/lib/recording/controller";
 import { LevelBar } from "@/components/recording/LevelBar";
+import { detectMicEnvironment, micHelpFor, type MicHelp } from "@/lib/recording/mic-help";
 
 export type PreJoinResult = {
   displayName: string;
@@ -33,7 +34,10 @@ export function PreJoin({
   const [consent, setConsent] = useState(mode === "host");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [micError, setMicError] = useState<string | null>(null);
+  const [micError, setMicError] = useState<MicHelp | null>(null);
+  // 「もう一度試す」で増やし、マイクを取り直す
+  const [micAttempt, setMicAttempt] = useState(0);
+  const [retrying, setRetrying] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
   const [network, setNetwork] = useState<NetworkCheck>({ state: "checking" });
@@ -47,7 +51,10 @@ export function PreJoin({
     (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
-          setMicError("このブラウザはマイクに対応していません。Chrome・Edge・Firefox・Safari の最新版でお試しください。");
+          setMicError({
+            message: "このブラウザはマイクに対応していません。",
+            steps: ["Chrome・Edge・Firefox・Safari の最新版で開き直す"],
+          });
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -68,18 +75,16 @@ export function PreJoin({
         if (!cancelled) setDevices(list);
       } catch (cause) {
         if (cancelled) return;
-        const name = cause instanceof DOMException ? cause.name : "";
-        setMicError(
-          name === "NotAllowedError"
-            ? "マイクの使用が許可されていません。ブラウザのアドレスバーからマイクを許可してください。"
-            : "マイクを使えませんでした。接続を確認してください。",
-        );
+        const environment = detectMicEnvironment(navigator.userAgent, navigator.maxTouchPoints);
+        setMicError(micHelpFor(cause, environment, { mac: /Macintosh/.test(navigator.userAgent) }));
+      } finally {
+        if (!cancelled) setRetrying(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [deviceId]);
+  }, [deviceId, micAttempt]);
 
   useEffect(() => {
     const timer = setInterval(() => setLevel(monitorRef.current?.read().self ?? 0), 100);
@@ -146,7 +151,26 @@ export function PreJoin({
           <Mic className="w-4 h-4 text-brand" /> マイク
         </label>
         {micError ? (
-          <p className="text-sm text-red-600">{micError}</p>
+          <div role="alert" className="rounded-xs border border-red-200 bg-red-50 p-3 space-y-2">
+            <p className="text-sm font-medium text-red-700">{micError.message}</p>
+            <ol className="list-decimal pl-5 space-y-1 text-sm text-gray-700">
+              {micError.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <button
+              type="button"
+              disabled={retrying}
+              onClick={() => {
+                setRetrying(true);
+                setMicAttempt((value) => value + 1);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-brand text-brand rounded-xs bg-white hover:bg-brand-light disabled:opacity-40"
+            >
+              <RotateCw className={`w-4 h-4 ${retrying ? "animate-spin" : ""}`} />
+              もう一度試す
+            </button>
+          </div>
         ) : (
           <>
             <select

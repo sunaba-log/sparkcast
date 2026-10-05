@@ -83,6 +83,7 @@ export function RoomView({
   const [actionError, setActionError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [copied, setCopied] = useState(false);
+  const [micRetrying, setMicRetrying] = useState(false);
   // 開始・停止・退出・エピソード化の二度押しを止める（state の反映を待たずに効く）
   const runningRef = useRef(false);
   // 開始・停止で押したボタンが消えると焦点が body に落ちるので、その状態になったら次の操作へ移す
@@ -177,6 +178,26 @@ export function RoomView({
         <div className="flex gap-2 rounded-xs border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <p>収録中は画面を閉じたり、他のアプリに切り替えたりしないでください。録音が途切れることがあります。</p>
+        </div>
+      )}
+
+      {/* 自分のマイクが止まった（ほかのタブやアプリに取られた・機器が外れた） */}
+      {!snapshot.muted && (snapshot.mic === "interrupted" || snapshot.mic === "ended") && (
+        <div role="alert" className="flex flex-col gap-2 rounded-xs border border-red-200 bg-red-50 p-3 text-sm sm:flex-row sm:items-center">
+          <p className="flex-1 text-red-700">
+            あなたのマイクの音が止まっています。同じブラウザのほかのタブや、ほかのアプリ（Zoom など）がマイクを使っていると起こります。それらを閉じてから取り直してください。
+          </p>
+          <button
+            type="button"
+            disabled={micRetrying}
+            onClick={() => {
+              setMicRetrying(true);
+              void controller.retryMic().finally(() => setMicRetrying(false));
+            }}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 px-3 py-2 border border-brand text-brand rounded-xs bg-white hover:bg-brand-light disabled:opacity-40"
+          >
+            <Mic className="w-4 h-4" /> マイクを取り直す
+          </button>
         </div>
       )}
 
