@@ -25,6 +25,7 @@ from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
 from services.speech_audio import GcsSpeechAudioPreparer
 from services.track_energy import load_track_energy
+from services.voiced_audio import GcsVoicedTrackPreparer
 from usecases import ProcessPodcastWorkflow, ProcessPodcastWorkflowInput
 
 if TYPE_CHECKING:
@@ -266,6 +267,7 @@ def process_podcast_workflow() -> None:
             work_bucket=config.work_bucket,
             energy_loader=load_track_energy,
             audio_preparer=GcsSpeechAudioPreparer(config.work_bucket) if config.work_bucket else None,
+            voiced_preparer=GcsVoicedTrackPreparer(config.work_bucket) if config.work_bucket else None,
             logger=logger,
         ),
         knowledge_reindexer=HttpKnowledgeReindexer(base_url=config.app_base_url, secret=config.cron_secret)

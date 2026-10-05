@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from domain.models.transcript import UNKNOWN_SPEAKER, TranscriptSegment, render_transcript
 from services.transcript_builder import EnergyFn, SpeakerTrack, merge_speaker_tracks
+from services.voiced_audio import VoicedTrack, remap_segments
 
 if TYPE_CHECKING:
     from domain.interfaces import EpisodeRepository, RecordingSpeakers, SpeechTranscriber, TranscriptProvider
@@ -44,6 +45,8 @@ class NoSpeechError(ValueError):
 EnergyLoader = Callable[[dict[str, str]], EnergyFn | None]
 # アップロードされた音声のバイト列 → 認識用に置いた音声の gs:// URI(services.speech_audio)
 SpeechAudioPreparer = Callable[[bytes, str, str], str]
+# 話者 ID → トラックの URI から、声のある区間だけの音声(services.voiced_audio)
+VoicedTrackPreparer = Callable[[dict[str, str]], dict[str, VoicedTrack | None]]
 
 
 @dataclass
@@ -72,6 +75,7 @@ class EpisodeTranscription:
         work_bucket: str | None,
         energy_loader: EnergyLoader | None = None,
         audio_preparer: SpeechAudioPreparer | None = None,
+        voiced_preparer: VoicedTrackPreparer | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Wire dependencies."""
@@ -81,6 +85,7 @@ class EpisodeTranscription:
         self._work_bucket = work_bucket
         self._energy_loader = energy_loader
         self._audio_preparer = audio_preparer
+        self._voiced_preparer = voiced_preparer
         self._logger = logger or logging.getLogger(__name__)
 
     def run(
@@ -161,12 +166,15 @@ class EpisodeTranscription:
             speaker.participant_id: aligned_track_uri(self._work_bucket, recording.session_id, speaker.participant_id)
             for speaker in recording.speakers
         }
-        results = self._speech.transcribe(dict.fromkeys(uris.values(), duration_seconds))
+        per_speaker = self._recognize_voiced(uris)
+        if per_speaker is None:
+            results = self._speech.transcribe(dict.fromkeys(uris.values(), duration_seconds))
+            per_speaker = {speaker_id: results.get(uri, []) for speaker_id, uri in uris.items()}
         tracks = [
             SpeakerTrack(
                 speaker_id=speaker.participant_id,
                 name=speaker.name,
-                segments=results.get(uris[speaker.participant_id], []),
+                segments=per_speaker.get(speaker.participant_id, []),
             )
             for speaker in recording.speakers
         ]
@@ -178,6 +186,23 @@ class EpisodeTranscription:
             len(recording.speakers),
         )
         return segments
+
+    def _recognize_voiced(self, uris: dict[str, str]) -> dict[str, list[TranscriptSegment]] | None:
+        """声のある区間だけを認識する(音声認識は長さで課金されるため)。用意できなければ None(トラック全体を認識する)."""
+        if self._voiced_preparer is None:
+            return None
+        assert self._speech is not None  # noqa: S101
+        try:
+            voiced = self._voiced_preparer(uris)
+        except Exception:
+            self._logger.exception("Failed to cut voiced regions; transcribing whole tracks")
+            return None
+        files = {track.uri: track.duration_seconds for track in voiced.values() if track is not None}
+        results = self._speech.transcribe(files) if files else {}
+        return {
+            speaker_id: remap_segments(results.get(track.uri, []), track.time_map) if track is not None else []
+            for speaker_id, track in voiced.items()
+        }
 
     def _transcribe_mixed(
         self,
