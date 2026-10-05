@@ -77,6 +77,21 @@ def drop_empty_sections(minutes: str) -> str:
     return "\n".join(kept).strip()
 
 
+_LINE_TIME = re.compile(r"^\[((?:\d+:)?\d{1,2}:\d{2})\]", re.MULTILINE)
+
+
+def transcript_minutes(transcript_text: str) -> int:
+    """`[m:ss] 話者: 発言` の文字起こしの長さ(最後の発言の時刻、分。切り上げ)."""
+    times = [parse_timestamp(value) for value in _LINE_TIME.findall(transcript_text)]
+    last = max((value for value in times if value is not None), default=0.0)
+    return max(1, -(-int(last) // 60))
+
+
+def topic_count_hint(minutes: int) -> int:
+    """目次の話題の数の上限。5 分で 1 つを目安に、1〜12 個(短い収録を細かく割りすぎない)."""
+    return max(1, min(12, round(minutes / 5)))
+
+
 def normalize_minutes(minutes: str) -> str:
     """モデルが書いた要点録の形をそろえる.
 

@@ -18,6 +18,8 @@ from domain.models.transcript import (
     normalize_minutes,
     parse_timestamp,
     render_transcript,
+    topic_count_hint,
+    transcript_minutes,
 )
 from infrastructure.episode_repository import split_cast_names
 from infrastructure.speech_transcriber import (
@@ -89,6 +91,13 @@ def test_normalize_minutes_adds_the_missing_summary_heading() -> None:
     minutes = "収録の話をした。\n\n## 【目次】\n0:00 収録\n\n## 決定事項\nなし\n"
     assert normalize_minutes(minutes) == "## 要約\n収録の話をした。\n\n## 【目次】\n0:00 収録"
     assert normalize_minutes("## 要約\nそのまま\n") == "## 要約\nそのまま"
+
+
+def test_topic_count_follows_the_length_of_the_recording() -> None:
+    assert transcript_minutes("[0:04] a: b\n[1:56] a: c") == 2
+    assert transcript_minutes("[1:02:30] a: b") == 63
+    assert transcript_minutes("") == 1
+    assert [topic_count_hint(m) for m in (1, 2, 10, 30, 60, 120)] == [1, 1, 2, 6, 12, 12]
 
 
 def test_split_cast_names() -> None:

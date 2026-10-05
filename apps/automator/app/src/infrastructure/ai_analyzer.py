@@ -9,7 +9,13 @@ from google.genai.types import GenerateContentConfig, Part
 
 from domain.interfaces import TranscriptProvider
 from domain.models import SnsPromotionsResponse, SpeakerAssignments, Summary
-from domain.models.transcript import TranscriptSegment, format_timestamp, normalize_minutes
+from domain.models.transcript import (
+    TranscriptSegment,
+    format_timestamp,
+    normalize_minutes,
+    topic_count_hint,
+    transcript_minutes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +142,12 @@ class AudioAnalyzer(TranscriptProvider):
         """
         model_id = model_id or self.DEFAULT_MODEL_ID
         cast = f"登場人物: {'、'.join(cast_names)}\n" if cast_names else ""
+        minutes_long = transcript_minutes(transcript_text)
         prompt = f"""
 以下はポッドキャストの収録の文字起こしです。各行は「[開始時刻] 話者: 発言」の形式で、時刻は音声の先頭からの経過時間です。
 {cast}
 {MINUTES_INSTRUCTIONS}
+この収録の長さは約 {minutes_long} 分です。話題(目次の行)の数は {topic_count_hint(minutes_long)} 個までにして下さい。同じ内容の繰り返しや短いやり取りは、近い話題にまとめて下さい。
 目次の時刻は、その話題が始まる行の時刻を文字起こしからそのまま写して下さい。推測で時刻を作らないで下さい。
 
 --- 以下が文字起こしです ---

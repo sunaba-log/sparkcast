@@ -36,6 +36,7 @@ def test_generate_minutes_uses_the_transcript_times_and_forbids_invented_dates(a
     assert "発言録は作らないで下さい" in prompt
     assert "「〇〇氏より『…』との発言がありました」" in prompt
     assert "# 短い収録" in prompt
+    assert "この収録の長さは約 1 分です。話題(目次の行)の数は 1 個まで" in prompt
     assert generate.call_args.kwargs["model"] == "m"
 
 
