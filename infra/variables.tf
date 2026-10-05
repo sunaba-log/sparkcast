@@ -97,6 +97,13 @@ variable "cloudflare_account_id" {
   description = "Cloudflare account ID that owns the R2 bucket."
 }
 
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API token for the restapi provider (Realtime apps). Pass TF_VAR_cloudflare_api_token (same value as CLOUDFLARE_API_TOKEN)."
+  sensitive   = true
+  default     = ""
+}
+
 variable "cloudflare_zone_name" {
   type        = string
   description = "Cloudflare zone name (e.g., example.com) for the custom domain."

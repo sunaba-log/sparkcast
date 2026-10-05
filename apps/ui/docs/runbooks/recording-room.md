@@ -10,8 +10,8 @@
 | ルーム（Durable Object）・SFU プロキシ・チャンクの受け口 | `apps/realtime`（`sparkcast-realtime-{env}.sunabalog.com`） | CD（realtime ジョブ、wrangler） |
 | ミックス | `apps/automator/app/src/mixer_main.py`（Cloud Run Job `sparkcast-automator-mixer-{env}`） | Terraform（`infra/recording.tf`） |
 | 録音の保存 | R2 `sparkcast-recordings-{env}`（`sessions/` は 30 日で削除） | Terraform |
-| Realtime SFU / TURN アプリ | Cloudflare（`sparkcast-recording-{env}`） | **手動**（下記。provider の不具合で Terraform では管理できない） |
-| 秘密 | Secret Manager: `sparkcast-recording-room-secret`・`sparkcast-recording-service-secret`（UI、値も Terraform）、`sparkcast-recording-worker-secrets`（Worker 用 JSON、入れ物だけ Terraform・値は手動） | Terraform / 手動 |
+| Realtime SFU / TURN アプリ | Cloudflare（`sparkcast-recording-{env}`） | Terraform（restapi provider。下記） |
+| 秘密 | Secret Manager: `sparkcast-recording-room-secret`・`sparkcast-recording-service-secret`（UI、値も Terraform）、`sparkcast-recording-worker-secrets`（Worker 用 JSON、値も Terraform） | Terraform |
 | DB | `recording_sessions`・`recording_participants`・`recording_tracks`（`apps/ui/migrations/008_*`） | CD（マイグレーション） |
 
 ## Cloudflare API トークンに要る権限
@@ -28,34 +28,20 @@ Terraform（`CLOUDFLARE_API_TOKEN`）と CD の wrangler は同じトークン�
 
 mixer は既存の R2 キー（Secret Manager の `cloudflare-access-key-id` / `cloudflare-secret-access-key`）を使う。このキーが特定のバケットに限定されている場合は、`sparkcast-recordings-{env}` にも読み書きできるようにする。
 
-## Realtime アプリと Worker 用の秘密（手動）
+## Realtime アプリと Worker 用の秘密（Terraform）
 
-cloudflare provider v5 の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_app` は refresh で
-`missing required app_id parameter` になり、以降の apply が必ず失敗する（#166 の dev 反映時に発生）。
-そのため Realtime のアプリは API で作り、Worker 用の秘密 JSON は手で入れる。dev は作成済み。
+Realtime の SFU アプリと TURN の鍵は、`infra/recording.tf` の `restapi_object`（Mastercard/restapi provider）で作る。
+cloudflare provider の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_app` は、v5.26 でも作成後の refresh が
+`missing required app_id / key_id parameter` で失敗し、TURN の鍵の値も取れないため使わない。
 
-```bash
-ACCOUNT=8ed20f6872cea7c9219d68bfcf5f98ae
-ENV=prod   # 作る環境
-PROJECT=sunabalog-$ENV
-# SFU アプリと TURN キーを作る。どちらも返り値の result.uid が ID、result.secret が値。
-# （API ドキュメントは TURN の値を key としているが、実際は secret で返る。provider が値を取れないのもこのため）
-SFU=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/calls/apps" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
-  -d "{\"name\":\"sparkcast-recording-$ENV\"}")
-TURN=$(curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/calls/turn_keys" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
-  -d "{\"name\":\"sparkcast-recording-$ENV\"}")
-ROOM=$(gcloud secrets versions access latest --secret=sparkcast-recording-room-secret --project=$PROJECT)
-SERVICE=$(gcloud secrets versions access latest --secret=sparkcast-recording-service-secret --project=$PROJECT)
-jq -n --arg room "$ROOM" --arg service "$SERVICE" --argjson sfu "$SFU" --argjson turn "$TURN" \
-  '{ROOM_SECRET: $room, SERVICE_SECRET: $service, SFU_APP_ID: $sfu.result.uid, SFU_APP_TOKEN: $sfu.result.secret,
-    TURN_KEY_ID: $turn.result.uid, TURN_KEY_TOKEN: $turn.result.secret}' \
-  | gcloud secrets versions add sparkcast-recording-worker-secrets --data-file=- --project=$PROJECT
-```
-
-`ROOM_SECRET` / `SERVICE_SECRET` は UI 用の secret と必ず同じ値にする（違うと入室・内部 API が 401 になる）。
-入れたら realtime の CD を流すか、下の手順で `wrangler secret bulk` を実行する。
+- 値（SFU のトークン・TURN の鍵）は作成時の応答にしか無いので、Terraform が `create_response` から読み、
+  `sparkcast-recording-worker-secrets`（Worker 用の JSON）に書く。ROOM_SECRET / SERVICE_SECRET も Terraform が同じ値で入れる。
+- restapi provider には `TF_VAR_cloudflare_api_token`（`CLOUDFLARE_API_TOKEN` と同じ値）が要る。CD は `.env` に入れている。
+  手元から plan / apply するときは、ルートの `.env` に `TF_VAR_cloudflare_api_token=...` を足す。
+- 作り直したいとき（漏えいなど）は `terraform apply -replace='restapi_object.realtime_sfu_app[0]'` のように置き換え、
+  そのあと Worker の secret を入れ直す（下）。
+- Worker の secret は、realtime の CD（push 時）が Secret Manager の JSON を `wrangler secret bulk` で入れる。
+  feature ブランチで dev に入れるときは、下の「dev への反映」の 2 の手順で入れる。
 
 ## dev への反映（初回）
 
