@@ -10,5 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // e2e/ は Playwright（npm run e2e）
+    exclude: ["**/node_modules/**", "e2e/**"],
   },
 });

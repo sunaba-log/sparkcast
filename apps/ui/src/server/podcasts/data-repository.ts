@@ -8,13 +8,15 @@ export type Podcast = {
   description: string | null;
   coverImageUrl: string | null;
   rssFeedPath: string | null;
+  // 登場人物（読点・カンマ・改行区切り）。文字起こしの話者推定と議事録で使う（#166）
+  castMembers?: string | null;
 };
 
 const DEFAULT_COVER_IMAGE_URL = "/images/default-podcast-cover.png";
 
 export async function getPodcast(podcastId: number): Promise<Podcast | null> {
   const result = await (await getDbPool()).query(
-    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path
+    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path, cast_members
      FROM podcasts
      WHERE podcast_id = $1`,
     [podcastId]
@@ -27,6 +29,7 @@ export async function getPodcast(podcastId: number): Promise<Podcast | null> {
     description: row.description,
     coverImageUrl: row.cover_image_url,
     rssFeedPath: row.rss_feed_path,
+    castMembers: row.cast_members ?? null,
   };
 }
 
@@ -173,7 +176,15 @@ export async function updatePodcast(input: {
   description: string | null;
   // undefined のときは rss_feed_path を変更しない
   rssFeedPath?: string | null;
+  // undefined のときは cast_members を変更しない
+  castMembers?: string | null;
 }): Promise<void> {
+  if (input.castMembers !== undefined) {
+    await (await getDbPool()).query(
+      `UPDATE podcasts SET cast_members = $2 WHERE podcast_id = $1`,
+      [input.podcastId, input.castMembers],
+    );
+  }
   if (input.rssFeedPath === undefined) {
     await (await getDbPool()).query(
       `UPDATE podcasts SET title = $2, description = $3 WHERE podcast_id = $1`,

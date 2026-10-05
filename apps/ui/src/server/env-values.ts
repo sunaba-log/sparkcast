@@ -206,3 +206,54 @@ export function getRateLimitDaily(): number {
   }
   return value;
 }
+
+// ブラウザ収録ルーム（#166）。prod は電気通信事業の届出が済むまで未設定＝無効。
+export function isRecordingEnabled(): boolean {
+  return process.env.RECORDING_ENABLED === "true";
+}
+
+export function getRecordingRoomSecret(): string {
+  return required("RECORDING_ROOM_SECRET");
+}
+
+export function getRecordingServiceSecret(): string {
+  return required("RECORDING_SERVICE_SECRET");
+}
+
+// Cloudflare Worker（apps/realtime）のベース URL。例: https://sparkcast-realtime-dev.sunabalog.com
+export function getRealtimeBaseUrl(): string {
+  return required("REALTIME_BASE_URL").replace(/\/+$/, "");
+}
+
+// mixer の Cloud Run Job のリソース名（projects/{p}/locations/{r}/jobs/{name}）
+export function getMixerJobName(): string {
+  return required("MIXER_JOB_NAME");
+}
+
+export function getRecordingMaxParticipants(): number {
+  const raw = process.env.RECORDING_MAX_PARTICIPANTS ?? "6";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 2 || value > 10) {
+    throw new Error("RECORDING_MAX_PARTICIPANTS must be an integer between 2 and 10");
+  }
+  return value;
+}
+
+// ルームの有効期限（作成から）。最大収録時間 3 時間＋待ち時間を見込む。
+export function getRecordingRoomTtlHours(): number {
+  const raw = process.env.RECORDING_ROOM_TTL_HOURS ?? "6";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("RECORDING_ROOM_TTL_HOURS must be a positive integer");
+  }
+  return value;
+}
+
+export function getPendingRecordingSessionLimit(): number {
+  const raw = process.env.PENDING_RECORDING_SESSION_LIMIT ?? "2";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("PENDING_RECORDING_SESSION_LIMIT must be a positive integer");
+  }
+  return value;
+}

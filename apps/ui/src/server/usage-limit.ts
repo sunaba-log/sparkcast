@@ -5,15 +5,27 @@ import type { SessionUser } from "@/server/auth";
 import {
   getPendingChatLimit,
   getPendingEpisodeUploadLimit,
+  getPendingRecordingSessionLimit,
   getRateLimitHourly,
   getRateLimitDaily,
 } from "@/server/env";
 
-export type UsageAction = "chat" | "episode_upload";
+export type UsageAction = "chat" | "episode_upload" | "recording_session";
 
 export interface UsageCheckResult {
   allowed: boolean;
   reason?: string;
+}
+
+function getPendingLimit(action: UsageAction): number {
+  switch (action) {
+    case "chat":
+      return getPendingChatLimit();
+    case "episode_upload":
+      return getPendingEpisodeUploadLimit();
+    case "recording_session":
+      return getPendingRecordingSessionLimit();
+  }
 }
 
 export async function checkUsageAllowed(
@@ -22,10 +34,7 @@ export async function checkUsageAllowed(
   action: UsageAction,
 ): Promise<UsageCheckResult> {
   if (user.approvalStatus === "pending_approval") {
-    const limit =
-      action === "chat"
-        ? getPendingChatLimit()
-        : getPendingEpisodeUploadLimit();
+    const limit = getPendingLimit(action);
     const result = await pool.query<{ count: number }>(
       `SELECT COUNT(*) as count FROM api_usage_logs
        WHERE user_id = $1 AND endpoint = $2`,

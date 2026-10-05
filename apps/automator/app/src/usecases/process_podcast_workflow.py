@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from domain.models import EpisodeObjectReference
+from domain.models.transcript import extract_topics
+from services.episode_transcription import EpisodeTranscription
 
 if TYPE_CHECKING:
     import logging
@@ -29,6 +31,13 @@ class PodcastFeedManager(Protocol):
 
     def get_rss_xml(self) -> str:
         """Return serialized RSS XML."""
+
+
+class KnowledgeReindexer(Protocol):
+    """チャット用の索引を、番組を指定して作り直してもらう."""
+
+    def reindex(self, podcast_id: str) -> None:
+        """作り直してもらう(失敗したら例外)."""
 
 
 class PodcastFeedManagerFactory(Protocol):
@@ -83,8 +92,15 @@ class ProcessPodcastWorkflow:
         firestore_manager: FirestoreManager | None,
         episode_repository: EpisodeRepository,
         logger: logging.Logger,
+        transcription: EpisodeTranscription | None = None,
+        knowledge_reindexer: KnowledgeReindexer | None = None,
     ) -> None:
-        """Initialize use case dependencies."""
+        """Initialize use case dependencies.
+
+        transcription を渡さないときは音声認識を使わず、Gemini に音声から議事録を作らせる(従来の方式)。
+        knowledge_reindexer を渡すと、完成したエピソードをすぐチャットで聞けるよう索引を作り直してもらう。
+        """
+        self._knowledge_reindexer = knowledge_reindexer
         self._transcript_provider = transcript_provider
         self._object_storage = object_storage
         self._blob_source = blob_source
@@ -95,6 +111,13 @@ class ProcessPodcastWorkflow:
         self._firestore_manager = firestore_manager
         self._episode_repository = episode_repository
         self._logger = logger
+        self._transcription = transcription or EpisodeTranscription(
+            transcript_provider=transcript_provider,
+            episode_repository=episode_repository,
+            speech=None,
+            work_bucket=None,
+            logger=logger,
+        )
 
     def run(self, request: ProcessPodcastWorkflowInput) -> None:
         """Execute podcast workflow and emit notifications for success/failure."""
@@ -116,23 +139,8 @@ class ProcessPodcastWorkflow:
             latest_episode_number = rss_manager.get_total_episodes() + 1
             self._logger.info("Latest Episode Number: %s", latest_episode_number)
 
-            self._logger.info("\n## Step1: Running AI Analysis... ##")
-            transcript = self._transcript_provider.generate_transcript(
-                f"gs://{request.gcs_bucket}/{request.gcs_trigger_object_name}", model_id=request.ai_model_id
-            )
-            self._notifier.send_discord_message(message=f"#{latest_episode_number} Meeting Transcript:\n\n{transcript}")
-            if not transcript:
-                raise ValueError("Failed to make transcript.")
-
-            summary = self._transcript_provider.summarize_transcript(transcript, model_id=request.ai_model_id)
-            self._logger.info("Generated Summary: %s", summary)
-            summary.title = f"#{latest_episode_number} {summary.title}"
-
-            self._notifier.send_discord_message(
-                message=f"New Podcast Processed:\nTitle: {summary.title}\nDescription: {summary.description}"
-            )
-
-            self._logger.info("\n## Step2: Converting to MP3 and Uploading to Cloudflare R2... ##")
+            # 音声認識の方式(短い音声は同期認識)を決めるため、先に MP3 にして長さを測る
+            self._logger.info("\n## Step1: Converting to MP3... ##")
             audio_upload_mime_type = "audio/mpeg"
             original_audio_bytes = self._blob_source.download_blob_as_bytes(
                 request.gcs_bucket, request.gcs_trigger_object_name
@@ -147,6 +155,29 @@ class ProcessPodcastWorkflow:
             except Exception:  # noqa: BLE001
                 self._logger.warning("Failed to get audio info")
                 file_size_bytes, duration_str = len(mp3_bytes), "00:00:00"
+
+            self._logger.info("\n## Step2: Transcribing and Running AI Analysis... ##")
+            transcription = self._transcription.run(
+                gcs_uri=f"gs://{request.gcs_bucket}/{request.gcs_trigger_object_name}",
+                podcast_id=episode_ref.podcast_id,
+                episode_id=episode_ref.episode_id,
+                duration_seconds=float(_duration_to_seconds(duration_str) or 0),
+                model_id=request.ai_model_id,
+                source_audio=original_audio_bytes,
+            )
+            transcript = transcription.minutes
+            self._logger.info("Transcription: %s", transcription.meta)
+            self._notifier.send_discord_message(message=f"#{latest_episode_number} Meeting Transcript:\n\n{transcript}")
+
+            summary = self._transcript_provider.summarize_transcript(transcript, model_id=request.ai_model_id)
+            self._logger.info("Generated Summary: %s", summary)
+            summary.title = f"#{latest_episode_number} {summary.title}"
+
+            self._notifier.send_discord_message(
+                message=f"New Podcast Processed:\nTitle: {summary.title}\nDescription: {summary.description}"
+            )
+
+            self._logger.info("\n## Step3: Uploading to Cloudflare R2... ##")
 
             r2_remote_key = f"{request.r2_key_prefix}/ep/{latest_episode_number}/audio.mp3"
             self._object_storage.upload_file(
@@ -200,12 +231,8 @@ class ProcessPodcastWorkflow:
                 }
                 show_notes_summary = {
                     "overview": summary.description,
-                    "topics": [
-                        {
-                            "time": "00:00",
-                            "title": summary.title,
-                        },
-                    ],
+                    # 議事録の【目次】(時刻は文字起こしの実際の時刻)。取れなければ従来どおり 1 件
+                    "topics": extract_topics(transcript) or [{"time": "00:00", "title": summary.title}],
                 }
                 audio_metadata = {
                     "file_size_bytes": file_size_bytes,
@@ -222,12 +249,22 @@ class ProcessPodcastWorkflow:
                     ai_generated_meta=ai_generated_meta,
                     show_notes_summary=show_notes_summary,
                     audio_metadata=audio_metadata,
+                    minutes=transcript,
+                    transcript_meta=transcription.meta,
                 )
-                self._firestore_manager.save_transcript_chunks(
-                    podcast_id=episode_ref.podcast_id,
-                    episode_id=episode_ref.episode_id,
-                    transcript=transcript,
-                )
+                if transcription.segments:
+                    self._firestore_manager.save_transcript_segments(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                        segments=transcription.segments,
+                    )
+                else:
+                    # 音声認識に失敗したとき(従来の方式)は議事録を分割して入れる
+                    self._firestore_manager.save_transcript_chunks(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                        transcript=transcript,
+                    )
                 sns_promotions = self._transcript_provider.generate_sns_promotions(
                     summary_description=summary.description,
                     num_promotions=request.sns_promotion_count,
@@ -257,6 +294,7 @@ class ProcessPodcastWorkflow:
                 audio_url=public_url,
                 duration_seconds=_duration_to_seconds(duration_str),
             )
+            self._reindex_knowledge(episode_ref.podcast_id)
             self._logger.info("\n## Notifying Discord (Success)... ##")
             self._notifier.send_discord_message(
                 message=f"Podcast Episode Published Successfully:\nTitle: {summary.title}\nURL: {public_url}"
@@ -273,6 +311,19 @@ class ProcessPodcastWorkflow:
                 self._logger.exception("Failed to persist episode failure state")
             self._notifier.send_discord_message(message=f"Podcast Processing Failed:\nError: {err}")
             raise
+
+    def _reindex_knowledge(self, podcast_id: str) -> None:
+        """チャット用の索引を作り直してもらう(完了にしたあと。索引は完了したエピソードだけを対象にする).
+
+        失敗してもエピソードは完成しているので失敗にしない(毎朝の定期実行で追いつく)。
+        """
+        if self._knowledge_reindexer is None:
+            return
+        try:
+            self._knowledge_reindexer.reindex(podcast_id)
+            self._logger.info("Reindexed chat knowledge for podcast %s", podcast_id)
+        except Exception:
+            self._logger.exception("Failed to reindex chat knowledge; the daily job will catch up")
 
 
 def _duration_to_seconds(duration: str) -> int | None:

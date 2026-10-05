@@ -10,7 +10,10 @@ from .gateways import (
     NewsSource,
     NotificationGateway,
     ObjectStorage,
+    RecordingSpeaker,
+    RecordingSpeakers,
     SecretProvider,
+    SpeechTranscriber,
     TranscriptProvider,
 )
 
@@ -24,6 +27,9 @@ __all__ = [
     "NewsSource",
     "NotificationGateway",
     "ObjectStorage",
+    "RecordingSpeaker",
+    "RecordingSpeakers",
     "SecretProvider",
+    "SpeechTranscriber",
     "TranscriptProvider",
 ]

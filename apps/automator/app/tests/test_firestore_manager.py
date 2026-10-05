@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from domain.models.transcript import TranscriptSegment
 from services.firestore_manager import FirestoreManager
 
 
@@ -45,6 +46,9 @@ class _FakeCollectionRef:
     def order_by(self, *_args: object, **_kwargs: object) -> _FakeCollectionRef:
         return self
 
+    def list_documents(self) -> list[_FakeDocRef]:
+        return list(self.documents.values())
+
     def limit(self, count: int) -> _FakeCollectionRef:
         self._limit = count
         return self
@@ -60,6 +64,9 @@ class _FakeBatch:
 
     def set(self, doc_ref: _FakeDocRef, data: dict[str, object]) -> None:
         self.operations.append((doc_ref.path, data))
+
+    def delete(self, doc_ref: _FakeDocRef) -> None:
+        self.operations.append((f"delete:{doc_ref.path}", {}))
 
     def commit(self) -> None:
         return None
@@ -204,3 +211,74 @@ def test_list_recent_transcript_episodes_reads_transcript_chunks() -> None:
             "updated_at": "2026-06-30T00:00:00Z",
         }
     ]
+
+
+def test_list_recent_transcript_episodes_prefers_minutes_over_utterances() -> None:
+    client = _FakeClient()
+    manager = FirestoreManager(project_id="demo", client=client)
+    episode_doc = client.collection("podcasts").document("p").collection("episodes_contents").document("ep-2")
+    episode_doc.set({"episode_number": 43, "updated_at": "2026-10-04T00:00:00Z", "minutes": " 議事録 "}, merge=True)
+    # 発話ごとの文字起こし(話者は別項目)はアジェンダには渡さない
+    episode_doc.collection("transcripts").document("seg_00001").set({"text": "こんにちは"}, merge=False)
+
+    result = manager.list_recent_transcript_episodes(podcast_id="p", limit=10)
+
+    assert result[0]["content"] == "議事録"
+
+
+def test_save_transcript_segments_replaces_previous_documents() -> None:
+    client = _FakeClient()
+    manager = FirestoreManager(project_id="demo", client=client)
+    transcripts = (
+        client.collection("podcasts")
+        .document("p")
+        .collection("episodes_contents")
+        .document("e")
+        .collection("transcripts")
+    )
+    transcripts.document("chunk_0001")  # 前回の処理で書かれた古い分割
+
+    count = manager.save_transcript_segments(
+        podcast_id="p",
+        episode_id="e",
+        segments=[
+            TranscriptSegment(start=0.004, end=2.5, text="こんにちは", speaker="小野", speaker_id="pid-1"),
+            TranscriptSegment(start=3.0, end=4.25, text="どうも", speaker="数森"),
+        ],
+    )
+
+    assert count == 2
+    operations = client.batch_instance.operations
+    assert operations[0][0] == "delete:podcasts/p/episodes_contents/e/transcripts/chunk_0001"
+    assert operations[1] == (
+        "podcasts/p/episodes_contents/e/transcripts/seg_00001",
+        {
+            "chunk_id": "seg_00001",
+            "start_time": 0.0,
+            "end_time": 2.5,
+            "speaker": "小野",
+            "speaker_id": "pid-1",
+            "text": "こんにちは",
+        },
+    )
+    assert operations[2][1]["speaker_id"] is None
+
+
+def test_save_episode_content_stores_minutes_and_transcript_meta() -> None:
+    client = _FakeClient()
+    manager = FirestoreManager(project_id="demo", client=client)
+    manager.save_episode_content(
+        podcast_id="p",
+        episode_id="e",
+        episode_number=1,
+        updated_at="now",
+        transcript_summary="s",
+        ai_generated_meta={},
+        show_notes_summary={},
+        audio_metadata={},
+        minutes="議事録",
+        transcript_meta={"engine": "chirp_2"},
+    )
+    data = client.collection("podcasts").document("p").collection("episodes_contents").document("e").data
+    assert data["minutes"] == "議事録"
+    assert data["transcript_meta"] == {"engine": "chirp_2"}

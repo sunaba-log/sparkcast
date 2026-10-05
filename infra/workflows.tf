@@ -21,6 +21,9 @@ resource "google_workflows_workflow" "main" {
           call: googleapis.run.v2.projects.locations.jobs.run
           args:
             name: $${"projects/" + project + "/locations/" + region + "/jobs/" + job}
+            # Job の終わりを待つ上限（既定は 30 分）。音声認識の待ちで Job が長引いてもここで失敗しないように
+            connector_params:
+              timeout: 86400
             body:
               overrides:
                 containerOverrides:

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import pytest
 
 from domain.models import SnsPromotionContent, SnsPromotionsResponse, Summary
+from domain.models.transcript import TranscriptSegment
+from services.episode_transcription import EpisodeTranscription
 from usecases.process_podcast_workflow import (
     ProcessPodcastWorkflow,
     ProcessPodcastWorkflowInput,
@@ -18,8 +20,17 @@ class _TranscriptProvider:
     def __init__(self, *, transcript: str = "transcript") -> None:
         self.transcript = transcript
 
-    def generate_transcript(self, source_uri: str, model_id: str | None = None) -> str:
+    def generate_transcript(
+        self, source_uri: str, model_id: str | None = None, cast_names: list[str] | None = None
+    ) -> str:
         return self.transcript
+
+    def generate_minutes(self, transcript_text: str, cast_names=None, model_id=None) -> str:
+        self.minutes_input = transcript_text
+        return "【目次】\n0:00 はじめに\n1:05 本題\n\n本文"
+
+    def assign_speakers(self, gcs_uri: str, segments, cast_names=None, model_id=None):
+        return [segment.with_speaker("小野") for segment in segments]
 
     def summarize_transcript(
         self,
@@ -100,6 +111,12 @@ class _EpisodeRepository:
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         self.failed = (podcast_id, episode_id, error_message)
 
+    def get_cast_names(self, *, podcast_id: str) -> list[str]:
+        return ["小野", "数森"]
+
+    def find_recording_speakers(self, *, episode_id: str):
+        return None
+
 
 class _FirestoreManager:
     def __init__(self) -> None:
@@ -114,6 +131,10 @@ class _FirestoreManager:
     def save_transcript_chunks(self, **values: object) -> list[str]:
         self.transcript = values
         return ["chunk_0001"]
+
+    def save_transcript_segments(self, **values: object) -> int:
+        self.segments = values
+        return len(values["segments"])  # type: ignore[arg-type]
 
     def create_sns_promotion(self, **values: object) -> str:
         self.promotions.append(values)
@@ -139,6 +160,7 @@ def _workflow(
     repository: _EpisodeRepository,
     firestore: _FirestoreManager,
     transcript_provider: _TranscriptProvider | None = None,
+    knowledge_reindexer=None,
 ) -> ProcessPodcastWorkflow:
     return ProcessPodcastWorkflow(
         transcript_provider=transcript_provider or _TranscriptProvider(),
@@ -151,7 +173,54 @@ def _workflow(
         firestore_manager=firestore,
         episode_repository=repository,
         logger=logging.getLogger("test-workflow"),
+        knowledge_reindexer=knowledge_reindexer,
     )
+
+
+class _Reindexer:
+    def __init__(self, repository: _EpisodeRepository, error: Exception | None = None) -> None:
+        self.repository = repository
+        self.error = error
+        self.calls: list[tuple[str, bool]] = []
+
+    def reindex(self, podcast_id: str) -> None:
+        # 索引は完了したエピソードだけが対象なので、完了にしたあとで呼ばれること
+        self.calls.append((podcast_id, self.repository.completed is not None))
+        if self.error:
+            raise self.error
+
+
+def test_workflow_reindexes_chat_knowledge_after_completion() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository)
+
+    _workflow(repository=repository, firestore=_FirestoreManager(), knowledge_reindexer=reindexer).run(_request())
+
+    assert reindexer.calls == [("1", True)]
+
+
+def test_reindex_failure_does_not_fail_the_episode() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository, error=TimeoutError("slow"))
+
+    _workflow(repository=repository, firestore=_FirestoreManager(), knowledge_reindexer=reindexer).run(_request())
+
+    assert repository.completed is not None
+    assert repository.failed is None
+
+
+def test_failed_episode_is_not_reindexed() -> None:
+    repository = _EpisodeRepository()
+    reindexer = _Reindexer(repository)
+    workflow = _workflow(
+        repository=repository,
+        firestore=_FirestoreManager(),
+        transcript_provider=_TranscriptProvider(transcript=""),
+        knowledge_reindexer=reindexer,
+    )
+    with pytest.raises(ValueError, match="Failed to make transcript"):
+        workflow.run(_request())
+    assert reindexer.calls == []
 
 
 def test_workflow_uses_object_path_ids_for_cloud_sql_and_firestore() -> None:
@@ -220,3 +289,44 @@ def test_workflow_rejects_invalid_path_before_database_update() -> None:
 )
 def test_duration_to_seconds(duration: str, expected: int | None) -> None:
     assert _duration_to_seconds(duration) == expected
+
+
+def test_workflow_saves_timestamped_segments_and_topics() -> None:
+    class _Speech:
+        def transcribe(self, files, timeout=3600):
+            return {uri: [TranscriptSegment(0, 2, "はじめます"), TranscriptSegment(65, 70, "本題")] for uri in files}
+
+    repository = _EpisodeRepository()
+    firestore = _FirestoreManager()
+    provider = _TranscriptProvider()
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=provider,
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [3, "00:01:30"],
+        firestore_manager=firestore,
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=EpisodeTranscription(
+            transcript_provider=provider,
+            episode_repository=repository,
+            speech=_Speech(),
+            work_bucket="work",
+        ),
+    )
+    workflow.run(_request())
+
+    assert provider.minutes_input == "[0:00] 小野: はじめます\n[1:05] 小野: 本題"
+    assert [s.text for s in firestore.segments["segments"]] == ["はじめます", "本題"]
+    assert firestore.transcript is None
+    content = firestore.episode_content
+    assert content is not None
+    assert content["minutes"].startswith("【目次】")
+    assert content["show_notes_summary"]["topics"] == [
+        {"time": "0:00", "title": "はじめに"},
+        {"time": "1:05", "title": "本題"},
+    ]
+    assert content["transcript_meta"]["engine"] == "speech_v2_long"

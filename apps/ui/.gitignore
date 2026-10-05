@@ -35,3 +35,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Playwright（e2e/）
+/test-results/
+/playwright-report/
+/e2e/.audio/

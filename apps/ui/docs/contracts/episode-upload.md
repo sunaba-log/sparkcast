@@ -82,3 +82,15 @@ The initial migration assumes that the `podcasts` table defined in
 - The API accepts MP3 and M4A files up to 500 MiB.
 - A scheduled cleanup for browsers that close before sending the result
   callback is still required.
+
+## Browser Recording (#166)
+
+Episodes recorded in the browser recording room do not use the signed upload URL.
+When the host finalizes a recording, `podcast-ui` creates the episode with
+`status = upload_pending` and `source_audio_path =
+podcasts/{podcast_id}/episodes/{episode_id}/source/recording-{session8}.flac`,
+then starts the `mixer` Cloud Run Job. The mixer writes that FLAC to the same
+input bucket (with `ifGenerationMatch=0`), which triggers `podcast-automator`
+exactly like a browser upload, and moves the episode from `upload_pending` to
+`uploaded`. FLAC is accepted only on this path; user uploads remain MP3/M4A.
+See `docs/adr/20261004-browser-recording-room.md`.

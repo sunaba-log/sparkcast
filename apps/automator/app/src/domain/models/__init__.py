@@ -12,9 +12,18 @@ from .agenda import (
     SortPolicy,
     TopicMatch,
 )
-from .common import DiscordMessage, NewsItem, SnsPromotionContent, SnsPromotionsResponse, Summary
+from .common import (
+    DiscordMessage,
+    NewsItem,
+    SnsPromotionContent,
+    SnsPromotionsResponse,
+    SpeakerAssignment,
+    SpeakerAssignments,
+    Summary,
+)
 from .episode import EpisodeObjectReference
 from .sns_post import SnsPost
+from .transcript import TranscriptSegment
 
 __all__ = [
     "ActionItem",
@@ -32,6 +41,9 @@ __all__ = [
     "SnsPromotionContent",
     "SnsPromotionsResponse",
     "SortPolicy",
+    "SpeakerAssignment",
+    "SpeakerAssignments",
     "Summary",
     "TopicMatch",
+    "TranscriptSegment",
 ]
