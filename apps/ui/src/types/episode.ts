@@ -28,6 +28,8 @@ export type Episode = {
   artworkUrl: string | null;
   processingError: string | null;
   minutesGenerated: boolean;
+  // 話者・時刻つきの文字起こしがあるか（#166 以降に処理したエピソード）
+  transcriptAvailable: boolean;
   xPostsGenerated: boolean;
   seedsGenerated: boolean;
   minutes: string;
@@ -52,4 +54,14 @@ export type TopicProposal = {
     suggestedPoints: string[];
     relatedPastEpisodes: number[];
   }>;
+};
+
+// 話者・時刻つきの文字起こしの 1 発話（#166）。時刻は音声の先頭からの秒。
+export type TranscriptSegment = {
+  id: string;
+  start: number;
+  end: number;
+  speaker: string;
+  speakerId: string | null;
+  text: string;
 };

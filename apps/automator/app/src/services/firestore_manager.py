@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from google.cloud import firestore
+
+if TYPE_CHECKING:
+    from domain.models.transcript import TranscriptSegment
+
+# Firestore の 1 バッチの書き込み上限(500)より少し小さく区切る
+BATCH_LIMIT = 400
 
 
 class FirestoreManager:
@@ -30,22 +36,64 @@ class FirestoreManager:
         ai_generated_meta: dict[str, Any],
         show_notes_summary: dict[str, Any],
         audio_metadata: dict[str, Any],
+        minutes: str | None = None,
+        transcript_meta: dict[str, Any] | None = None,
     ) -> str:
-        """Upsert episode content document."""
+        """Upsert episode content document.
+
+        minutes は AI が作った議事録(#166 以降。それ以前は transcripts に議事録を分割して入れていた)。
+        transcript_meta は文字起こしの作り方(engine / speaker_source / segment_count など)。
+        """
         doc_ref = self._episode_contents_collection(podcast_id).document(episode_id)
-        doc_ref.set(
-            {
-                "episode_id": episode_id,
-                "episode_number": episode_number,
-                "updated_at": updated_at,
-                "transcript_summary": transcript_summary,
-                "ai_generated_meta": ai_generated_meta,
-                "show_notes_summary": show_notes_summary,
-                "audio_metadata": audio_metadata,
-            },
-            merge=True,
-        )
+        data: dict[str, Any] = {
+            "episode_id": episode_id,
+            "episode_number": episode_number,
+            "updated_at": updated_at,
+            "transcript_summary": transcript_summary,
+            "ai_generated_meta": ai_generated_meta,
+            "show_notes_summary": show_notes_summary,
+            "audio_metadata": audio_metadata,
+        }
+        if minutes is not None:
+            data["minutes"] = minutes
+        if transcript_meta is not None:
+            data["transcript_meta"] = transcript_meta
+        doc_ref.set(data, merge=True)
         return doc_ref.id
+
+    def save_transcript_segments(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        segments: list[TranscriptSegment],
+    ) -> int:
+        """発話ごとに transcripts に保存する(#166)。前回の処理で書いたものは先に消す."""
+        collection = self._transcripts_collection(podcast_id, episode_id)
+        self._clear_collection(collection)
+        batch = self._client.batch()
+        pending = 0
+        for index, segment in enumerate(segments, start=1):
+            chunk_id = f"seg_{index:05d}"
+            batch.set(
+                collection.document(chunk_id),
+                {
+                    "chunk_id": chunk_id,
+                    "start_time": round(segment.start, 2),
+                    "end_time": round(segment.end, 2),
+                    "speaker": segment.speaker,
+                    "speaker_id": segment.speaker_id,
+                    "text": segment.text,
+                },
+            )
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+        return len(segments)
 
     def save_transcript_chunks(
         self,
@@ -56,6 +104,7 @@ class FirestoreManager:
         chunk_size: int = 1200,
     ) -> list[str]:
         """Store transcript chunks in a subcollection."""
+        self._clear_collection(self._transcripts_collection(podcast_id, episode_id))
         chunks = list(_chunk_text(transcript, chunk_size=chunk_size))
         batch = self._client.batch()
         saved_ids: list[str] = []
@@ -168,15 +217,20 @@ class FirestoreManager:
             if not isinstance(episode_number, int):
                 continue
 
-            transcript_parts: list[str] = []
-            transcript_docs = doc.reference.collection("transcripts").order_by("chunk_id").stream()
-            for transcript_doc in transcript_docs:
-                transcript_data = transcript_doc.to_dict() or {}
-                text = transcript_data.get("text")
-                if isinstance(text, str) and text.strip():
-                    transcript_parts.append(text.strip())
-
-            content = "\n\n".join(transcript_parts).strip()
+            # #166 以降は議事録が親ドキュメントの minutes にあり、transcripts は発話ごと(話者名は別の項目)。
+            # アジェンダには従来どおり議事録を渡す。以前のエピソードは transcripts に議事録が分割されている。
+            minutes = data.get("minutes")
+            if isinstance(minutes, str) and minutes.strip():
+                content = minutes.strip()
+            else:
+                transcript_parts: list[str] = []
+                transcript_docs = doc.reference.collection("transcripts").order_by("chunk_id").stream()
+                for transcript_doc in transcript_docs:
+                    transcript_data = transcript_doc.to_dict() or {}
+                    text = transcript_data.get("text")
+                    if isinstance(text, str) and text.strip():
+                        transcript_parts.append(text.strip())
+                content = "\n\n".join(transcript_parts).strip()
             if not content:
                 summary = data.get("transcript_summary")
                 content = summary.strip() if isinstance(summary, str) else ""
@@ -214,6 +268,23 @@ class FirestoreManager:
 
     def _episode_contents_collection(self, podcast_id: str) -> firestore.CollectionReference:
         return self._podcast_collection(podcast_id).collection("episodes_contents")
+
+    def _transcripts_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
+        return self._episode_contents_collection(podcast_id).document(episode_id).collection("transcripts")
+
+    def _clear_collection(self, collection: firestore.CollectionReference) -> None:
+        """再処理で古い文字起こしが残らないよう、サブコレクションを空にする."""
+        batch = self._client.batch()
+        pending = 0
+        for snapshot in collection.list_documents():
+            batch.delete(snapshot)
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
 
 
 def _chunk_text(text: str, *, chunk_size: int) -> list[str]:

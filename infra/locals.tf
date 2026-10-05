@@ -19,6 +19,8 @@ locals {
     "orgpolicy.googleapis.com",
     # 予算アラート（google_billing_budget）の API 呼び出しに必要。
     "billingbudgets.googleapis.com",
+    # 話者・時刻つきの文字起こし（Speech-to-Text v2、#166）
+    "speech.googleapis.com",
   ]
 
   default_compute_service_account = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"

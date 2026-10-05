@@ -12,7 +12,9 @@ module "cloud_run_job" {
   job_name                       = "${local.automator_name_prefix}-app-${var.environment}"
   service_account_email          = local.default_compute_service_account
 
-  timeout            = "3600s"
+  # 音声認識を急がない処理（ダイナミックバッチ）にしたので、結果を待つ時間が延びうる（#166）。
+  # 認識を待つ上限（SPEECH_TIMEOUT_SECONDS = 5 時間）に、その前後の処理の分を足した長さ
+  timeout            = "21600s"
   memory             = "8Gi"
   cpu                = "2"
   max_instance_count = 1
@@ -38,10 +40,20 @@ module "cloud_run_job" {
     CLOUDFLARE_SECRET_ACCESS_KEY_SECRET_NAME = var.cloudflare_secret_access_key_secret_name
     PODCAST_ID                               = var.podcast_id
     SNS_SCHEDULE_OFFSET_HOURS                = var.sns_schedule_offset_hours
+    # 話者・時刻つきの文字起こし（#166、transcription.tf）
+    WORK_BUCKET     = google_storage_bucket.work.name
+    SPEECH_LOCATION = "asia-northeast1"
+    SPEECH_MODEL    = "long"
+    # 1 分 $0.016 → $0.003。結果が出るまでの時間に保証は無いので、待つ上限を長めにする
+    SPEECH_DYNAMIC_BATCH   = "true"
+    SPEECH_TIMEOUT_SECONDS = "18000"
+    # エピソードが完成したらチャット用の索引をすぐ作り直してもらう（#166。認証は定期実行と同じ CRON_SECRET）
+    APP_BASE_URL = local.app_base_url
   }
 
   secret_environment_variables = {
     DATABASE_URL = var.database_url_secret_name
+    CRON_SECRET  = data.google_secret_manager_secret.cron_secret.secret_id
   }
 
   depends_on = [

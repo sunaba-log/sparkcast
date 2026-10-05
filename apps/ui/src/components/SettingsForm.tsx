@@ -2,23 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Radio, Rss, Key, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Save, Radio, Rss, Key, RefreshCw, Eye, EyeOff, Users } from "lucide-react";
 
 export function SettingsForm({
   podcastId,
   title: initialTitle,
   description: initialDescription,
   rssFeedPath: initialRssFeedPath,
+  castMembers: initialCastMembers,
 }: {
   podcastId: number;
   title: string;
   description: string;
   rssFeedPath: string;
+  castMembers: string;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [rssFeedPath, setRssFeedPath] = useState(initialRssFeedPath);
+  const [castMembers, setCastMembers] = useState(initialCastMembers);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -123,6 +126,7 @@ export function SettingsForm({
           title: title.trim(),
           description: description.trim() || undefined,
           rssFeedPath: rssFeedPath.trim(),
+          castMembers: castMembers.trim(),
         }),
       });
       const result = (await response.json()) as { error?: string };
@@ -211,6 +215,30 @@ export function SettingsForm({
               maxLength={2000}
               className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="cast-members"
+              className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
+            </label>
+            <input
+              id="cast-members"
+              type="text"
+              value={castMembers}
+              onChange={(e) => {
+                setCastMembers(e.target.value);
+                setSaved(false);
+              }}
+              maxLength={500}
+              placeholder="例: さとう、すずき、たかはし"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base sm:text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
+            </p>
           </div>
 
           <div className="pt-3 flex items-center justify-between border-t border-gray-100">
@@ -398,7 +426,31 @@ export function SettingsForm({
               </div>
             </div>
 
-            <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+            <div>
+            <label
+              htmlFor="cast-members"
+              className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
+            </label>
+            <input
+              id="cast-members"
+              type="text"
+              value={castMembers}
+              onChange={(e) => {
+                setCastMembers(e.target.value);
+                setSaved(false);
+              }}
+              maxLength={500}
+              placeholder="例: さとう、すずき、たかはし"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
+            </p>
+          </div>
+
+          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
               <span className="text-xs text-emerald-600 font-semibold">
                 {savedSecrets ? "シークレット設定を更新しました" : ""}
               </span>

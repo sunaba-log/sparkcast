@@ -97,6 +97,13 @@ variable "cloudflare_account_id" {
   description = "Cloudflare account ID that owns the R2 bucket."
 }
 
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API token for the restapi provider (Realtime apps). Pass TF_VAR_cloudflare_api_token (same value as CLOUDFLARE_API_TOKEN)."
+  sensitive   = true
+  default     = ""
+}
+
 variable "cloudflare_zone_name" {
   type        = string
   description = "Cloudflare zone name (e.g., example.com) for the custom domain."
@@ -284,5 +291,17 @@ variable "rate_limit_daily" {
 variable "rate_limit_hourly" {
   type        = string
   description = "1時間あたりのレート制限回数"
+  default     = ""
+}
+
+variable "enable_recording" {
+  type        = bool
+  description = "ブラウザ収録ルーム（#166）の有効化フラグ。電気通信事業の届出が済むまで prod は false。"
+  default     = false
+}
+
+variable "realtime_hostname" {
+  type        = string
+  description = "収録ルームの Cloudflare Worker（apps/realtime）のホスト名。wrangler.jsonc の routes と揃える。"
   default     = ""
 }

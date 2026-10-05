@@ -1,0 +1,46 @@
+// sparkcast 収録ルームの Worker（#166）。
+// secret（wrangler secret / CD で投入）: ROOM_SECRET, SERVICE_SECRET, SFU_APP_ID, SFU_APP_TOKEN,
+//   TURN_KEY_ID, TURN_KEY_TOKEN。値は GCP Secret Manager の sparkcast-recording-* が正。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sparkcast-realtime-local",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-15",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "r2_buckets": [{ "binding": "RECORDINGS", "bucket_name": "sparkcast-recordings-dev" }],
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:3000,http://localhost:3002"
+  },
+  "env": {
+    "dev": {
+      "name": "sparkcast-realtime-dev",
+      "workers_dev": false,
+      "routes": [{ "pattern": "sparkcast-realtime-dev.sunabalog.com", "custom_domain": true }],
+      "durable_objects": {
+        "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+      },
+      "r2_buckets": [{ "binding": "RECORDINGS", "bucket_name": "sparkcast-recordings-dev" }],
+      "vars": {
+        "ALLOWED_ORIGINS": "https://dev.sparkcast.sunabalog.com,http://localhost:3000,http://localhost:3002",
+        // PR プレビュー（pr-145---sparkcast-ui-dev-jztgcd4mia-an.a.run.app の形）
+        "ALLOWED_ORIGIN_PATTERN": "^https://pr-[0-9]+---sparkcast-ui-dev-jztgcd4mia-an\\.a\\.run\\.app$"
+      }
+    },
+    "prod": {
+      "name": "sparkcast-realtime-prod",
+      "workers_dev": false,
+      "routes": [{ "pattern": "sparkcast-realtime.sunabalog.com", "custom_domain": true }],
+      "durable_objects": {
+        "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
+      },
+      "r2_buckets": [{ "binding": "RECORDINGS", "bucket_name": "sparkcast-recordings-prod" }],
+      "vars": {
+        "ALLOWED_ORIGINS": "https://sparkcast.sunabalog.com"
+      }
+    }
+  }
+}

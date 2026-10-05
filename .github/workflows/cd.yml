@@ -2,6 +2,7 @@
 # ブランチで環境を切り替える: develop → dev（sunabalog-dev） / main → prod（sunabalog-prod）
 #   - ui ジョブ   : apps/ui/** の変更で Cloud Run Service を deploy
 #   - infra ジョブ: infra/** または apps/automator/** の変更で terraform apply
+#   - realtime ジョブ: apps/realtime/** の変更で収録ルームの Cloudflare Worker を wrangler deploy（#166）
 # ローカルからの手動 apply は `make terraform-deploy-<env>`、
 # PR プレビューは pr-preview.yml が担当する。
 name: cd
@@ -15,6 +16,7 @@ on:
       - "apps/ui/**"
       - "apps/automator/**"
       - "infra/**"
+      - "apps/realtime/**"
       - ".github/workflows/cd.yml"
       # 手順書などドキュメントのみの変更で apply を走らせない（#125）。
       # 除外は後方のパターンが勝つため、必ず positive の後ろに置くこと。
@@ -59,6 +61,7 @@ jobs:
     outputs:
       ui: ${{ steps.filter.outputs.ui }}
       infra: ${{ steps.filter.outputs.infra }}
+      realtime: ${{ steps.filter.outputs.realtime }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -82,6 +85,9 @@ jobs:
             infra:
               - 'infra/**'
               - 'apps/automator/**'
+            realtime:
+              - 'apps/realtime/**'
+              - '.github/workflows/cd.yml'
 
   # ui のビルド・デプロイ。push で apps/ui/** が変わったとき、または
   # workflow_dispatch で deploy_ui = true を指定したとき。
@@ -256,6 +262,7 @@ jobs:
         run: |
           cat > .env <<EOF
           CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCESS_KEY_ID=${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
           CLOUDFLARE_SECRET_ACCESS_KEY=${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
           EOF
@@ -281,4 +288,80 @@ jobs:
         with:
           webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
           title: "infra deploy (${{ env.ENVIRONMENT }})"
+          username: GitHub Actions
+
+  # 収録ルームの Cloudflare Worker（apps/realtime、#166）。
+  # R2 バケットや secret は infra（Terraform）が作るため、infra の後に走らせる。
+  # secret は Terraform が Secret Manager に置いた JSON を wrangler secret bulk で入れる。
+  # prod は電気通信事業の届出が済むまで出さない（リポジトリ変数 RECORDING_PROD_ENABLED=true で解禁）。
+  realtime:
+    needs: [changes, infra]
+    if: |
+      always() &&
+      needs.infra.result != 'failure' && needs.infra.result != 'cancelled' &&
+      github.event_name == 'push' && needs.changes.outputs.realtime == 'true' &&
+      (github.ref_name != 'main' || vars.RECORDING_PROD_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 8ed20f6872cea7c9219d68bfcf5f98ae
+    defaults:
+      run:
+        working-directory: apps/realtime
+    steps:
+      - name: Resolve environment
+        working-directory: .
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            {
+              echo "ENVIRONMENT=prod"
+              echo "PROJECT_ID=sunabalog-prod"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/697315992056/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-prod.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          else
+            {
+              echo "ENVIRONMENT=dev"
+              echo "PROJECT_ID=sunabalog-dev"
+              echo "WORKLOAD_IDENTITY_PROVIDER=projects/452347646684/locations/global/workloadIdentityPools/github-actions/providers/github-oidc"
+              echo "DEPLOYER_SA=github-actions-deployer@sunabalog-dev.iam.gserviceaccount.com"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/realtime/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy worker
+        run: npx wrangler deploy --env "$ENVIRONMENT"
+
+      - name: Put worker secrets
+        run: |
+          SECRETS_FILE="$(mktemp)"
+          trap 'rm -f "$SECRETS_FILE"' EXIT
+          gcloud secrets versions access latest \
+            --secret=sparkcast-recording-worker-secrets \
+            --project="$PROJECT_ID" > "$SECRETS_FILE"
+          npx wrangler secret bulk "$SECRETS_FILE" --env "$ENVIRONMENT"
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_ACTIONS_WEBHOOK_URL }}
+          title: "realtime worker deploy (${{ env.ENVIRONMENT }})"
           username: GitHub Actions

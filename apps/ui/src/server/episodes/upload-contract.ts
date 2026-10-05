@@ -66,3 +66,14 @@ export function buildEpisodeSourceObjectPath(
 ): string {
   return `podcasts/${podcastId}/episodes/${episodeId}/source/${sanitizeFileName(fileName)}`;
 }
+
+// ブラウザ収録（#166）の mixer が置く FLAC のパス。ユーザーのアップロードでは
+// FLAC を受け付けないので、sanitizeFileName を通さずに組み立てる。
+export function buildRecordingSourceObjectPath(
+  podcastId: number,
+  episodeId: number,
+  sessionId: string,
+): string {
+  const suffix = sessionId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "session";
+  return `podcasts/${podcastId}/episodes/${episodeId}/source/recording-${suffix}.flac`;
+}

@@ -3,7 +3,12 @@ import "server-only";
 import type { QueryResultRow } from "pg";
 import { getDbPool } from "@/server/db";
 import { getAdminFirestore } from "@/server/firebase-admin";
-import type { Episode, EpisodePromotion, EpisodeStatus } from "@/types/episode";
+import type {
+  Episode,
+  EpisodePromotion,
+  EpisodeStatus,
+  TranscriptSegment,
+} from "@/types/episode";
 
 type EpisodeRow = QueryResultRow & {
   episode_id: number;
@@ -20,9 +25,22 @@ type EpisodeRow = QueryResultRow & {
 
 type FirestoreEpisodeContent = {
   transcript_summary?: string;
+  // AI が作った議事録（#166 以降。それ以前は transcripts に議事録を分割して入れていた）
+  minutes?: string;
+  transcript_meta?: {
+    engine?: string;
+    speaker_source?: string;
+    segment_count?: number;
+  };
   editorial?: {
     minutes?: string;
   };
+};
+
+type EpisodeContent = {
+  minutes: string;
+  transcriptAvailable: boolean;
+  promotions: EpisodePromotion[];
 };
 
 function audioFileName(path: string | null): string {
@@ -32,33 +50,34 @@ function audioFileName(path: string | null): string {
 async function loadEpisodeContent(
   podcastId: number,
   episodeId: number,
-): Promise<{
-  minutes: string;
-  promotions: EpisodePromotion[];
-}> {
-  const firestore = getAdminFirestore();
-  const contentRef = firestore
-    .collection("podcasts")
-    .doc(String(podcastId))
-    .collection("episodes_contents")
-    .doc(String(episodeId));
-  const [contentSnapshot, transcriptSnapshot, promotionsSnapshot] =
-    await Promise.all([
-      contentRef.get(),
-      contentRef.collection("transcripts").orderBy("chunk_id").get(),
-      contentRef.collection("sns_promotions").get(),
-    ]);
+): Promise<EpisodeContent> {
+  const contentRef = episodeContentRef(podcastId, episodeId);
+  const [contentSnapshot, promotionsSnapshot] = await Promise.all([
+    contentRef.get(),
+    contentRef.collection("sns_promotions").get(),
+  ]);
 
   const content = contentSnapshot.data() as FirestoreEpisodeContent | undefined;
-  const generatedTranscript = transcriptSnapshot.docs
-    .map((document) => String(document.data().text ?? ""))
-    .filter(Boolean)
-    .join("\n\n");
+  // 以前の形式（transcripts に議事録を分割して保存）のときだけ、transcripts を議事録として連結する。
+  // 新しい形式では transcripts は発話ごと（数百件）なので、一覧のたびに読まない。
+  let legacyMinutes = "";
+  if (!content?.editorial?.minutes && !content?.minutes) {
+    const transcriptSnapshot = await contentRef
+      .collection("transcripts")
+      .orderBy("chunk_id")
+      .get();
+    legacyMinutes = transcriptSnapshot.docs
+      .map((document) => String(document.data().text ?? ""))
+      .filter(Boolean)
+      .join("\n\n");
+  }
   const minutes =
     content?.editorial?.minutes ||
-    generatedTranscript ||
+    content?.minutes ||
+    legacyMinutes ||
     content?.transcript_summary ||
     "";
+  const transcriptAvailable = (content?.transcript_meta?.segment_count ?? 0) > 0;
   const promotions = promotionsSnapshot.docs.map((document) => {
     const data = document.data();
     return {
@@ -81,13 +100,42 @@ async function loadEpisodeContent(
     };
   });
 
-  return { minutes, promotions };
+  return { minutes, transcriptAvailable, promotions };
 }
 
-function toEpisode(
-  row: EpisodeRow,
-  content: { minutes: string; promotions: EpisodePromotion[] },
-): Episode {
+function episodeContentRef(podcastId: number, episodeId: number) {
+  return getAdminFirestore()
+    .collection("podcasts")
+    .doc(String(podcastId))
+    .collection("episodes_contents")
+    .doc(String(episodeId));
+}
+
+// 話者・時刻つきの文字起こし（#166）。時刻順（seg_00001...）。
+export async function listTranscriptSegments(
+  podcastId: number,
+  episodeId: number,
+): Promise<TranscriptSegment[]> {
+  const snapshot = await episodeContentRef(podcastId, episodeId)
+    .collection("transcripts")
+    .orderBy("chunk_id")
+    .get();
+  return snapshot.docs
+    .map((document) => {
+      const data = document.data();
+      return {
+        id: document.id,
+        start: Number(data.start_time ?? 0),
+        end: Number(data.end_time ?? 0),
+        speaker: String(data.speaker ?? ""),
+        speakerId: data.speaker_id ? String(data.speaker_id) : null,
+        text: String(data.text ?? ""),
+      };
+    })
+    .filter((segment) => segment.text.trim().length > 0);
+}
+
+function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
   return {
     id: String(row.episode_id),
     podcastId: row.podcast_id,
@@ -100,6 +148,7 @@ function toEpisode(
     artworkUrl: row.artwork_url || null,
     processingError: row.processing_error,
     minutesGenerated: Boolean(content.minutes),
+    transcriptAvailable: content.transcriptAvailable,
     xPostsGenerated: content.promotions.length > 0,
     seedsGenerated: false,
     minutes: content.minutes,

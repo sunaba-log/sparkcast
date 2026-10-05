@@ -18,6 +18,19 @@ class Summary(BaseModel):
     description: str = Field(..., description="Episode description")
 
 
+class SpeakerAssignment(BaseModel):
+    """1 つの発話の話者."""
+
+    id: int = Field(..., description="発話の番号")
+    speaker: str = Field(..., description="話者名")
+
+
+class SpeakerAssignments(BaseModel):
+    """発話ごとの話者."""
+
+    assignments: list[SpeakerAssignment] = Field(..., description="発話ごとの話者")
+
+
 class SnsPromotionContent(BaseModel):
     """SNS promotion message and hashtags."""
 

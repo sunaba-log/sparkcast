@@ -2,24 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import type { Episode, EpisodePromotion } from "@/types/episode";
-import { Check, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
+import { Check, Minus, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { TranscriptPanel } from "@/components/TranscriptPanel";
+import { formatJstDate, jstParts } from "@/lib/datetime";
+import { htmlToPlainText } from "@/lib/text";
 
-type TabType = "overview" | "minutes" | "promotions";
+type TabType = "overview" | "minutes" | "transcript" | "promotions";
 
+// 日本時間で固定して書式化する（サーバーとブラウザで同じ文字列にし、描画の食い違いを防ぐ）
 function formatDate(dateStr: string) {
-  try {
-    const d = new Date(dateStr);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hours = String(d.getHours()).padStart(2, "0");
-    const mins = String(d.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${mins}:00`;
-  } catch {
-    return dateStr;
-  }
+  const parts = jstParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:00`;
 }
 
 type PodcastInfo = {
@@ -28,6 +24,14 @@ type PodcastInfo = {
   description: string | null;
   coverImageUrl: string | null;
   rssFeedPath: string | null;
+};
+
+const EPISODE_STATUS_LABELS: Record<string, string> = {
+  upload_pending: "アップロード待ち",
+  uploaded: "処理待ち",
+  processing: "処理中",
+  completed: "完了",
+  failed: "失敗",
 };
 
 export function EpisodeMasterDetail({
@@ -254,30 +258,37 @@ export function EpisodeMasterDetail({
                   <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">
                     {ep.title}
                   </h3>
-                  <span className="shrink-0 text-[10px] font-semibold bg-brand text-white px-2 py-0.5">
-                    {ep.status === "completed" ? "完了" : ep.status}
+                  <span
+                    className={`shrink-0 text-[10px] font-semibold text-white px-2 py-0.5 ${ep.status === "failed" ? "bg-red-600" : "bg-brand"}`}
+                  >
+                    {EPISODE_STATUS_LABELS[ep.status] ?? ep.status}
                   </span>
                 </div>
 
                 <div className="flex items-center text-xs space-x-3 mb-2">
-                  <span>再生時間: 45:12</span>
-                  <span>収録日: {ep.createdAt.split("T")[0]}</span>
+                  <span>収録日: {formatJstDate(ep.createdAt)}</span>
                 </div>
 
                 <p className="text-xs text-gray-600 line-clamp-2 mb-3 leading-relaxed">
-                  概要: {ep.description || ep.minutes?.slice(0, 80) || "概要文がまだ設定されていません。"}
+                  概要: {htmlToPlainText(ep.description) || ep.minutes?.slice(0, 80) || "概要文がまだ設定されていません。"}
                 </p>
 
+                {/* できているものだけに印を付ける（以前は処理の結果によらず 3 つとも付いていた） */}
                 <div className="flex items-center gap-4 text-[11px] text-gray-600 border-t border-brand/30 pt-2 font-medium">
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" /> 配信済み
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" /> 議事録
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" /> X投稿文
-                  </span>
+                  {[
+                    { label: "配信済み", done: ep.status === "completed" && ep.audioUrl !== null },
+                    { label: "議事録", done: ep.minutesGenerated },
+                    { label: "X投稿文", done: ep.xPostsGenerated },
+                  ].map((item) => (
+                    <span key={item.label} className={`flex items-center gap-1 ${item.done ? "" : "text-gray-400"}`}>
+                      {item.done ? (
+                        <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" />
+                      ) : (
+                        <Minus className="w-3.5 h-3.5" aria-label="未作成" />
+                      )}
+                      {item.label}
+                    </span>
+                  ))}
                 </div>
               </div>
             );
@@ -288,11 +299,12 @@ export function EpisodeMasterDetail({
         {selectedEpisode && (
           <div className="col-span-7 rounded-xs border-l border-brand/30 flex flex-col overflow-hidden">
             {/* Top Bar Tabs & Actions */}
-            <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
-              <div className="flex items-center space-x-6">
+            {/* 幅が狭いとき、タブの文字を縦に折らずにタブごと折り返す */}
+            <div className="px-5 py-1 border-b border-brand flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 min-w-0">
                 <button
                   onClick={() => setActiveTab("overview")}
-                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "overview"
+                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "overview"
                     ? "border-brand text-brand"
                     : "border-transparent text-gray-500 hover:text-gray-800"
                     }`}
@@ -301,7 +313,7 @@ export function EpisodeMasterDetail({
                 </button>
                 <button
                   onClick={() => setActiveTab("minutes")}
-                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "minutes"
+                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "minutes"
                     ? "border-brand text-brand"
                     : "border-transparent text-gray-500 hover:text-gray-800"
                     }`}
@@ -309,8 +321,17 @@ export function EpisodeMasterDetail({
                   議事録
                 </button>
                 <button
+                  onClick={() => setActiveTab("transcript")}
+                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "transcript"
+                    ? "border-brand text-brand"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
+                >
+                  文字起こし
+                </button>
+                <button
                   onClick={() => setActiveTab("promotions")}
-                  className={`py-1 text-sm font-semibold border-b-2 transition-colors ${activeTab === "promotions"
+                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "promotions"
                     ? "border-brand text-brand"
                     : "border-transparent text-gray-500 hover:text-gray-800"
                     }`}
@@ -319,11 +340,11 @@ export function EpisodeMasterDetail({
                 </button>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-emerald-600 text-white rounded-xs text-xs font-semibold">
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="px-3 py-1 whitespace-nowrap bg-emerald-600 text-white rounded-xs text-xs font-semibold">
                   配信済み
                 </span>
-                <button className="px-3 py-1 border border-gray-300 hover:bg-gray-50 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1">
+                <button className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-gray-50 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1">
                   <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                   削除
                 </button>
@@ -521,6 +542,24 @@ export function EpisodeMasterDetail({
                     />
                   )}
                 </div>
+              )}
+
+              {activeTab === "transcript" && (
+                <TranscriptPanel
+                  episodeId={selectedEpisode.id}
+                  available={selectedEpisode.transcriptAvailable}
+                  currentTime={currentTime}
+                  canSeek={Boolean(selectedEpisode.audioUrl)}
+                  onSeek={(seconds) => {
+                    if (!audioRef.current) return;
+                    audioRef.current.currentTime = seconds;
+                    setCurrentTime(seconds);
+                    audioRef.current
+                      .play()
+                      .then(() => setIsPlaying(true))
+                      .catch(() => undefined);
+                  }}
+                />
               )}
 
               {activeTab === "promotions" && (
