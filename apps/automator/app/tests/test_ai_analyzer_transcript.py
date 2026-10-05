@@ -25,7 +25,7 @@ def _respond(analyzer: AudioAnalyzer, text: str) -> MagicMock:
 
 def test_generate_minutes_uses_the_transcript_times_and_forbids_invented_dates(analyzer: AudioAnalyzer) -> None:
     generate = _respond(analyzer, "minutes")
-    assert analyzer.generate_minutes("[0:05] 小野: こんにちは", ["小野", "数森"], model_id="m") == "minutes"
+    assert analyzer.generate_minutes("[0:05] 小野: こんにちは", ["小野", "数森"], model_id="m") == "## 要約\nminutes"
     prompt = generate.call_args.kwargs["contents"][0]
     assert "[0:05] 小野: こんにちは" in prompt
     assert "登場人物: 小野、数森" in prompt

@@ -77,6 +77,18 @@ def drop_empty_sections(minutes: str) -> str:
     return "\n".join(kept).strip()
 
 
+def normalize_minutes(minutes: str) -> str:
+    """モデルが書いた要点録の形をそろえる.
+
+    - 先頭の「## 要約」の見出しが抜けて要約の文から始まっていたら補う
+    - 中身が「なし」だけの節を消す
+    """
+    text = minutes.strip()
+    if text and not text.startswith("#"):
+        text = f"## 要約\n{text}"
+    return drop_empty_sections(text)
+
+
 def extract_topics(minutes: str) -> list[dict[str, str]]:
     """議事録の【目次】から `{time, title}` を取り出す(見つからなければ空)."""
     topics: list[dict[str, str]] = []

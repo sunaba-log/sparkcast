@@ -9,7 +9,7 @@ from google.genai.types import GenerateContentConfig, Part
 
 from domain.interfaces import TranscriptProvider
 from domain.models import SnsPromotionsResponse, SpeakerAssignments, Summary
-from domain.models.transcript import TranscriptSegment, drop_empty_sections, format_timestamp
+from domain.models.transcript import TranscriptSegment, format_timestamp, normalize_minutes
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,11 @@ MINUTES_INSTRUCTIONS = """
 この要点録は、エピソードの画面で人が読むほか、チャットの検索、エピソードのタイトルと概要文の作成、次回の議題の提案にも使います。
 
 # 出力の構成(この順で。該当が無い節は見出しごと書かない。「なし」「特になし」とも書かない)
-## 要約 … 2〜3 文。何を話し、何が決まり、何が残ったか。
-## 【目次】 … 話題の始まりを「m:ss 題」の 1 行ずつで書く。時刻に角括弧や記号は付けない。題は 20 字程度まで。3〜5 分で 1 つを目安にし、細かく割りすぎない。目次の直後には必ず次の見出しを置く。
-## 話題ごとのまとめ … 話題ごとに「### 開始時刻〜終了時刻 題」の見出しを付け、その下に箇条書きで要点を 3〜6 個書く。
+## 要約 … 2〜3 文。何を話し、何が決まり、何が残ったか。必ず「## 要約」の見出しから書き始める。
+## 【目次】 … 話題の始まりを「m:ss 題」の 1 行ずつで書く。時刻に角括弧や記号は付けない。題は 20 字程度まで。3〜5 分で 1 つを目安にし、細かく割りすぎない。最初の行は文字起こしの最初の発言の時刻から始め、冒頭の話題も落とさない。目次の直後には必ず次の見出しを置く。
+## 話題ごとのまとめ … 目次の話題ごとに「### 開始時刻〜終了時刻 題」の見出しを付け(目次と同じ数・同じ題・同じ開始時刻にする)、その下に箇条書きで要点を 3〜6 個書く。
   - 意見が分かれたときや誰かが提案したときだけ、「- 立場:」の下に「  - 名前:主張」を 1 行ずつ書く。全員の発言を並べる欄にはしない。
-  - 結論があれば「- 結論:」に、合意/保留/意見が分かれた のどれかと中身を書く。
+  - 話し合って何かを決めたとき・決めきれなかったときだけ、「- 結論:」に 合意/保留/意見が分かれた のどれかと中身を書く。紹介や感想だけの話題には書かない(「〜が評価された」のような結論は作らない)。
   - 印象に残る言い回しがあれば「- 引用:「…」(名前)」を 30 字程度まで、1 話題に 1 個まで、全体で 3 個まで書いてよい。
 ## 決定事項 … 決まったことと、その話題の時刻。
 ## ToDo … 「- [ ] 名前:やること」。期限は文字起こしにあるときだけ書く。
@@ -152,7 +152,7 @@ class AudioAnalyzer(TranscriptProvider):
         )
         if not response.text:
             raise ValueError("No minutes received from the model.")
-        return drop_empty_sections(response.text)
+        return normalize_minutes(response.text)
 
     def assign_speakers(
         self,

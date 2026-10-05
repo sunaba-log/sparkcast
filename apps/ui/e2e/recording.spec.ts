@@ -101,7 +101,7 @@ async function enterRoom(participant: Participant, options: { name?: string; con
     await page.getByLabel("表示名").fill(options.name);
   }
   if (options.consent) {
-    await page.getByRole("checkbox").check();
+    await page.getByRole("checkbox", { name: /同意/ }).check();
   }
   const join = page.getByRole("button", { name: "入室する" });
   await expect(join).toBeEnabled({ timeout: 30_000 });
