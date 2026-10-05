@@ -233,7 +233,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={500}
-              placeholder="例: 小野、数森、高島"
+              placeholder="例: さとう、すずき、たかはし"
               className="w-full px-3.5 py-2 rounded-xs border border-brand text-base sm:text-sm text-gray-900 focus:outline-none focus:border-brand"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -442,7 +442,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={500}
-              placeholder="例: 小野、数森、高島"
+              placeholder="例: さとう、すずき、たかはし"
               className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
             />
             <p className="text-xs text-gray-500 mt-1">
