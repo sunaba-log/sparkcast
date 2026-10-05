@@ -23,6 +23,13 @@ export function jstParts(value: string | Date): {
   return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour, minute: parts.minute };
 }
 
+// 例: 2026-10-04（日本時間の日付）
+export function formatJstDate(value: string | Date): string {
+  const parts = jstParts(value);
+  if (!parts) return String(value);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 // 例: 2026/10/04 11:03
 export function formatJstDateTime(value: string | Date): string {
   const parts = jstParts(value);
