@@ -1,0 +1,68 @@
+{
+  "source_commit": "cc2fabc4940618210479e5ee13f8d5a131cac64c",
+  "executed_at_utc": "2026-10-06T05:39:44.159603+00:00",
+  "method": "real use cases with injected synthetic dependencies and blocked sockets",
+  "live_services_tested": false,
+  "observations": [
+    {
+      "id": "audit_outage",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [
+        "synthetic/ep/1/audio.mp3",
+        "synthetic/feed.xml"
+      ],
+      "audit_api_attempts": 1,
+      "awaiting_approval": false,
+      "completed": true,
+      "notification_calls": 3,
+      "status": "gap"
+    },
+    {
+      "id": "empty_response",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [
+        "synthetic/ep/1/audio.mp3",
+        "synthetic/feed.xml"
+      ],
+      "audit_api_attempts": 1,
+      "awaiting_approval": false,
+      "completed": true,
+      "notification_calls": 3,
+      "status": "gap"
+    },
+    {
+      "id": "no_segments",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [
+        "synthetic/ep/1/audio.mp3",
+        "synthetic/feed.xml"
+      ],
+      "audit_api_attempts": 0,
+      "awaiting_approval": false,
+      "completed": true,
+      "notification_calls": 3,
+      "status": "gap"
+    },
+    {
+      "id": "intervention",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [],
+      "audit_api_attempts": 1,
+      "awaiting_approval": true,
+      "completed": false,
+      "notification_calls": 3,
+      "status": "observed_stop"
+    },
+    {
+      "id": "sns_unapproved_missing_credentials",
+      "requirement": "PUB-01/PUB-03",
+      "expected": "No send for an unapproved post or unresolved channel credentials",
+      "default_client_send_calls": 1,
+      "status": "gap"
+    }
+  ]
+}
