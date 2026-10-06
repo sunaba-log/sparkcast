@@ -96,4 +96,4 @@ cloudflare provider の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_app`
 2. リポジトリ変数 `RECORDING_PROD_ENABLED=true` を設定する（CD が prod に Worker を出すようになる）。
 3. CD を `workflow_dispatch`（main、`deploy_realtime = true`）で動かし、Worker のデプロイと secret の投入を行う。
 4. UI の Cloud Run に env を足すので、`infra/ui_cloud_run.tf` の `template[0].revision` の ignore を apply の間だけ外す（409 の回避）。
-5. プライバシーポリシーに、音声の取得と利用目的を書き足す。
+5. プライバシーポリシー（`/privacy`）に、音声の取得と利用目的を書いた（#174）。
