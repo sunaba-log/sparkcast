@@ -3,7 +3,7 @@ import { getSessionUser } from "@/server/auth";
 import { getDbPool } from "@/server/db";
 import { listUsers } from "@/server/admin/users-repository";
 import { listPreRegisteredEmails } from "@/server/admin/pre-registered-emails-repository";
-import { isAdminUser } from "@/server/env";
+import { isAdminUser, isRecordingEnabled } from "@/server/env";
 import { AdminUsersPanel } from "@/components/AdminUsersPanel";
 import { AdminPreRegisteredEmailsPanel } from "@/components/AdminPreRegisteredEmailsPanel";
 
@@ -28,7 +28,11 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <AdminUsersPanel users={users} isAdmin={user.isAdmin} />
+      <AdminUsersPanel
+        users={users}
+        isAdmin={user.isAdmin}
+        recordingEnabled={isRecordingEnabled()}
+      />
       {user.isAdmin && (
         <AdminPreRegisteredEmailsPanel emails={preRegisteredEmails} />
       )}

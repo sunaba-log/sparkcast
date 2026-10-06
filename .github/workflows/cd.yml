@@ -42,6 +42,11 @@ on:
         required: false
         default: false
         type: boolean
+      deploy_realtime:
+        description: "realtime: 収録ルームの Worker をデプロイし secret を入れ直す"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: cd-${{ github.ref_name }}
@@ -293,13 +298,15 @@ jobs:
   # 収録ルームの Cloudflare Worker（apps/realtime、#166）。
   # R2 バケットや secret は infra（Terraform）が作るため、infra の後に走らせる。
   # secret は Terraform が Secret Manager に置いた JSON を wrangler secret bulk で入れる。
-  # prod は電気通信事業の届出が済むまで出さない（リポジトリ変数 RECORDING_PROD_ENABLED=true で解禁）。
+  # prod はリポジトリ変数 RECORDING_PROD_ENABLED=true のときだけ出す（#174 で解禁）。
+  # 初回や secret の入れ直しは workflow_dispatch の deploy_realtime で行う。
   realtime:
     needs: [changes, infra]
     if: |
       always() &&
       needs.infra.result != 'failure' && needs.infra.result != 'cancelled' &&
-      github.event_name == 'push' && needs.changes.outputs.realtime == 'true' &&
+      ((github.event_name == 'push' && needs.changes.outputs.realtime == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.deploy_realtime)) &&
       (github.ref_name != 'main' || vars.RECORDING_PROD_ENABLED == 'true')
     runs-on: ubuntu-latest
     env:

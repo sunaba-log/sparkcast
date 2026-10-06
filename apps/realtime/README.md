@@ -32,4 +32,4 @@ TURN_KEY_TOKEN=...
 ## デプロイ
 
 `npx wrangler deploy --env dev`（`sparkcast-realtime-dev.sunabalog.com`）。secret は GCP Secret Manager の値を CD が `wrangler secret bulk` で入れる。
-prod（`--env prod`）は電気通信事業の届出が済むまでデプロイしない。
+prod（`--env prod`、`sparkcast-realtime.sunabalog.com`）は、リポジトリ変数 `RECORDING_PROD_ENABLED=true` のときだけ CD が出す。使えるのは admin と制限を解除したユーザーだけ（#174）。

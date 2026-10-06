@@ -204,6 +204,11 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
       >
         {loading ? "ログイン中..." : "Googleでログイン"}
       </button>
+      <p className="mt-4 text-center text-xs text-gray-500">
+        <a href="/privacy" className="underline hover:text-gray-700">
+          プライバシーポリシー
+        </a>
+      </p>
     </div>
   );
 }
