@@ -120,7 +120,9 @@ def main() -> int:
             print(f"refused: real model calls need EVAL_ALLOW_REAL_MODEL=1 and project in {ALLOWED_PROJECTS}", file=sys.stderr)
             return 2
         analyzer = AudioAnalyzer(project_id=project)
-        analyzer.client = SimpleNamespace(models=RecordingModels(analyzer.client.models))
+        real_client = analyzer.client
+        # 元の genai.Client を保持する。参照が切れると回収時に通信が閉じられ、以降の呼び出しが失敗する
+        analyzer.client = SimpleNamespace(models=RecordingModels(real_client.models), _real_client=real_client)
     recorder: RecordingModels = analyzer.client.models
 
     cases = json.loads((HERE / "generation-cases.json").read_text())["cases"]
