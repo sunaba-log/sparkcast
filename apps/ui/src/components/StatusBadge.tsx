@@ -4,9 +4,9 @@ const statusConfig: Record<EpisodeStatus, { label: string; className: string }> 
   upload_pending: { label: "アップロード待ち", className: "bg-gray-100 text-gray-700" },
   uploaded: { label: "アップロード済み", className: "bg-blue-100 text-blue-800" },
   processing: { label: "処理中", className: "bg-yellow-100 text-yellow-800" },
-  auditing: { label: "監査中", className: "bg-violet-100 text-violet-800" },
+  auditing: { label: "監査中", className: "bg-purple-100 text-purple-800" },
   awaiting_approval: { label: "承認待ち", className: "bg-amber-100 text-amber-800" },
-  editing: { label: "音声編集中", className: "bg-sky-100 text-sky-800" },
+  editing: { label: "編集・合成中", className: "bg-indigo-100 text-indigo-800" },
   completed: { label: "完了", className: "bg-green-100 text-green-800" },
   failed: { label: "失敗", className: "bg-red-100 text-red-800" },
 };

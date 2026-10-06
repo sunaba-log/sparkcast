@@ -76,6 +76,13 @@ export function RegisterForm({
         >
           {loading ? "登録中..." : "登録して開始"}
         </button>
+        <p className="text-center text-xs text-gray-500">
+          登録すると、
+          <a href="/privacy" target="_blank" rel="noopener" className="underline hover:text-gray-700">
+            プライバシーポリシー
+          </a>
+          に沿って情報を取り扱います。
+        </p>
       </form>
     </div>
   );

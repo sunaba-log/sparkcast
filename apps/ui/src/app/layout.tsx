@@ -66,7 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               userDisplayName={user.displayName}
               userRegistered={user.registered}
               userIsAdmin={user.isAdmin}
-              recordingEnabled={isRecordingEnabled()}
+              recordingEnabled={isRecordingEnabled() && user.canRecord}
             />
           )}
           <main className="flex-1 overflow-y-auto bg-app-bg p-6">{children}</main>

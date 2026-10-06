@@ -99,8 +99,10 @@ upload_pending -> uploaded -> processing -> auditing -> awaiting_approval -> edi
 
 AIディレクターの監査結果は Firestore の
 `podcasts/{podcastId}/episodes_contents/{episodeId}/director_interventions` に保存されます。
-各ドキュメントには `insert_at`（秒）、`source_text`、`speaker`、`severity`（1〜5）、
-`category`、`correction_script`、`status`（`pending` / `approved` / `rejected`）を持たせます。
+各ドキュメントには `chunk_id`、`target_speaker`、`insert_timestamp_ms`、
+`audit_metrics.score`（1〜5）、`audit_metrics.choice`、`correction_script`、
+`status`（`pending` / `approved` / `rejected`）を持たせます。元の発話は
+対応する `transcripts/{chunk_id}` から参照します。
 承認後の音声編集ジョブには `AUDIO_EDITOR_URL` を設定します。必要に応じて
 `AUDIO_EDITOR_API_TOKEN` を設定すると、呼び出し時に Bearer トークンとして送信されます。
 

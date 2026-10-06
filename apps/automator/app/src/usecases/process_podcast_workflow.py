@@ -9,14 +9,22 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from domain.models import EpisodeObjectReference
+from domain.models import EpisodeObjectReference, UtteranceChunk
 from domain.models.transcript import extract_topics
 from services.episode_transcription import EpisodeTranscription
 
 if TYPE_CHECKING:
     import logging
 
-    from domain.interfaces import BlobSource, EpisodeRepository, NotificationGateway, ObjectStorage, TranscriptProvider
+    from domain.interfaces import (
+        BlobSource,
+        DirectorScriptGeneratorGateway,
+        EpisodeRepository,
+        FactCheckAuditorGateway,
+        NotificationGateway,
+        ObjectStorage,
+        TranscriptProvider,
+    )
     from services.firestore_manager import FirestoreManager
 
 
@@ -61,6 +69,9 @@ class AudioInfoReader(Protocol):
         """Return [size_bytes, duration_str]."""
 
 
+INTERVENTION_THRESHOLD_SCORE = 3
+
+
 @dataclass(frozen=True)
 class ProcessPodcastWorkflowInput:
     """Input parameters for podcast processing workflow."""
@@ -94,6 +105,8 @@ class ProcessPodcastWorkflow:
         logger: logging.Logger,
         transcription: EpisodeTranscription | None = None,
         knowledge_reindexer: KnowledgeReindexer | None = None,
+        fact_check_auditor: FactCheckAuditorGateway | None = None,
+        director_script_generator: DirectorScriptGeneratorGateway | None = None,
     ) -> None:
         """Initialize use case dependencies.
 
@@ -111,6 +124,8 @@ class ProcessPodcastWorkflow:
         self._firestore_manager = firestore_manager
         self._episode_repository = episode_repository
         self._logger = logger
+        self._fact_check_auditor = fact_check_auditor
+        self._director_script_generator = director_script_generator
         self._transcription = transcription or EpisodeTranscription(
             transcript_provider=transcript_provider,
             episode_repository=episode_repository,
@@ -176,6 +191,93 @@ class ProcessPodcastWorkflow:
             self._notifier.send_discord_message(
                 message=f"New Podcast Processed:\nTitle: {summary.title}\nDescription: {summary.description}"
             )
+
+            # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170)
+            if self._fact_check_auditor is not None and transcription.segments:
+                self._logger.info("\n## Step2.5: Running Jev Fast Audit and Gemini Director Pipeline... ##")
+                self._episode_repository.mark_auditing(
+                    podcast_id=episode_ref.podcast_id,
+                    episode_id=episode_ref.episode_id,
+                )
+                chunks = [
+                    UtteranceChunk.from_segment(seg, idx) for idx, seg in enumerate(transcription.segments, start=1)
+                ]
+                audit_results = self._fact_check_auditor.audit_chunks(chunks)
+                severe_items = [(c, m) for c, m in audit_results if m.score >= INTERVENTION_THRESHOLD_SCORE]
+                self._logger.info(
+                    "Jev audit finished: %d chunks, %d severe errors (Score >= %d)",
+                    len(chunks),
+                    len(severe_items),
+                    INTERVENTION_THRESHOLD_SCORE,
+                )
+
+                interventions = []
+                if severe_items and self._director_script_generator is not None:
+                    cast_names = self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id)
+                    for c, m in severe_items:
+                        intervention = self._director_script_generator.generate_intervention(
+                            chunk=c,
+                            metric=m,
+                            all_chunks=chunks,
+                            cast_names=cast_names,
+                            model_id=request.ai_model_id,
+                        )
+                        interventions.append(intervention)
+
+                if interventions:
+                    if self._firestore_manager is not None:
+                        generated_at = datetime.now(UTC).isoformat()
+                        show_notes_summary = {
+                            "overview": summary.description,
+                            "topics": extract_topics(transcript) or [{"time": "00:00", "title": summary.title}],
+                        }
+                        audio_metadata = {
+                            "file_size_bytes": file_size_bytes,
+                            "duration_str": duration_str,
+                            "audio_url": "",
+                            "mime_type": audio_upload_mime_type,
+                        }
+                        self._firestore_manager.save_episode_content(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            episode_number=latest_episode_number,
+                            updated_at=generated_at,
+                            transcript_summary=summary.description,
+                            ai_generated_meta={
+                                "title": summary.title,
+                                "description": summary.description,
+                                "prompt_version": "v1",
+                                "generated_at": generated_at,
+                            },
+                            show_notes_summary=show_notes_summary,
+                            audio_metadata=audio_metadata,
+                            minutes=transcript,
+                            transcript_meta=transcription.meta,
+                        )
+                        self._firestore_manager.save_transcript_segments(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            segments=transcription.segments,
+                        )
+                        self._firestore_manager.save_director_interventions(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            interventions=interventions,
+                        )
+
+                    self._episode_repository.mark_awaiting_approval(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                    )
+                    self._logger.info("Marked episode %s as awaiting_approval", episode_ref.episode_id)
+                    self._notifier.send_discord_message(
+                        message=(
+                            f"#{latest_episode_number} AIディレクターによる訂正提案が {len(interventions)} 件あります。\n"
+                            f"タイトル: {summary.title}\n"
+                            f"管理画面(UI)で承認を行ってください。"
+                        )
+                    )
+                    return
 
             self._logger.info("\n## Step3: Uploading to Cloudflare R2... ##")
 

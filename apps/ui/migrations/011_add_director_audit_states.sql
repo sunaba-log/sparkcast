@@ -1,3 +1,4 @@
+-- Add auditing, awaiting_approval, and editing states to episodes table
 ALTER TABLE episodes
   DROP CONSTRAINT IF EXISTS episodes_status_valid;
 

@@ -46,12 +46,14 @@ type EpisodeContent = {
 };
 
 type FirestoreDirectorIntervention = {
-  insert_at?: number;
-  source_text?: string;
-  speaker?: string;
-  severity?: number;
-  category?: string;
+  chunk_id?: string;
+  target_speaker?: string;
+  insert_timestamp_ms?: number;
   correction_script?: string;
+  audit_metrics?: {
+    score?: number;
+    choice?: string;
+  };
   status?: string;
 };
 
@@ -150,17 +152,18 @@ export async function listTranscriptSegments(
 function toDirectorIntervention(
   id: string,
   data: FirestoreDirectorIntervention,
+  sourceText: string,
 ): DirectorIntervention {
-  const severity = Math.min(5, Math.max(1, Math.round(Number(data.severity ?? 1)))) as 1 | 2 | 3 | 4 | 5;
+  const severity = Math.min(5, Math.max(1, Math.round(Number(data.audit_metrics?.score ?? 1)))) as 1 | 2 | 3 | 4 | 5;
   const status: DirectorInterventionStatus =
     data.status === "approved" || data.status === "rejected" ? data.status : "pending";
   return {
     id,
-    insertAt: Number(data.insert_at ?? 0),
-    sourceText: String(data.source_text ?? ""),
-    speaker: String(data.speaker ?? ""),
+    insertAt: Number(data.insert_timestamp_ms ?? 0) / 1_000,
+    sourceText,
+    speaker: String(data.target_speaker ?? ""),
     severity,
-    category: String(data.category ?? "未分類"),
+    category: String(data.audit_metrics?.choice ?? "other"),
     correctionScript: String(data.correction_script ?? ""),
     status,
   };
@@ -170,16 +173,27 @@ export async function listDirectorInterventions(
   podcastId: number,
   episodeId: number,
 ): Promise<DirectorIntervention[]> {
-  const snapshot = await episodeContentRef(podcastId, episodeId)
-    .collection("director_interventions")
-    .orderBy("insert_at")
-    .get();
-  return snapshot.docs.map((document) =>
-    toDirectorIntervention(
+  const contentRef = episodeContentRef(podcastId, episodeId);
+  const [interventionsSnapshot, transcriptsSnapshot] = await Promise.all([
+    contentRef.collection("director_interventions").get(),
+    contentRef.collection("transcripts").get(),
+  ]);
+  const sourceTextByChunkId = new Map(
+    transcriptsSnapshot.docs.map((document) => [
       document.id,
-      document.data() as FirestoreDirectorIntervention,
-    ),
+      String(document.data().text ?? ""),
+    ]),
   );
+  return interventionsSnapshot.docs
+    .map((document) => {
+      const data = document.data() as FirestoreDirectorIntervention;
+      return toDirectorIntervention(
+        document.id,
+        data,
+        sourceTextByChunkId.get(String(data.chunk_id ?? "")) ?? "",
+      );
+    })
+    .sort((left, right) => left.insertAt - right.insertAt);
 }
 
 export async function updateDirectorInterventions(input: {

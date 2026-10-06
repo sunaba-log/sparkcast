@@ -32,12 +32,14 @@ injected by the GitHub Actions workflows (`.github/workflows/`).
 | `ENABLE_GUEST_MODE` | Optional | 通常は未設定（ローカルはモック認証を使う） | gcloud で dev の Cloud Run にのみ設定 | `true` でログイン画面に「ゲストとして試す」を表示し、共有ゲストアカウントで利用可能にする。prod には設定しない。 |
 | `GUEST_EMAIL` | Optional | 未設定 | 未設定（デフォルトを使用） | ゲストアカウントのメール。デフォルトは `guest@sunabalog.com`。 |
 | `RATE_LIMIT_HOURLY` / `RATE_LIMIT_DAILY` | Optional | 未設定 | 未設定（デフォルト 20 / 100） | ユーザー単位のレート制限。ゲストモード中は全ゲストで共有されるため、審査期間中は dev で引き上げる。 |
-| `RECORDING_ENABLED` | Optional | `true`（収録ルームを試すとき） | `infra/ui_cloud_run.tf`（`enable_recording = true` の環境のみ） | ブラウザ収録ルーム（#166）。未設定なら `/record`・`/join`・API は 404。prod は電気通信事業の届出まで未設定。 |
+| `RECORDING_ENABLED` | Optional | `true`（収録ルームを試すとき） | `infra/ui_cloud_run.tf`（`enable_recording = true` の環境のみ） | ブラウザ収録ルーム（#166）。未設定なら `/record`・`/join`・API は 404。使えるのは admin と制限を解除したユーザーだけ（#174）。 |
 | `RECORDING_ROOM_SECRET` | 収録時のみ Required | 任意の長いランダム文字列（Worker の `.dev.vars` と揃える） | Secret Manager（`sparkcast-recording-room-secret`） | ルーム JWT・招待キー・再入室キーの署名。Worker の `ROOM_SECRET` と同じ値。 |
 | `RECORDING_SERVICE_SECRET` | 収録時のみ Required | 同上 | Secret Manager（`sparkcast-recording-service-secret`） | UI → Worker の内部 API とダウンロード URL の署名。Worker の `SERVICE_SECRET` と同じ値。 |
 | `REALTIME_BASE_URL` | 収録時のみ Required | `http://localhost:8787`（`wrangler dev`） | `infra/ui_cloud_run.tf` | 収録ルームの Cloudflare Worker（apps/realtime）。 |
 | `MIXER_JOB_NAME` | エピソード化に Required | 未設定でも入室・録音は試せる | `infra/ui_cloud_run.tf` | `projects/{p}/locations/{r}/jobs/{name}`。ローカルから起動するときは `GOOGLE_OAUTH_ACCESS_TOKEN` も要る。 |
 | `RECORDING_MAX_PARTICIPANTS` / `RECORDING_ROOM_TTL_HOURS` / `PENDING_RECORDING_SESSION_LIMIT` | Optional | 未設定 | 未設定（6 人 / 6 時間 / 2 回） | 定員・ルームの期限・承認待ちユーザーの作成回数。 |
+| `AUDIO_EDITOR_URL` | AIディレクター編集時 Required | 音声編集ジョブのHTTPエンドポイント | `infra/ui_cloud_run.tf` | 承認済み訂正案を音声合成・カットイン編集ジョブへ送信するURL。 |
+| `AUDIO_EDITOR_API_TOKEN` | Optional | 音声編集ジョブの認証トークン | Secret Manager | 設定時、`AUDIO_EDITOR_URL` 呼び出しにBearerトークンとして送信する。 |
 
 ## Current Secret Stores
 

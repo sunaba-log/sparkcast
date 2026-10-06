@@ -16,6 +16,7 @@ export default async function HostRecordingPage({
 }) {
   if (!isRecordingEnabled()) notFound();
   const user = await requireRegisteredUser();
+  if (!user.canRecord) notFound();
   const { sessionId } = await params;
   const pool = await getDbPool();
   const session = await getRecordingSession(pool, sessionId);

@@ -36,7 +36,7 @@ const EPISODE_STATUS_LABELS: Record<string, string> = {
   processing: "処理中",
   auditing: "監査中",
   awaiting_approval: "承認待ち",
-  editing: "音声編集中",
+  editing: "編集・合成中",
   completed: "完了",
   failed: "失敗",
 };
