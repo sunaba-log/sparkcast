@@ -68,3 +68,16 @@ export type TranscriptSegment = {
   speakerId: string | null;
   text: string;
 };
+
+export type DirectorInterventionStatus = "pending" | "approved" | "rejected";
+
+export type DirectorIntervention = {
+  id: string;
+  insertAt: number;
+  sourceText: string;
+  speaker: string;
+  severity: 1 | 2 | 3 | 4 | 5;
+  category: string;
+  correctionScript: string;
+  status: DirectorInterventionStatus;
+};

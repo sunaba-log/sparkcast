@@ -38,6 +38,8 @@ injected by the GitHub Actions workflows (`.github/workflows/`).
 | `REALTIME_BASE_URL` | 収録時のみ Required | `http://localhost:8787`（`wrangler dev`） | `infra/ui_cloud_run.tf` | 収録ルームの Cloudflare Worker（apps/realtime）。 |
 | `MIXER_JOB_NAME` | エピソード化に Required | 未設定でも入室・録音は試せる | `infra/ui_cloud_run.tf` | `projects/{p}/locations/{r}/jobs/{name}`。ローカルから起動するときは `GOOGLE_OAUTH_ACCESS_TOKEN` も要る。 |
 | `RECORDING_MAX_PARTICIPANTS` / `RECORDING_ROOM_TTL_HOURS` / `PENDING_RECORDING_SESSION_LIMIT` | Optional | 未設定 | 未設定（6 人 / 6 時間 / 2 回） | 定員・ルームの期限・承認待ちユーザーの作成回数。 |
+| `AUDIO_EDITOR_URL` | AIディレクター編集時 Required | 音声編集ジョブのHTTPエンドポイント | `infra/ui_cloud_run.tf` | 承認済み訂正案を音声合成・カットイン編集ジョブへ送信するURL。 |
+| `AUDIO_EDITOR_API_TOKEN` | Optional | 音声編集ジョブの認証トークン | Secret Manager | 設定時、`AUDIO_EDITOR_URL` 呼び出しにBearerトークンとして送信する。 |
 
 ## Current Secret Stores
 
