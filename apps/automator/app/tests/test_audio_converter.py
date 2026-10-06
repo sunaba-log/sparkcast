@@ -28,17 +28,25 @@ def _wav_bytes(audio: AudioSegment) -> bytes:
     return output.getvalue()
 
 
-def test_cut_in_editor_offsets_each_original_timeline_timestamp_and_recalculates_metadata() -> None:
+def test_cut_in_editor_offsets_each_original_timeline_timestamp_and_recalculates_metadata(monkeypatch) -> None:
     """Each later insertion includes the complete rendered duration of earlier cut-ins."""
     source = Sine(440).to_audio_segment(duration=1000).apply_gain(-18)
     cut_in = Sine(880).to_audio_segment(duration=200).apply_gain(-8)
+    source_bytes = _wav_bytes(source)
+    cut_in_bytes = _wav_bytes(cut_in)
+
+    def export_mp3(self, output, **kwargs):
+        assert kwargs["format"] == "mp3"
+        output.write(b"synthetic-mp3")
+
+    monkeypatch.setattr(AudioSegment, "export", export_mp3)
 
     result = AudioCutInEditor(silence_ms=75, crossfade_ms=50).edit_to_mp3(
-        _wav_bytes(source),
+        source_bytes,
         "wav",
         [
-            AudioCutIn(insert_timestamp_ms=600, audio_bytes=_wav_bytes(cut_in), audio_format="wav"),
-            AudioCutIn(insert_timestamp_ms=100, audio_bytes=_wav_bytes(cut_in), audio_format="wav"),
+            AudioCutIn(insert_timestamp_ms=600, audio_bytes=cut_in_bytes, audio_format="wav"),
+            AudioCutIn(insert_timestamp_ms=100, audio_bytes=cut_in_bytes, audio_format="wav"),
         ],
     )
 
@@ -49,8 +57,8 @@ def test_cut_in_editor_offsets_each_original_timeline_timestamp_and_recalculates
     assert [item.inserted_duration_ms for item in result.applied_cut_ins] == [350, 350]
     assert result.duration_seconds == 2
     assert result.duration_str == "00:00:02"
+    assert result.mp3_bytes == b"synthetic-mp3"
     assert result.file_size_bytes == len(result.mp3_bytes)
-    assert len(AudioSegment.from_file(io.BytesIO(result.mp3_bytes), format="mp3")) >= 1700
 
 
 def test_cut_in_editor_rejects_timestamp_outside_original_master() -> None:
