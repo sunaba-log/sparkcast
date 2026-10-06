@@ -27,12 +27,18 @@ class AutoPostSnsUsecase:
         secret_provider: SecretProvider | None = None,
         x_client: XClient | None = None,
         logger: logging.Logger | None = None,
+        fallback_podcast_id: str | None = None,
     ) -> None:
-        """Initialize use case."""
+        """Initialize use case.
+
+        x_client(既定アカウント)は fallback_podcast_id の番組の投稿にだけ使う。
+        他の番組の投稿を既定アカウントから送らないため、未設定なら既定アカウントは使わない。
+        """
         self._firestore_manager = firestore_manager
         self._secret_provider = secret_provider
         self._x_client = x_client
         self._logger = logger or logging.getLogger(__name__)
+        self._fallback_podcast_id = fallback_podcast_id
 
     def run(self) -> None:
         """Execute the auto-posting process."""
@@ -76,9 +82,17 @@ class AutoPostSnsUsecase:
         doc_id = oldest_promo["doc_id"]
         self._logger.info("Selected promotion to post. doc_id: %s, path: %s", doc_id, reference_path)
 
+        # 送信前に pending → posting を原子的に確保する。同時実行・取得後の削除や状態変更では送らない
+        claimed = self._firestore_manager.claim_sns_promotion(reference_path)
+        if claimed is None:
+            self._logger.info("Promotion is no longer pending; skipping. doc_id: %s", doc_id)
+            return
+        oldest_promo = {**claimed, "doc_id": doc_id, "reference_path": reference_path}
+
         message = oldest_promo.get("message", "").strip()
         if not message:
             self._logger.warning("Empty message, skipping. doc_id: %s", doc_id)
+            self._firestore_manager.update_sns_promotion_status(reference_path, "failed")
             return
 
         # Resolve episode number from the nested 'episode' structure
@@ -126,23 +140,21 @@ class AutoPostSnsUsecase:
                 x_client = None
 
         if not x_client:
-            if self._x_client:
+            if self._x_client and podcast_id is not None and podcast_id == self._fallback_podcast_id:
                 self._logger.info("Falling back to default XClient")
                 x_client = self._x_client
             else:
-                self._logger.error("No valid XClient could be initialized for podcast_id: %s", podcast_id)
+                self._logger.error(
+                    "No valid XClient for podcast_id: %s (default account is only for podcast %s)",
+                    podcast_id,
+                    self._fallback_podcast_id,
+                )
                 self._firestore_manager.update_sns_promotion_status(reference_path, "failed")
                 return
 
         self._logger.info("Attempting to post thread. doc_id: %s, text_length: %s", doc_id, len(post_text))
         try:
             success = x_client.post_thread(post_text)
-            if success:
-                self._firestore_manager.update_sns_promotion_status(reference_path, "posted")
-                self._logger.info("SNS promotion posted successfully. doc_id: %s", doc_id)
-            else:
-                self._firestore_manager.update_sns_promotion_status(reference_path, "failed")
-                self._logger.error("SNS promotion posting failed. doc_id: %s", doc_id)
         except Exception:
             self._logger.exception("Unexpected error while posting SNS promotion. doc_id: %s", doc_id)
             try:
@@ -150,3 +162,14 @@ class AutoPostSnsUsecase:
             except Exception:
                 self._logger.exception("Failed to update status to failed in Firestore. doc_id: %s", doc_id)
             raise
+        if not success:
+            self._firestore_manager.update_sns_promotion_status(reference_path, "failed")
+            self._logger.error("SNS promotion posting failed. doc_id: %s", doc_id)
+            return
+        # 送信済みのものを failed と記録しない。記録に失敗したら posting のまま残し、再送もしない
+        try:
+            self._firestore_manager.update_sns_promotion_status(reference_path, "posted")
+        except Exception:
+            self._logger.exception("Posted to X but failed to record status; left as posting. doc_id: %s", doc_id)
+            raise
+        self._logger.info("SNS promotion posted successfully. doc_id: %s", doc_id)

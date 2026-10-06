@@ -259,6 +259,23 @@ class FirestoreManager:
             results.append(data)
         return results
 
+    def claim_sns_promotion(self, doc_path: str) -> dict[str, Any] | None:
+        """状態が pending の投稿を posting にして確保する(トランザクション)。確保できなければ None."""
+        doc_ref = self._client.document(doc_path)
+
+        @firestore.transactional
+        def _claim(transaction: firestore.Transaction) -> dict[str, Any] | None:
+            snapshot = doc_ref.get(transaction=transaction)
+            if not snapshot.exists:
+                return None
+            data = snapshot.to_dict() or {}
+            if data.get("status") != "pending":
+                return None
+            transaction.update(doc_ref, {"status": "posting"})
+            return data
+
+        return _claim(self._client.transaction())
+
     def update_sns_promotion_status(self, doc_path: str, status: str) -> None:
         """Update status of a specific SNS promotion document by its full reference path."""
         self._client.document(doc_path).update({"status": status})

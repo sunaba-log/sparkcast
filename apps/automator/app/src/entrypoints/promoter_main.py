@@ -56,6 +56,8 @@ def auto_post_sns() -> None:
         secret_provider=secret_provider,
         x_client=x_client,
         logger=logger,
+        # 既定アカウント(X_* の環境変数)で投稿してよい番組
+        fallback_podcast_id=os.environ.get("PODCAST_ID") or None,
     )
     usecase.run()
 

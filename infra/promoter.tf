@@ -39,6 +39,12 @@ resource "google_cloud_run_v2_job" "promoter" {
           value = var.project_id
         }
 
+        # 既定の X アカウント（下の X_* ）で投稿してよい番組。他の番組はチャンネル個別の認証情報が必要
+        env {
+          name  = "PODCAST_ID"
+          value = var.podcast_id
+        }
+
         # X API secrets from Secret Manager
         env {
           name = "X_API_KEY"
