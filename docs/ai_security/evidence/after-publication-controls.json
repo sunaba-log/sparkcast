@@ -1,0 +1,68 @@
+{
+  "source_commit": "737c70fda347425ab18a8ea8017aef4d08c43dbc",
+  "working_tree_dirty": false,
+  "executed_at_utc": "2026-10-06T07:00:31.999979+00:00",
+  "method": "real use cases with injected synthetic dependencies and blocked sockets",
+  "live_services_tested": false,
+  "observations": [
+    {
+      "id": "audit_outage",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [],
+      "audit_api_attempts": 1,
+      "awaiting_approval": false,
+      "completed": false,
+      "failed": true,
+      "stop_reason": "公開前監査を完了できませんでした。設定・接続を確認して再実行してください。",
+      "notification_calls": 3,
+      "status": "observed_stop"
+    },
+    {
+      "id": "empty_response",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [],
+      "audit_api_attempts": 1,
+      "awaiting_approval": false,
+      "completed": false,
+      "failed": true,
+      "stop_reason": "公開前監査を完了できませんでした。設定・接続を確認して再実行してください。",
+      "notification_calls": 3,
+      "status": "observed_stop"
+    },
+    {
+      "id": "no_segments",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [],
+      "audit_api_attempts": 0,
+      "awaiting_approval": false,
+      "completed": false,
+      "failed": true,
+      "stop_reason": "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。",
+      "notification_calls": 3,
+      "status": "observed_stop"
+    },
+    {
+      "id": "intervention",
+      "requirement": "PUB-02",
+      "expected": "No public writes when review is incomplete or awaiting approval",
+      "observed_public_write_keys": [],
+      "audit_api_attempts": 1,
+      "awaiting_approval": true,
+      "completed": false,
+      "failed": false,
+      "stop_reason": null,
+      "notification_calls": 3,
+      "status": "observed_stop"
+    },
+    {
+      "id": "sns_unapproved_missing_credentials",
+      "requirement": "PUB-03",
+      "expected": "Automatic posting is allowed by policy; unresolved channel credentials must not silently change destination",
+      "default_client_send_calls": 0,
+      "status": "observed_stop"
+    }
+  ]
+}
