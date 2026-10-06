@@ -93,14 +93,22 @@ class AutoPostSnsUsecase:
         post_text = post.generate_text()
 
         # Parse reference path to get podcast_id
-        podcast_id = None
         parts = reference_path.split("/")
-        if len(parts) >= 2 and parts[0] == "podcasts":  # noqa: PLR2004
-            podcast_id = parts[1]
+        if (
+            len(parts) != 6  # noqa: PLR2004
+            or parts[0] != "podcasts"
+            or parts[2] != "episodes_contents"
+            or parts[4] != "sns_promotions"
+            or not all(parts)
+            or parts[5] != doc_id
+        ):
+            self._logger.error("Invalid promotion reference; refusing to select a posting account. doc_id: %s", doc_id)
+            return
+        podcast_id = parts[1]
 
         # Determine which XClient to use
         x_client = None
-        if self._secret_provider and podcast_id:
+        if self._secret_provider is not None:
             try:
                 self._logger.info("Fetching channel credentials for podcast_id: %s", podcast_id)
                 creds = self._secret_provider.get_channel_credentials(podcast_id)
@@ -126,8 +134,10 @@ class AutoPostSnsUsecase:
                 x_client = None
 
         if not x_client:
-            if self._x_client:
-                self._logger.info("Falling back to default XClient")
+            # A configured channel lookup is authoritative: failure must not change accounts.
+            # A directly injected client is supported only for explicit single-account callers.
+            if self._secret_provider is None and self._x_client is not None:
+                self._logger.info("Using explicitly configured single-account XClient")
                 x_client = self._x_client
             else:
                 self._logger.error("No valid XClient could be initialized for podcast_id: %s", podcast_id)

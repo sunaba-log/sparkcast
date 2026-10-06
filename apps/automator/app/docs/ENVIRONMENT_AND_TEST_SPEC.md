@@ -33,9 +33,22 @@
 | DISCORD_WEBHOOK_INFO_URL | No | - | Discord webhook URL for notifications |
 | AI_MODEL_ID | No | gemini-2.5-flash | Gemini model ID |
 | R2_CUSTOM_DOMAIN | No | podcast.sunabalog.com | Public domain for generated audio URL |
+| JEV_ENABLED | No | true | `false` の場合のみ監査を無効化。それ以外は監査完了を公開条件とする |
+| TYPESAFE_API_KEY | When JEV_ENABLED is enabled | - | Jev監査用。利用可能な認証がない場合は監査を完了できず公開しない |
+| DIRECTOR_ENABLED | No | true | `false` なら訂正生成を無効化。監査で要訂正と判定された場合は公開を停止する |
 
 Cloud TTS の認証には Cloud Run のサービスアカウントまたは Application Default Credentials を使用します。
 訂正音声を生成するサービスアカウントには `roles/texttospeech.user` が必要です。
+
+### 公開前監査が完了しない場合
+
+`JEV_ENABLED` が有効な場合、API失敗・タイムアウト例外・必須回答欠落/不正値・監査用セグメント欠落・一部発話の評価欠落を正常な低スコアに置き換えず、音声とRSSの公開前に停止する。要訂正なのに訂正生成が無効、訂正文が空、保存先がない/保存に失敗した場合も停止する。既存の `failed` 状態とエラー理由を保存し、ジョブは失敗として終了する。DBスキーマの追加はない。
+
+監査が正常に完了して要訂正の発話がない場合は、自動公開を継続する。訂正提案を保存できた場合は既存の `awaiting_approval` へ進む。`JEV_ENABLED=false` の自動公開は監査完了を保証しない明示的な運用であり、障害時に自動でこの設定へ切り替えない。
+
+復旧時は失敗理由に応じて認証/接続、音声認識、訂正生成/Firestoreの設定を直す。今回の停止で公開書込が始まっていないこと、同じエピソードを別ジョブが公開していないことを確認してから、既存の運用手順で元入力のジョブを再実行する。再開専用UI・重複イベントの排他制御は本変更の対象外。失敗時の自動再試行設定と費用上限は環境で別途確認する。
+
+停止前の議事録・概要のDiscord通知およびログは既存どおり発生し得る。「音声/RSS未公開」は「外部共有なし」を意味しない。X投稿の事前確認機能とは独立しており、本変更は既存のX自動投稿を変更しない。
 
 Conditional rule:
 
@@ -65,6 +78,11 @@ Behavior rule:
   sends the fixed reminder message.
 
 ## 3. Secret Manager Contract
+
+SNS Promoter (`entrypoints.promoter_main`) は `PROJECT_ID` と `podcast-{podcast_id}-secrets` のX認証情報を使用する。
+共通X認証用の環境変数 `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` は使用しない。
+チャンネル認証が取得/検証できなければ送信せずfailedとする。事前確認なしの自動投稿は継続する。
+移行時には各Podcastの認証情報とSecret参照権限を確認する。Terraform内に残る共通X Secretの注入設定の削除は別作業とし、本変更ではインフラを適用しない。
 
 Podcast Processing Job で SECRET_NAME を使う場合、シークレットは次のキーを持つ JSON を想定します。
 

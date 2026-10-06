@@ -96,6 +96,11 @@ cp .env.sample .env
 
 変数仕様は docs/ENVIRONMENT_AND_TEST_SPEC.md を参照してください。
 
+SNS投稿ジョブ（`uv run python -m entrypoints.promoter_main`）は、予定時刻を過ぎた投稿を事前承認なしで自動送信します。
+`PROJECT_ID` と、Secret Managerの `podcast-{podcast_id}-secrets` に登録したチャンネル別X認証情報を使用します。
+チャンネル認証に失敗した場合は投稿を `failed` にし、別アカウントへ切り替えません。旧環境変数の共通X認証情報はこのentrypointでは使用しません。
+適用前の移行・復旧条件は [チャンネル認証情報ガイド](docs/CHANNEL_CREDENTIALS_GUIDE.md) を確認してください。
+
 Podcast Processing Jobでは、`DATABASE_URL`でCloud SQLへ接続します。Cloud Run Jobでは
 Cloud SQL Unix socketを`/cloudsql`へマウントし、GCSオブジェクトパスから取得した
 `podcast_id` / `episode_id`で処理状態を更新します。
