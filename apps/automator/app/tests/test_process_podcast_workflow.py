@@ -330,3 +330,32 @@ def test_workflow_saves_timestamped_segments_and_topics() -> None:
         {"time": "1:05", "title": "本題"},
     ]
     assert content["transcript_meta"]["engine"] == "speech_v2_long"
+
+
+def test_workflow_does_not_publish_other_podcast_to_configured_feed() -> None:
+    storage = _ObjectStorage()
+    repository = _EpisodeRepository()
+    workflow = _workflow(repository=repository, firestore=_FirestoreManager())
+    workflow._object_storage = storage  # noqa: SLF001
+    request = _request("podcasts/2/episodes/42/source/recording.mp3")
+    request = ProcessPodcastWorkflowInput(**{**request.__dict__, "publish_podcast_id": "1"})
+
+    with pytest.raises(ValueError, match="no RSS publish target"):
+        workflow.run(request)
+
+    assert storage.uploads == []
+    assert repository.failed is not None
+    assert repository.completed is None
+
+
+def test_workflow_publishes_configured_podcast() -> None:
+    storage = _ObjectStorage()
+    repository = _EpisodeRepository()
+    workflow = _workflow(repository=repository, firestore=_FirestoreManager())
+    workflow._object_storage = storage  # noqa: SLF001
+    request = ProcessPodcastWorkflowInput(**{**_request().__dict__, "publish_podcast_id": "1"})
+
+    workflow.run(request)
+
+    assert "dev/feed.xml" in storage.uploads
+    assert repository.completed is not None

@@ -65,6 +65,8 @@ class PodcastEnvConfig:
     # チャット用の索引の作り直し(UI の URL と、定期実行と同じ CRON_SECRET)。無ければ毎朝の定期実行だけ
     app_base_url: str | None = None
     cron_secret: str | None = None
+    # RSS/R2 へ公開してよい番組(PODCAST_ID)。設定時は他の番組のアップロードを公開しない
+    publish_podcast_id: str | None = None
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -105,6 +107,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     work_bucket = environ.get("WORK_BUCKET") or None
     app_base_url = environ.get("APP_BASE_URL") or None
     cron_secret = environ.get("CRON_SECRET") or None
+    publish_podcast_id = environ.get("PODCAST_ID") or None
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -135,6 +138,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         work_bucket=work_bucket,
         app_base_url=app_base_url,
         cron_secret=cron_secret,
+        publish_podcast_id=publish_podcast_id,
     )
 
 
@@ -162,6 +166,7 @@ def _log_environment(config: PodcastEnvConfig) -> None:
         config.speech_timeout_seconds,
     )
     logger.info("WORK_BUCKET: %s", config.work_bucket)
+    logger.info("PUBLISH_PODCAST_ID: %s", config.publish_podcast_id)
     logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
     logger.info("###########################\n")
 
@@ -285,6 +290,7 @@ def process_podcast_workflow() -> None:
             ai_model_id=config.ai_model_id,
             r2_custom_domain=config.r2_custom_domain,
             sns_promotion_count=config.sns_promotion_count,
+            publish_podcast_id=config.publish_podcast_id,
         )
     )
 

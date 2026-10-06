@@ -74,6 +74,8 @@ class ProcessPodcastWorkflowInput:
     ai_model_id: str
     r2_custom_domain: str
     sns_promotion_count: int = 3
+    # RSS/R2 の公開先(r2_key_prefix)はこの番組専用。他の番組のアップロードを既定番組のフィードへ載せない
+    publish_podcast_id: str | None = None
 
 
 class ProcessPodcastWorkflow:
@@ -134,6 +136,12 @@ class ProcessPodcastWorkflow:
                 episode_id=episode_ref.episode_id,
                 source_audio_path=episode_ref.object_path,
             )
+            if request.publish_podcast_id is not None and episode_ref.podcast_id != request.publish_podcast_id:
+                msg = (
+                    f"podcast {episode_ref.podcast_id} has no RSS publish target "
+                    f"(this job publishes only podcast {request.publish_podcast_id})"
+                )
+                raise ValueError(msg)
             rss_feed_bytes = self._object_storage.download_file(f"{request.r2_key_prefix}/feed.xml")
             rss_manager = self._rss_manager_factory(rss_xml=rss_feed_bytes.decode("utf-8"))
             latest_episode_number = rss_manager.get_total_episodes() + 1
