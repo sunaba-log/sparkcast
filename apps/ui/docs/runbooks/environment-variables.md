@@ -108,20 +108,27 @@ For upload testing, use the target environment's matching Cloud SQL database,
 GCS bucket, Firebase project, and service account. Mixing dev and prod values
 can create signed URLs that fail with GCS `AccessDenied`.
 
-## Firebase Redirect Sign-In on a Custom Host
+## Firebase Sign-In (Popup vs Redirect) on a Custom Host
 
-Mobile browsers may block the cross-origin storage access used by Firebase
-`signInWithRedirect()` when the app is served from a host other than
-`<project>.firebaseapp.com` while `authDomain` points at
-`<project>.firebaseapp.com`. In that state, Google sign-in appears to
-complete, but the app returns to `/login` because `getRedirectResult()` is empty
-and `/api/auth/session` is never called.
+Mobile browsers (Safari, Chrome) block cross-origin storage access / third-party
+cookies by default (ITP / storage partitioning). When `signInWithRedirect()` is
+used while the app is served from a host other than `<project>.firebaseapp.com`
+and `authDomain` points at `<project>.firebaseapp.com`, the redirect completes
+at Google, but upon return to `/login`, `getRedirectResult()` returns `null`
+because the iframe cannot access the auth credentials across origins.
 
-If mobile redirect sign-in is needed, set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to
-the serving host (Cloud Run domain) and keep `FIREBASE_AUTH_HELPER_DOMAIN` at
-the Firebase helper host. The Next.js rewrite proxies `/__/auth/*` to the
-Firebase helper domain. Also make sure Firebase Auth authorized domains include
-the serving host, and the Google OAuth client allows this redirect URI:
+To avoid this, `LoginForm` uses `signInWithPopup()` as the primary sign-in flow
+for both desktop and mobile browsers. `signInWithPopup()` communicates via
+window messaging (`postMessage`), which is not subject to cross-origin storage
+blocking.
+
+`signInWithRedirect()` is kept as a fallback only when popups are explicitly
+blocked (`auth/popup-blocked`). If redirect sign-in is required on a custom host,
+set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to the serving host (Cloud Run domain)
+and keep `FIREBASE_AUTH_HELPER_DOMAIN` at the Firebase helper host. The Next.js
+rewrite proxies `/__/auth/*` to the Firebase helper domain. Also make sure
+Firebase Auth authorized domains include the serving host, and the Google OAuth
+client allows this redirect URI:
 
 ```text
 https://<cloud-run-domain>/__/auth/handler
