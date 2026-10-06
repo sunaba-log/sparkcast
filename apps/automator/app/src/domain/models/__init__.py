@@ -21,6 +21,12 @@ from .common import (
     SpeakerAssignments,
     Summary,
 )
+from .director import (
+    ChoiceCategory,
+    DirectorIntervention,
+    FactCheckAuditMetric,
+    UtteranceChunk,
+)
 from .episode import EpisodeObjectReference
 from .sns_post import SnsPost
 from .transcript import TranscriptSegment
@@ -29,10 +35,13 @@ __all__ = [
     "ActionItem",
     "AgendaMetadata",
     "AgendaResult",
+    "ChoiceCategory",
+    "DirectorIntervention",
     "DiscordMessage",
     "DiscussionPrompt",
     "Episode",
     "EpisodeObjectReference",
+    "FactCheckAuditMetric",
     "MentionEvidence",
     "NewsItem",
     "PromptType",
@@ -46,4 +55,5 @@ __all__ = [
     "Summary",
     "TopicMatch",
     "TranscriptSegment",
+    "UtteranceChunk",
 ]

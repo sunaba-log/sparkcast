@@ -2,6 +2,9 @@ export type EpisodeStatus =
   | "upload_pending"
   | "uploaded"
   | "processing"
+  | "auditing"
+  | "awaiting_approval"
+  | "editing"
   | "completed"
   | "failed";
 
