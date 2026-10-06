@@ -207,7 +207,7 @@ export function getRateLimitDaily(): number {
   return value;
 }
 
-// ブラウザ収録ルーム（#166）。使えるのは admin と管理画面で許可したユーザーだけ（#174、auth.ts の canUseRecording）。
+// ブラウザ収録ルーム（#166）。使えるのは admin と制限を解除したユーザーだけ（#174、auth.ts の canUseRecording）。
 export function isRecordingEnabled(): boolean {
   return process.env.RECORDING_ENABLED === "true";
 }

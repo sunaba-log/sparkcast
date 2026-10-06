@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, Trash2, Users } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 import type { AdminUser } from "@/server/admin/users-repository";
 
 type AdminUserItem = AdminUser & { isAdmin: boolean };
@@ -39,9 +39,9 @@ export function AdminUsersPanel({
     );
   }
 
-  async function updateUser(
+  async function setApprovalStatus(
     uid: string,
-    patch: { approvalStatus?: AdminUser["approvalStatus"]; recordingAllowed?: boolean },
+    approvalStatus: AdminUser["approvalStatus"],
   ) {
     try {
       setPendingUid(uid);
@@ -49,7 +49,7 @@ export function AdminUsersPanel({
       const response = await fetch(`/api/admin/users/${uid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ approvalStatus }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
@@ -108,7 +108,7 @@ export function AdminUsersPanel({
           </p>
           {recordingEnabled && (
             <p className="text-xs text-gray-500 mt-1">
-              収録ルームは、管理者と「収録ルーム」をオンにしたユーザー（番組の仲間）だけが作成・入室できます。招待 URL から入るゲストには不要です。
+              制限を解除したユーザーは、収録ルームも使えます。解除するのは番組の仲間だけにしてください（招待 URL から入るゲストには登録は不要です）。
             </p>
           )}
         </div>
@@ -143,12 +143,6 @@ export function AdminUsersPanel({
                               制限あり
                             </span>
                           )}
-                        {recordingEnabled && !user.isAdmin && user.recordingAllowed && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-subtle text-brand">
-                            <Mic className="w-3 h-3" aria-hidden />
-                            収録ルーム
-                          </span>
-                        )}
                       </div>
                       <p className="mt-1 text-xs text-gray-500">{user.email}</p>
                       <p className="mt-0.5 text-[10px] text-gray-400">
@@ -158,24 +152,10 @@ export function AdminUsersPanel({
 
                     {!user.isAdmin && (
                       <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-                        {recordingEnabled && (
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={user.recordingAllowed}
-                            onClick={() =>
-                              updateUser(user.uid, { recordingAllowed: !user.recordingAllowed })
-                            }
-                            disabled={busy}
-                            className="px-3 sm:px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap"
-                          >
-                            {user.recordingAllowed ? "収録ルームをオフ" : "収録ルームをオン"}
-                          </button>
-                        )}
                         {user.approvalStatus === "pending_approval" ? (
                           <button
                             type="button"
-                            onClick={() => updateUser(user.uid, { approvalStatus: "active" })}
+                            onClick={() => setApprovalStatus(user.uid, "active")}
                             disabled={busy}
                             className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 whitespace-nowrap"
                           >
@@ -185,7 +165,7 @@ export function AdminUsersPanel({
                           <button
                             type="button"
                             onClick={() =>
-                              updateUser(user.uid, { approvalStatus: "pending_approval" })
+                              setApprovalStatus(user.uid, "pending_approval")
                             }
                             disabled={busy}
                             className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap"

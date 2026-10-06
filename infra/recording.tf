@@ -8,7 +8,7 @@
 # Worker 本体（apps/realtime）は wrangler で CD がデプロイし、secret は下の
 # sparkcast-recording-worker-secrets（JSON）を `wrangler secret bulk` で入れる。
 #
-# 使えるのは admin と管理画面で許可したユーザー（番組の仲間）だけで、運営者の番組の収録に使う
+# 使えるのは admin と制限を解除したユーザー（番組の仲間）だけで、運営者の番組の収録に使う
 # （自己の需要。電気通信事業にあたらない）。判断の根拠は ADR 20261006-recording-room-private-use。
 
 locals {

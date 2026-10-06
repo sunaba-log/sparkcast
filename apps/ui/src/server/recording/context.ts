@@ -38,7 +38,7 @@ export function recordingDisabledResponse() {
   return NextResponse.json({ error: "収録機能は無効です" }, { status: 404 });
 }
 
-// 収録ルームは admin と管理画面で許可したユーザーだけが使える（#174）
+// 収録ルームは admin と制限を解除したユーザーだけが使える（#174）
 export function recordingNotAllowedResponse() {
   return NextResponse.json({ error: "収録ルームを使う権限がありません" }, { status: 403 });
 }

@@ -39,7 +39,7 @@ app_service_account_id           = "sparkcast-ui-prod"
 app_service_account_display_name = "SparkCast UI prod"
 custom_domain                    = "sparkcast.sunabalog.com"
 
-# ブラウザ収録ルーム（#166 / #174）。使えるのは admin と管理画面で許可したユーザーだけ（自己の需要）。
+# ブラウザ収録ルーム（#166 / #174）。使えるのは admin と制限を解除したユーザーだけ（自己の需要）。
 # Worker のホスト名は apps/realtime/wrangler.jsonc の env.prod.routes と揃える。
 enable_recording  = true
 realtime_hostname = "sparkcast-realtime.sunabalog.com"

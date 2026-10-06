@@ -296,7 +296,7 @@ variable "rate_limit_hourly" {
 
 variable "enable_recording" {
   type        = bool
-  description = "ブラウザ収録ルーム（#166）の有効化フラグ。使えるのは admin と管理画面で許可したユーザーだけ（#174）。"
+  description = "ブラウザ収録ルーム（#166）の有効化フラグ。使えるのは admin と制限を解除したユーザーだけ（#174）。"
   default     = false
 }
 

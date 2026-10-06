@@ -24,15 +24,15 @@ export type SessionUser = {
   registered: boolean;
   approvalStatus: "pending_approval" | "active";
   isAdmin: boolean;
-  // 収録ルームを使えるか（admin・管理画面で許可したユーザー）
+  // 収録ルームを使えるか（admin と、制限を解除したユーザー。お試しは不可）
   canRecord: boolean;
 };
 
 // 収録ルームを使えるか（#174）。運営者が自分の番組の収録に使う（自己の需要）前提で、
-// admin と管理画面で許可したユーザー（番組の仲間）だけにする。dev も同じ
-// （dev のお試しログインは誰でも入れるので、全員に開けると他人の通信の媒介になる）。
-export function canUseRecording(isAdmin: boolean, recordingAllowed: boolean | undefined): boolean {
-  return isAdmin || recordingAllowed === true;
+// admin と、admin が制限を解除した（承認した）ユーザー＝番組の仲間だけにする。
+// prod の登録は事前登録と承認が要るので、承認を仲間の指定として使う。
+export function canUseRecording(isAdmin: boolean, approvalStatus: string | undefined): boolean {
+  return isAdmin || approvalStatus === "active";
 }
 
 export function mockUidForEmail(email: string): string {
@@ -63,8 +63,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         user_id: string;
         display_name: string | null;
         approval_status: string;
-        recording_allowed: boolean;
-      }>("SELECT user_id, display_name, approval_status, recording_allowed FROM users WHERE email = $1", [email]);
+      }>("SELECT user_id, display_name, approval_status FROM users WHERE email = $1", [email]);
       const row = user.rows[0];
       return {
         uid: row?.user_id ?? guestUidForEmail(email),
@@ -74,7 +73,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         // GUEST_EMAIL が誤って ADMIN_EMAILS に含まれても管理権限は与えない
         approvalStatus: row?.approval_status === "active" ? "active" : "pending_approval",
         isAdmin: false,
-        canRecord: canUseRecording(false, row?.recording_allowed),
+        // お試しの共有アカウントは誰でも入れるので、収録ルームは使わせない（#174）
+        canRecord: false,
       };
     } catch {
       return null;
@@ -92,8 +92,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         user_id: string;
         display_name: string | null;
         approval_status: string;
-        recording_allowed: boolean;
-      }>("SELECT user_id, display_name, approval_status, recording_allowed FROM users WHERE email = $1", [email]);
+      }>("SELECT user_id, display_name, approval_status FROM users WHERE email = $1", [email]);
       const row = user.rows[0];
       return {
         uid: row?.user_id ?? mockUidForEmail(email),
@@ -102,7 +101,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         registered: user.rows.length > 0,
         approvalStatus: resolveApprovalStatus(email, row?.approval_status),
         isAdmin: isAdminUser(email),
-        canRecord: canUseRecording(isAdminUser(email), row?.recording_allowed),
+        canRecord: canUseRecording(isAdminUser(email), row?.approval_status),
       };
     } catch {
       return null;
@@ -117,8 +116,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       user_id: string;
       display_name: string | null;
       approval_status: string;
-      recording_allowed: boolean;
-    }>("SELECT user_id, display_name, approval_status, recording_allowed FROM users WHERE email = $1", [email]);
+    }>("SELECT user_id, display_name, approval_status FROM users WHERE email = $1", [email]);
     const row = user.rows[0];
     return {
       uid: row?.user_id ?? token.uid,
@@ -129,7 +127,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       registered: user.rows.length > 0,
       approvalStatus: resolveApprovalStatus(email, row?.approval_status),
       isAdmin: isAdminUser(email),
-      canRecord: canUseRecording(isAdminUser(email), row?.recording_allowed),
+      canRecord: canUseRecording(isAdminUser(email), row?.approval_status),
     };
   } catch {
     return null;
