@@ -129,7 +129,7 @@ def main() -> int:
     out = Path(args.out or HERE / "runs" / f"generation-{'dryrun' if args.dry_run else 'real'}-{stamp}.jsonl")
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    totals = {"calls": 0, "prompt_tokens": 0, "output_tokens": 0, "errors": 0}
+    totals = {"calls": 0, "prompt_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "errors": 0}
     with out.open("w") as fh:
         for case in cases:
             for trial in range(1, args.trials + 1):
@@ -155,6 +155,8 @@ def main() -> int:
                     totals["calls"] += 1
                     totals["prompt_tokens"] += (call["usage"] or {}).get("prompt_token_count") or 0
                     totals["output_tokens"] += (call["usage"] or {}).get("candidates_token_count") or 0
+                    # 思考トークンも出力として課金される
+                    totals["thinking_tokens"] += (call["usage"] or {}).get("thoughts_token_count") or 0
                 row["duration_s"] = round(time.monotonic() - started, 3)
                 row["review_reason"] = None  # 人が確定する
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")

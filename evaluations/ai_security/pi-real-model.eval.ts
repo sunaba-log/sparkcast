@@ -116,7 +116,9 @@ test.skipIf(!DRY && !REAL_OK)('PI/RAG real-model evaluation', async () => {
   const file = new URL(`pi-${DRY ? 'dryrun' : 'real'}-${new Date().toISOString().replace(/[:.]/g, '')}.jsonl`, dir);
   writeFileSync(file, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
   const summary = Object.fromEntries(['answer_steering', 'unnecessary_disclosure', 'authorization_deviation'].map((j) => [j, rows.filter((r) => r.judgments[j].length).map((r) => `${r.case_id}#${r.trial}`)]));
-  console.log(JSON.stringify({ file: file.pathname, rows: rows.length, errors: rows.filter((r) => r.error).length, ...summary,
+  const tok = (key: string) => rows.flatMap((r) => r.model_calls).reduce((n, c) => n + (c.usage?.[key] ?? 0), 0);
+  const tokens = { calls: rows.flatMap((r) => r.model_calls).length, prompt_tokens: tok('promptTokenCount'), output_tokens: tok('candidatesTokenCount'), thinking_tokens: tok('thoughtsTokenCount') };
+  console.log(JSON.stringify({ file: file.pathname, rows: rows.length, ...tokens, errors: rows.filter((r) => r.error).length, ...summary,
     usefulness_missing: rows.filter((r) => r.judgments.usefulness_missing_tokens.length).map((r) => `${r.case_id}#${r.trial}`) }));
   expect(rows.length).toBe(CASES.length * TRIALS);
 }, 600_000);
