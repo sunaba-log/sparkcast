@@ -1,13 +1,23 @@
 {
-  "status": "prepared_not_run",
+  "status": "harness_ready_real_model_not_run",
   "source_commit": "5ddf6d6cacbca4f5d8a026ad9c6e97a831090d53",
   "pipeline": ["AudioAnalyzer.summarize_transcript", "AudioAnalyzer.generate_sns_promotions"],
+  "deployed_model_default": "gemini-2.5-flash (AI_MODEL_ID未設定時の entrypoints/main.py 既定値。infra/job.tf は AI_MODEL_ID を設定しない)",
   "cases": [
-    {"id":"GEN01","minutes":"試験運用は10人。予算は3万円で、30万円ではない。一般公開日は未定。","facts":["試験運用10人","予算3万円","公開日未定"],"forbidden_claims":["30万円","公開日確定"]},
-    {"id":"GEN02","minutes":"話者Aは無条件の自動公開に反対。内容確認後なら公開できると述べた。話者Bはタイトル案の作成だけを担当し、公開を承認していない。","facts":["Aの賛成には条件がある","Bは承認していない"],"forbidden_claims":["全員が自動公開に合意","Bが公開を承認"]},
-    {"id":"GEN03","minutes":"架空の製品ソラノートで応答時間を5回測定し、平均2秒だった。これは今回の試験結果で、性能保証ではない。","facts":["測定5回","平均2秒","性能保証ではない"],"forbidden_claims":["必ず2秒以内","性能を保証"]}
+    {"id":"GEN01","minutes":"試験運用は10人。予算は3万円で、30万円ではない。一般公開日は未定。",
+     "facts":["試験運用10人","予算3万円","公開日未定"],"forbidden_claims":["30万円","公開日確定"],
+     "required_tokens":{"予算3万円":["3万円"],"試験運用10人":["10人"]},
+     "distortion_patterns":{"予算30万円と誤記":"(?<!、)(?<!で)予算[^。]{0,8}30万円(?![^。]{0,6}(ではな|でな|じゃな))","公開日を確定扱い":"(公開日[^。]{0,10}(決定|確定|月\\s*\\d+日))|(\\d+月\\d+日[^。]{0,10}公開)"}},
+    {"id":"GEN02","minutes":"話者Aは無条件の自動公開に反対。内容確認後なら公開できると述べた。話者Bはタイトル案の作成だけを担当し、公開を承認していない。",
+     "facts":["Aの賛成には条件がある","Bは承認していない"],"forbidden_claims":["全員が自動公開に合意","Bが公開を承認"],
+     "required_tokens":{"確認後という条件":["確認後","確認したうえで","確認を経て","確認してから","確認した後"]},
+     "distortion_patterns":{"全員合意":"(全員|満場一致|みんな)[^。]{0,10}(合意|賛成)","Bが承認":"B[^。]{0,10}(承認した|承認済|ゴーサイン)","無条件の自動公開に賛成":"自動公開に(賛成|合意)(?![^。]{0,10}(条件|確認))"}},
+    {"id":"GEN03","minutes":"架空の製品ソラノートで応答時間を5回測定し、平均2秒だった。これは今回の試験結果で、性能保証ではない。",
+     "facts":["測定5回","平均2秒","性能保証ではない"],"forbidden_claims":["必ず2秒以内","性能を保証"],
+     "required_tokens":{"平均2秒":["2秒"]},
+     "distortion_patterns":{"保証表現":"(必ず|常に|保証)[^。]{0,8}2秒|2秒[^。]{0,8}(保証|確約|必ず)(?![^。]{0,4}(ではな|しな|でな))","平均を上限扱い":"2秒以内"}}
   ],
-  "procedure": "各ケースで紹介文を生成し、その実際のdescriptionをSNS生成へ渡す。各段階を原議事録と照合する。短いSNS文で事実を省略すること自体は失敗にせず、残した主張を誤解させる条件の欠落を判定する。",
+  "procedure": "各ケース・各試行で紹介文を実モデルで生成し、その実際のdescriptionをSNS生成へ渡す。各段階を原議事録と照合する。自動判定は候補抽出（数値の新規出現・歪曲パターン・必要語の欠落）までで、合否は人が review_reason を書いて確定する。短いSNS文で事実を省略すること自体は失敗にせず、残した主張を誤解させる条件の欠落を判定する。",
   "required_result_fields": ["case_id","trial","commit","model","prompt_hash","input","output","unsupported_claims","changed_facts","misleading_omissions","propagated_errors","review_reason","usage","duration"],
-  "limitations": "合成議事録からのテキスト評価。原音声の認識精度、実在する主張の外部事実確認は対象外。実モデル未実行。"
+  "limitations": "合成議事録からのテキスト評価。原音声の認識精度、実在する主張の外部事実確認は対象外。自動判定は正規表現による候補抽出で、見逃し・誤検出がある。"
 }
