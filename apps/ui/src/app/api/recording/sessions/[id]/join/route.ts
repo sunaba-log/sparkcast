@@ -6,6 +6,7 @@ import {
   buildRecordingDeps,
   recordingDisabledResponse,
   recordingErrorResponse,
+  recordingNotAllowedResponse,
 } from "@/server/recording/context";
 import { getRecordingSession } from "@/server/recording/repository";
 import { joinAsGuest, joinAsHost } from "@/server/recording/service";
@@ -52,6 +53,7 @@ export async function POST(
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
+    if (!user.canRecord) return recordingNotAllowedResponse();
     const input = hostSchema.parse(body);
     const session = await getRecordingSession(deps.pool, sessionId);
     if (!session || !(await hasPodcastAccess(user.uid, session.podcastId))) {

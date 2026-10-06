@@ -7,6 +7,7 @@ import {
   buildRecordingDeps,
   recordingDisabledResponse,
   recordingErrorResponse,
+  recordingNotAllowedResponse,
 } from "@/server/recording/context";
 import { createSession } from "@/server/recording/service";
 import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     if (!user.registered) {
       return NextResponse.json({ error: "ユーザー登録が必要です" }, { status: 403 });
     }
+    if (!user.canRecord) return recordingNotAllowedResponse();
     const input = createSchema.parse(await request.json());
     await requirePodcastAccess(user.uid, input.podcastId);
 
