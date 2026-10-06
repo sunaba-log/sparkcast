@@ -40,7 +40,8 @@ flowchart TD
 | 1 | `podcasts/{podcast_id}/episodes_contents/{episode_id}` | 親ドキュメント | `${var.system}-app-${var.environment}` | GCSバケットへの音声アップロード完了（Eventarc → Workflows 経由） |
 | 2 | `podcasts/{podcast_id}/episodes_contents/{episode_id}/transcripts/{chunk_id}` | サブコレクション | `${var.system}-app-${var.environment}` | 同上 |
 | 3 | `podcasts/{podcast_id}/episodes_contents/{episode_id}/sns_promotions/{promotion_id}` | サブコレクション | `${var.system}-app-${var.environment}` | 同上 |
-| 4 | `podcasts/{podcast_id}/topic_proposals/{proposal_id}` | コレクション（トップレベル） | `${var.system}-agenda-${var.environment}` | Cloud Scheduler による毎週水曜日 07:00 JST の定期実行 |
+| 4 | `podcasts/{podcast_id}/episodes_contents/{episode_id}/director_interventions/{intervention_id}` | サブコレクション | `${var.system}-app-${var.environment}` | AI ディレクター監査完了時 |
+| 5 | `podcasts/{podcast_id}/topic_proposals/{proposal_id}` | コレクション（トップレベル） | `${var.system}-agenda-${var.environment}` | Cloud Scheduler による毎週水曜日 07:00 JST の定期実行 |
 
 ---
 
@@ -183,7 +184,50 @@ flowchart TD
 
 ---
 
-### 3.4 次回収録向けの議題提案 (topic_proposals)
+### 3.4 AI ディレクターの介入提案 (director_interventions)
+Jev による監査で検出した、原稿の確認または音声編集が必要な箇所を保持するサブコレクション。`approved_script` は人が承認した差し替え原稿だけを保持し、音声編集処理は `status` が `approved` のドキュメントだけを適用する。
+
+- **Firestore パス**: `podcasts/{podcast_id}/episodes_contents/{episode_id}/director_interventions/{intervention_id}`
+- **生成ジョブ**: `podcast-automator-app-{environment}`
+- **ドキュメントID (`{intervention_id}`)**: UUID
+
+| フィールド名 | データ型 | 説明 |
+|:---|:---|:---|
+| `intervention_id` | `string (UUID)` | ドキュメント ID と同一の介入提案 ID |
+| `start_ms` | `number` | 対象音声の開始位置（音声先頭からのミリ秒） |
+| `end_ms` | `number` | 対象音声の終了位置（音声先頭からのミリ秒） |
+| `original_text` | `string` | 監査対象になった元の発話 |
+| `speaker` | `string` | 対象発話者 |
+| `jev_audit` | `map` | Jev の監査結果 |
+| ├ `noul` | `number` | NOUL 指標 |
+| ├ `score` | `number` | 総合スコア |
+| └ `choice` | `string` | Jev が選択した処理種別 |
+| `suggested_script` | `string` | AI が提案する差し替え原稿 |
+| `approved_script` | `string \| null` | 承認済みの差し替え原稿。未承認時は `null` |
+| `status` | `string` | `pending`、`approved`、`rejected`、`applied` |
+| `created_at` | `string (ISO 8601)` | 提案の生成日時 |
+
+#### ペイロード例
+```json
+{
+  "intervention_id": "c6fd8ef2-6ac2-4f61-b43f-7b91a0e6dc27",
+  "start_ms": 12500,
+  "end_ms": 18750,
+  "original_text": "ここは言い直して、えっと、その……",
+  "speaker": "ゲストA",
+  "jev_audit": {
+    "noul": 0.82,
+    "score": 0.91,
+    "choice": "replace"
+  },
+  "suggested_script": "ここは改めて説明します。",
+  "approved_script": null,
+  "status": "pending",
+  "created_at": "2026-10-06T00:00:00Z"
+}
+```
+
+### 3.5 次回収録向けの議題提案 (topic_proposals)
 過去の Discord での音声文字起こし履歴と、RSSフィードから収集した最新テックニュースを照らし合わせ、次回収録のテーマや論点をAIが提案するアジェンダ情報。
 
 - **Firestore パス**: `podcasts/{podcast_id}/topic_proposals/{proposal_id}`

@@ -152,6 +152,12 @@ variable "database_url_secret_name" {
   description = "Secret Manager secret containing the PostgreSQL DATABASE_URL."
 }
 
+variable "jev_api_key_secret_name" {
+  type        = string
+  description = "Secret Manager secret name for the Jev API key used by the AI director."
+  default     = "jev-api-key"
+}
+
 variable "sns_schedule_offset_hours" {
   type        = number
   description = "Hours after episode processing to schedule the first SNS promotion. Default 1 hour."

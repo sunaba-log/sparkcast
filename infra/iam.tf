@@ -22,6 +22,14 @@ resource "google_project_iam_member" "job_vertex_ai" {
   depends_on = [google_project_service.required]
 }
 
+resource "google_project_iam_member" "job_text_to_speech" {
+  project = var.project_id
+  role    = "roles/texttospeech.user"
+  member  = "serviceAccount:${local.default_compute_service_account}"
+
+  depends_on = [google_project_service.required]
+}
+
 resource "google_project_iam_member" "eventarc_receiver" {
   project = var.project_id
   role    = "roles/eventarc.eventReceiver"

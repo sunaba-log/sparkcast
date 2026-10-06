@@ -21,6 +21,8 @@ locals {
     "billingbudgets.googleapis.com",
     # 話者・時刻つきの文字起こし（Speech-to-Text v2、#166）
     "speech.googleapis.com",
+    # AI ディレクターの差し替え音声生成（#173）
+    "texttospeech.googleapis.com",
   ]
 
   default_compute_service_account = "${data.google_project.project.number}-compute@developer.gserviceaccount.com"
