@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url';
 export default {
+ // Viteのキャッシュをリポジトリ直下に作らない
+ cacheDir: fileURLToPath(new URL('../../apps/ui/node_modules/.vite-eval', import.meta.url)),
  resolve: { alias: {
   'next/headers': fileURLToPath(new URL('../../apps/ui/node_modules/next/headers.js', import.meta.url)),
   'next/navigation': fileURLToPath(new URL('../../apps/ui/node_modules/next/navigation.js', import.meta.url)),
