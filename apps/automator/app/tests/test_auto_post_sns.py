@@ -237,8 +237,8 @@ def test_auto_post_dynamic_credentials_success(monkeypatch: pytest.MonkeyPatch) 
     assert firestore.updates == [("podcasts/channel_abc/episodes_contents/1/sns_promotions/doc_dynamic", "posted")]
 
 
-def test_auto_post_dynamic_credentials_missing_falls_back_to_default() -> None:
-    """Test fallback to default x_client when secret_provider fails to load credentials."""
+def test_auto_post_dynamic_credentials_missing_does_not_use_default() -> None:
+    """A failed channel lookup must not send through a different account."""
     past_time = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     promo = {
         "doc_id": "doc_fail",
@@ -260,7 +260,5 @@ def test_auto_post_dynamic_credentials_missing_falls_back_to_default() -> None:
 
     # Secret provider fails to find the channel
     assert secret_provider.calls == ["nonexistent_channel"]
-    # Verify the fallback client is used instead
-    assert len(x_client.posted_texts) == 1
-    assert "Fallback message" in x_client.posted_texts[0]
-    assert firestore.updates == [("podcasts/nonexistent_channel/episodes_contents/1/sns_promotions/doc_fail", "posted")]
+    assert not x_client.posted_texts
+    assert firestore.updates == [("podcasts/nonexistent_channel/episodes_contents/1/sns_promotions/doc_fail", "failed")]

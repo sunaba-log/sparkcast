@@ -79,6 +79,11 @@ Behavior rule:
 
 ## 3. Secret Manager Contract
 
+SNS Promoter (`entrypoints.promoter_main`) は `PROJECT_ID` と `podcast-{podcast_id}-secrets` のX認証情報を使用する。
+共通X認証用の環境変数 `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` は使用しない。
+チャンネル認証が取得/検証できなければ送信せずfailedとする。事前確認なしの自動投稿は継続する。
+移行時には各Podcastの認証情報とSecret参照権限を確認する。Terraform内に残る共通X Secretの注入設定の削除は別作業とし、本変更ではインフラを適用しない。
+
 Podcast Processing Job で SECRET_NAME を使う場合、シークレットは次のキーを持つ JSON を想定します。
 
 ```json
