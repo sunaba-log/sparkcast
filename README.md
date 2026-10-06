@@ -36,6 +36,17 @@ GCS オブジェクト命名）を通じて疎結合に連携する。
 - Web アプリ: [`apps/ui/README.md`](apps/ui/README.md)
 - オートメーター: [`apps/automator/README.md`](apps/automator/README.md) / [`apps/automator/ARCHITECTURE.md`](apps/automator/ARCHITECTURE.md)
 
+## ドキュメント・仕様書
+
+システムの全体設計、データスキーマ、パイプライン、コンセプトに関する詳細ドキュメントは以下を参照してください。
+
+| ドキュメント | 概要 |
+|:---|:---|
+| 🏛️ [システムアーキテクチャ](docs/system_architecture.md) | システム全体像、論理構成・データフロー図、各層別のコンポーネント構成、インフラ・デプロイ基盤 |
+| 🗄️ [データベース・ストレージスキーマ](docs/database_and_storage_schema.md) | PostgreSQL (Cloud SQL / Supabase) ER図・テーブル定義、Firestore NoSQLドキュメント構造、GCS/R2バケット設計、エピソード状態遷移 |
+| ⚡ [処理パイプライン詳細](docs/processing_pipelines.md) | ブラウザ収録・ミキシング、音声認識・要約・配信、TypeSafe Jev ファクトチェック＆AIディレクター、アジェンダ生成、SNS自動投稿、多ソースRAG |
+| 💡 [サービスコンセプト・アピールポイント](docs/service_concept.md) | 3大コンセプト（つくる・まわす・とどける）、5大AIエージェントの役割分担、Human-in-the-Loop育成サイクル |
+
 ## CI/CD
 
 `.github/workflows/` でパスフィルタにより2スタックを分離してビルド・デプロイする。
