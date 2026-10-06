@@ -9,11 +9,13 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
+import math
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, Score
 
+from domain.errors import ReviewIncompleteError
 from domain.models.director import ChoiceCategory, FactCheckAuditMetric, UtteranceChunk
 
 if TYPE_CHECKING:
@@ -52,6 +54,16 @@ CHOICE_CRITERIA: dict[str, str] = {
 }
 
 VALID_CHOICES: set[str] = {"technology", "proper_noun", "numerical_data", "historical_fact", "other"}
+
+
+def _bounded_number(value: object, minimum: float, maximum: float) -> float:
+    """Reject missing, non-finite or out-of-range model values instead of repairing them."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("Invalid audit number")
+    number = float(value)
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        raise ValueError("Audit number outside expected range")
+    return number
 
 
 class FactCheckAuditor:
@@ -97,44 +109,33 @@ class FactCheckAuditor:
             )
             metric = self._parse_response(response)
             return chunk, metric
-        except Exception:
-            self._logger.exception("Failed to audit chunk %s via Jev API", chunk.chunk_id)
-            # エラー時は安全側に倒してデフォルト(深刻度1、スルー可)とする
-            default_metric = FactCheckAuditMetric(
-                noul=0.0,
-                score=1,
-                choice="other",
-                confidence=0.0,
+        except Exception as error:  # noqa: BLE001 - all API/parse failures stop publication
+            # APIの応答本文・認証情報を公開用のエラーや通知へ引き継がない。
+            self._logger.error(  # noqa: TRY400 - upstream payloads must not reach logs/notifications
+                "Audit incomplete for chunk %s (%s)",
+                chunk.chunk_id,
+                type(error).__name__,
             )
-            return chunk, default_metric
+            raise ReviewIncompleteError(
+                "公開前監査を完了できませんでした。設定・接続を確認して再実行してください。"
+            ) from None
 
     def _parse_response(self, response: SystemOneResponse) -> FactCheckAuditMetric:
-        """Jev のレスポンスを FactCheckAuditMetric に変換する."""
-        noul_val = 0.0
-        score_val = 1
-        choice_val: ChoiceCategory = "other"
-        confidence: float | None = None
-
+        """Jev の必須回答を検証し、欠落を正常な低スコアとして扱わない."""
         answers = response.answers
-        if "noul" in answers:
-            ans = answers["noul"]
-            noul_val = float(getattr(ans, "noul", 0.0))
-
-        if "score" in answers:
-            ans = answers["score"]
-            raw_score = getattr(ans, "score", 1.0)
-            score_val = max(1, min(5, round(float(raw_score))))
-            confidence = getattr(ans, "confidence", None)
-
-        if "choice" in answers:
-            ans = answers["choice"]
-            raw_choice = getattr(ans, "choice", "other")
-            choice_val = raw_choice if raw_choice in VALID_CHOICES else "other"  # type: ignore[assignment]
+        noul_val = _bounded_number(answers["noul"].noul, 0, 1)
+        raw_score = _bounded_number(answers["score"].score, 1, 5)
+        raw_choice = answers["choice"].choice
+        if not isinstance(raw_choice, str) or raw_choice not in VALID_CHOICES:
+            raise ValueError("Unknown audit category")
+        confidence = getattr(answers["score"], "confidence", None)
+        if confidence is not None:
+            confidence = _bounded_number(confidence, 0, 1)
 
         return FactCheckAuditMetric(
             noul=noul_val,
-            score=score_val,
-            choice=choice_val,
+            score=round(raw_score),
+            choice=cast("ChoiceCategory", raw_choice),
             confidence=confidence,
         )
 

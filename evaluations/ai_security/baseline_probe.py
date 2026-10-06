@@ -22,6 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "apps/automator/app/src"))
 
+from domain.errors import ReviewIncompleteError  # noqa: E402
 from domain.models import DirectorIntervention, FactCheckAuditMetric, Summary  # noqa: E402
 from domain.models.transcript import TranscriptSegment  # noqa: E402
 from services.episode_transcription import TranscriptionResult  # noqa: E402
@@ -83,12 +84,17 @@ def workflow_observation(mode: str) -> dict:
         logger=logging.getLogger("probe"), transcription=transcription,
         fact_check_auditor=auditor, director_script_generator=generator,
     )
-    workflow.run(ProcessPodcastWorkflowInput(
+    request = ProcessPodcastWorkflowInput(
         project_id="synthetic", sns_schedule_offset_hours=1,
         gcs_bucket="synthetic", gcs_trigger_object_name="podcasts/p1/episodes/e1/source/audio.mp3",
         r2_bucket="synthetic", r2_key_prefix="synthetic",
         ai_model_id="unused-synthetic-model", r2_custom_domain="example.invalid",
-    ))
+    )
+    stop_reason = None
+    try:
+        workflow.run(request)
+    except ReviewIncompleteError as error:
+        stop_reason = str(error)
     uploads = [call.kwargs["remote_key"] for call in storage.upload_file.call_args_list]
     return {
         "id": mode, "requirement": "PUB-02",
@@ -97,6 +103,8 @@ def workflow_observation(mode: str) -> dict:
         "audit_api_attempts": client.system_one.call_count,
         "awaiting_approval": repository.mark_awaiting_approval.called,
         "completed": repository.mark_completed.called,
+        "failed": repository.mark_failed.called,
+        "stop_reason": stop_reason,
         "notification_calls": notifier.send_discord_message.call_count,
         "status": "gap" if uploads else "observed_stop",
     }
@@ -119,8 +127,8 @@ def sns_observation() -> dict:
         firestore_manager=firestore, secret_provider=secrets, x_client=default_client,
     ).run()
     return {
-        "id": "sns_unapproved_missing_credentials", "requirement": "PUB-01/PUB-03",
-        "expected": "No send for an unapproved post or unresolved channel credentials",
+        "id": "sns_unapproved_missing_credentials", "requirement": "PUB-03",
+        "expected": "Automatic posting is allowed by policy; unresolved channel credentials must not silently change destination",
         "default_client_send_calls": default_client.post_thread.call_count,
         "status": "gap" if default_client.post_thread.called else "observed_stop",
     }
@@ -138,6 +146,7 @@ def main() -> None:
         observations.append(sns_observation())
     print(json.dumps({
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "working_tree_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()),
         "executed_at_utc": datetime.now(UTC).isoformat(),
         "method": "real use cases with injected synthetic dependencies and blocked sockets",
         "live_services_tested": False,
