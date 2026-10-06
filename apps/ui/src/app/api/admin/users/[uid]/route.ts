@@ -7,14 +7,21 @@ import {
   deleteUser,
   getUserEmail,
   setApprovalStatus,
+  setRecordingAllowed,
 } from "@/server/admin/users-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const patchSchema = z.object({
-  approvalStatus: z.enum(["pending_approval", "active"]),
-});
+// 制限の解除・収録ルームの許可（#174）を、それぞれ単独で変えられる
+const patchSchema = z
+  .object({
+    approvalStatus: z.enum(["pending_approval", "active"]).optional(),
+    recordingAllowed: z.boolean().optional(),
+  })
+  .refine(
+    (value) => value.approvalStatus !== undefined || value.recordingAllowed !== undefined,
+  );
 
 // 管理者メールのユーザーは常に active 扱いのため、変更・削除の対象にしない
 async function ensureNotAdminTarget(uid: string): Promise<void> {
@@ -37,8 +44,10 @@ export async function PATCH(
 
     const { uid } = await context.params;
     await ensureNotAdminTarget(uid);
-    const { approvalStatus } = patchSchema.parse(await request.json());
-    await setApprovalStatus(await getDbPool(), uid, approvalStatus);
+    const { approvalStatus, recordingAllowed } = patchSchema.parse(await request.json());
+    const pool = await getDbPool();
+    if (approvalStatus !== undefined) await setApprovalStatus(pool, uid, approvalStatus);
+    if (recordingAllowed !== undefined) await setRecordingAllowed(pool, uid, recordingAllowed);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -54,7 +63,7 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    console.error("Failed to update user approval status", error);
+    console.error("Failed to update user", error);
     return NextResponse.json({ error: "更新に失敗しました" }, { status: 500 });
   }
 }

@@ -38,6 +38,11 @@ export function recordingDisabledResponse() {
   return NextResponse.json({ error: "収録機能は無効です" }, { status: 404 });
 }
 
+// 収録ルームは admin と管理画面で許可したユーザーだけが使える（#174）
+export function recordingNotAllowedResponse() {
+  return NextResponse.json({ error: "収録ルームを使う権限がありません" }, { status: 403 });
+}
+
 // ホスト（ログイン済みで、そのポッドキャストの owner / editor）だけが操作できるセッションを読む
 export async function loadHostSession(
   sessionId: string,
@@ -53,6 +58,7 @@ export async function loadHostSession(
       response: NextResponse.json({ error: "認証が必要です" }, { status: 401 }),
     };
   }
+  if (!user.canRecord) return { ok: false, response: recordingNotAllowedResponse() };
   const deps = await buildRecordingDeps();
   const session = await getRecordingSession(deps.pool, sessionId);
   if (!session || !(await hasPodcastAccess(user.uid, session.podcastId))) {

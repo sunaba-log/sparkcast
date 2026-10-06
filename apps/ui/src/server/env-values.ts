@@ -207,7 +207,7 @@ export function getRateLimitDaily(): number {
   return value;
 }
 
-// ブラウザ収録ルーム（#166）。prod は電気通信事業の届出が済むまで未設定＝無効。
+// ブラウザ収録ルーム（#166）。使えるのは admin と管理画面で許可したユーザーだけ（#174、auth.ts の canUseRecording）。
 export function isRecordingEnabled(): boolean {
   return process.env.RECORDING_ENABLED === "true";
 }

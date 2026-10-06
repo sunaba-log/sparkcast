@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Users } from "lucide-react";
+import { Mic, Trash2, Users } from "lucide-react";
 import type { AdminUser } from "@/server/admin/users-repository";
 
 type AdminUserItem = AdminUser & { isAdmin: boolean };
 
-
 export function AdminUsersPanel({
   users,
   isAdmin,
+  recordingEnabled,
 }: {
   users: AdminUserItem[];
   isAdmin: boolean;
+  recordingEnabled: boolean;
 }) {
   const router = useRouter();
   const [pendingUid, setPendingUid] = useState<string | null>(null);
@@ -38,9 +39,9 @@ export function AdminUsersPanel({
     );
   }
 
-  async function setApprovalStatus(
+  async function updateUser(
     uid: string,
-    approvalStatus: AdminUser["approvalStatus"],
+    patch: { approvalStatus?: AdminUser["approvalStatus"]; recordingAllowed?: boolean },
   ) {
     try {
       setPendingUid(uid);
@@ -48,7 +49,7 @@ export function AdminUsersPanel({
       const response = await fetch(`/api/admin/users/${uid}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvalStatus }),
+        body: JSON.stringify(patch),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
@@ -105,6 +106,11 @@ export function AdminUsersPanel({
           <p className="text-xs text-gray-500 mt-1">
             「制限あり」のユーザーは AI チャット・エピソードアップロードがお試し枠（少回数）のみ。制限を解除すると通常枠で利用できます。
           </p>
+          {recordingEnabled && (
+            <p className="text-xs text-gray-500 mt-1">
+              収録ルームは、管理者と「収録ルーム」をオンにしたユーザー（番組の仲間）だけが作成・入室できます。招待 URL から入るゲストには不要です。
+            </p>
+          )}
         </div>
 
         {users.length === 0 ? (
@@ -120,7 +126,7 @@ export function AdminUsersPanel({
                   key={user.uid}
                   className="rounded-xs border border-brand/20 p-4"
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-gray-900 truncate">
@@ -137,6 +143,12 @@ export function AdminUsersPanel({
                               制限あり
                             </span>
                           )}
+                        {recordingEnabled && !user.isAdmin && user.recordingAllowed && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-subtle text-brand">
+                            <Mic className="w-3 h-3" aria-hidden />
+                            収録ルーム
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-gray-500">{user.email}</p>
                       <p className="mt-0.5 text-[10px] text-gray-400">
@@ -145,13 +157,27 @@ export function AdminUsersPanel({
                     </div>
 
                     {!user.isAdmin && (
-                      <div className="shrink-0 flex gap-2">
+                      <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+                        {recordingEnabled && (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={user.recordingAllowed}
+                            onClick={() =>
+                              updateUser(user.uid, { recordingAllowed: !user.recordingAllowed })
+                            }
+                            disabled={busy}
+                            className="px-3 sm:px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {user.recordingAllowed ? "収録ルームをオフ" : "収録ルームをオン"}
+                          </button>
+                        )}
                         {user.approvalStatus === "pending_approval" ? (
                           <button
                             type="button"
-                            onClick={() => setApprovalStatus(user.uid, "active")}
+                            onClick={() => updateUser(user.uid, { approvalStatus: "active" })}
                             disabled={busy}
-                            className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
+                            className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 whitespace-nowrap"
                           >
                             {pendingUid === user.uid ? "処理中..." : "制限を解除"}
                           </button>
@@ -159,10 +185,10 @@ export function AdminUsersPanel({
                           <button
                             type="button"
                             onClick={() =>
-                              setApprovalStatus(user.uid, "pending_approval")
+                              updateUser(user.uid, { approvalStatus: "pending_approval" })
                             }
                             disabled={busy}
-                            className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50"
+                            className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap"
                           >
                             {pendingUid === user.uid ? "処理中..." : "制限をかける"}
                           </button>

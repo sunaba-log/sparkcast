@@ -14,6 +14,7 @@ const pendingUser: SessionUser = {
   registered: true,
   approvalStatus: "pending_approval",
   isAdmin: false,
+  canRecord: false,
 };
 
 const activeUser: SessionUser = {
@@ -23,6 +24,7 @@ const activeUser: SessionUser = {
   registered: true,
   approvalStatus: "active",
   isAdmin: false,
+  canRecord: false,
 };
 
 describe("usage-limit", () => {

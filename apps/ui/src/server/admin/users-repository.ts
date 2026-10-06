@@ -9,6 +9,8 @@ export interface AdminUser {
   email: string;
   displayName: string | null;
   approvalStatus: ApprovalStatus;
+  // 収録ルームを使えるか（#174。admin は列に関わらず使える）
+  recordingAllowed: boolean;
   createdAt: string;
 }
 
@@ -18,9 +20,10 @@ export async function listUsers(pool: Pool): Promise<AdminUser[]> {
     email: string;
     display_name: string | null;
     approval_status: string;
+    recording_allowed: boolean;
     created_at: string;
   }>(
-    `SELECT user_id, email, display_name, approval_status, created_at
+    `SELECT user_id, email, display_name, approval_status, recording_allowed, created_at
      FROM users
      ORDER BY created_at ASC`,
   );
@@ -31,6 +34,7 @@ export async function listUsers(pool: Pool): Promise<AdminUser[]> {
     displayName: row.display_name,
     approvalStatus:
       row.approval_status === "active" ? "active" : "pending_approval",
+    recordingAllowed: row.recording_allowed,
     createdAt: row.created_at,
   }));
 }
@@ -54,6 +58,17 @@ export async function setApprovalStatus(
   await pool.query(
     `UPDATE users SET approval_status = $2 WHERE user_id = $1`,
     [userId, status],
+  );
+}
+
+export async function setRecordingAllowed(
+  pool: Pool,
+  userId: string,
+  allowed: boolean,
+): Promise<void> {
+  await pool.query(
+    `UPDATE users SET recording_allowed = $2 WHERE user_id = $1`,
+    [userId, allowed],
   );
 }
 
