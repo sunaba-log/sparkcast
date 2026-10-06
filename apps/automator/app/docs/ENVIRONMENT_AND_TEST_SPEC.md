@@ -34,6 +34,9 @@
 | AI_MODEL_ID | No | gemini-2.5-flash | Gemini model ID |
 | R2_CUSTOM_DOMAIN | No | podcast.sunabalog.com | Public domain for generated audio URL |
 
+Cloud TTS の認証には Cloud Run のサービスアカウントまたは Application Default Credentials を使用します。
+訂正音声を生成するサービスアカウントには `roles/texttospeech.user` が必要です。
+
 Conditional rule:
 
 - SECRET_NAME を指定しない場合、CLOUDFLARE_ACCESS_KEY_ID と CLOUDFLARE_SECRET_ACCESS_KEY の両方が必要です。

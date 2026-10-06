@@ -24,6 +24,7 @@ dependencies = [
     "tweepy>=4.16.0",
     "numpy>=2.0",
     "google-cloud-speech>=2.30",
+    "google-cloud-texttospeech>=2.38.0",
     "typesafe-sdk>=0.7.2",
 ]
 
