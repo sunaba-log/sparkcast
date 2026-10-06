@@ -79,6 +79,35 @@ class PostgresEpisodeRepository:
             episode_id=episode_id,
         )
 
+    def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as auditing."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET status = 'auditing',
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
+    def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as awaiting approval for director interventions."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET status = 'awaiting_approval',
+                processing_error = NULL,
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """番組設定の登場人物(改行・読点・カンマ区切り)を返す。未設定なら空."""
         with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:

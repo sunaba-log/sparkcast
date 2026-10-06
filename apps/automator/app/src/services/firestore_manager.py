@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from google.cloud import firestore
 
 if TYPE_CHECKING:
+    from domain.models.director import DirectorIntervention
     from domain.models.transcript import TranscriptSegment
 
 # Firestore の 1 バッチの書き込み上限(500)より少し小さく区切る
@@ -94,6 +95,45 @@ class FirestoreManager:
         if pending:
             batch.commit()
         return len(segments)
+
+    def save_director_interventions(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        interventions: list[DirectorIntervention],
+    ) -> int:
+        """AIディレクターの訂正介入候補を Firestore に保存する(#170)."""
+        collection = self._director_interventions_collection(podcast_id, episode_id)
+        self._clear_collection(collection)
+        batch = self._client.batch()
+        pending = 0
+        for intervention in interventions:
+            doc_ref = collection.document(intervention.intervention_id)
+            batch.set(doc_ref, intervention.to_dict())
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+        return len(interventions)
+
+    def get_director_interventions(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> list[dict[str, Any]]:
+        """AIディレクターの訂正介入候補一覧を取得する(#170)."""
+        collection = self._director_interventions_collection(podcast_id, episode_id)
+        results = []
+        for doc in collection.stream():
+            data = doc.to_dict()
+            data["id"] = doc.id
+            results.append(data)
+        return results
 
     def save_transcript_chunks(
         self,
@@ -271,6 +311,9 @@ class FirestoreManager:
 
     def _transcripts_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
         return self._episode_contents_collection(podcast_id).document(episode_id).collection("transcripts")
+
+    def _director_interventions_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
+        return self._episode_contents_collection(podcast_id).document(episode_id).collection("director_interventions")
 
     def _clear_collection(self, collection: firestore.CollectionReference) -> None:
         """再処理で古い文字起こしが残らないよう、サブコレクションを空にする."""

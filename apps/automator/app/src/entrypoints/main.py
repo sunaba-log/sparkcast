@@ -20,7 +20,9 @@ from infrastructure.secret_manager import SecretManagerClient
 from infrastructure.speech_transcriber import ChirpTranscriber
 from infrastructure.storage import GCSClient, R2Client, get_audio_info
 from services.audio_converter import AudioConverter
+from services.director_script_generator import DirectorScriptGenerator
 from services.episode_transcription import EpisodeTranscription
+from services.fact_check_auditor import FactCheckAuditor
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
 from services.speech_audio import GcsSpeechAudioPreparer
@@ -65,6 +67,10 @@ class PodcastEnvConfig:
     # チャット用の索引の作り直し(UI の URL と、定期実行と同じ CRON_SECRET)。無ければ毎朝の定期実行だけ
     app_base_url: str | None = None
     cron_secret: str | None = None
+    # Jev 高速監査・Gemini ディレクター介入(#170)
+    typesafe_api_key: str | None = None
+    jev_enabled: bool = True
+    director_enabled: bool = True
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -105,6 +111,9 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     work_bucket = environ.get("WORK_BUCKET") or None
     app_base_url = environ.get("APP_BASE_URL") or None
     cron_secret = environ.get("CRON_SECRET") or None
+    typesafe_api_key = environ.get("TYPESAFE_API_KEY") or None
+    jev_enabled = environ.get("JEV_ENABLED", "true").lower() != "false"
+    director_enabled = environ.get("DIRECTOR_ENABLED", "true").lower() != "false"
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -135,6 +144,9 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         work_bucket=work_bucket,
         app_base_url=app_base_url,
         cron_secret=cron_secret,
+        typesafe_api_key=typesafe_api_key,
+        jev_enabled=jev_enabled,
+        director_enabled=director_enabled,
     )
 
 
@@ -272,6 +284,13 @@ def process_podcast_workflow() -> None:
         ),
         knowledge_reindexer=HttpKnowledgeReindexer(base_url=config.app_base_url, secret=config.cron_secret)
         if config.app_base_url and config.cron_secret
+        else None,
+        fact_check_auditor=FactCheckAuditor(api_key=config.typesafe_api_key) if config.jev_enabled else None,
+        director_script_generator=DirectorScriptGenerator(
+            project_id=config.project_id,
+            model_id=config.ai_model_id,
+        )
+        if config.director_enabled
         else None,
     )
     usecase.run(

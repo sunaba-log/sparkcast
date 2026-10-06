@@ -30,6 +30,9 @@ const EPISODE_STATUS_LABELS: Record<string, string> = {
   upload_pending: "アップロード待ち",
   uploaded: "処理待ち",
   processing: "処理中",
+  auditing: "監査中",
+  awaiting_approval: "承認待ち",
+  editing: "編集・合成中",
   completed: "完了",
   failed: "失敗",
 };

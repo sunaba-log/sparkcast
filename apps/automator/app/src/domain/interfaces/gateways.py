@@ -10,12 +10,15 @@ if TYPE_CHECKING:
 
     from domain.models import (
         AgendaResult,
+        DirectorIntervention,
         DiscordMessage,
+        FactCheckAuditMetric,
         NewsItem,
         SnsPromotionsResponse,
         Summary,
         TopicMatch,
         TranscriptSegment,
+        UtteranceChunk,
     )
 
 
@@ -143,11 +146,44 @@ class EpisodeRepository(Protocol):
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
 
+    def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as auditing."""
+
+    def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as awaiting approval for director interventions."""
+
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """Return the cast (登場人物) registered in the podcast settings."""
 
     def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
         """Return the speakers when the episode was recorded in the browser recording room."""
+
+
+class FactCheckAuditorGateway(Protocol):
+    """Jev 高速監査ゲートキーパー (#170)."""
+
+    def audit_chunks(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        concurrency_limit: int = 10,
+    ) -> list[tuple[UtteranceChunk, FactCheckAuditMetric]]:
+        """発話チャンク配列を非同期バッチで高速監査し、各チャンクの評価メトリクスを返す."""
+
+
+class DirectorScriptGeneratorGateway(Protocol):
+    """Gemini ディレクター訂正スクリプトジェネレーター (#170)."""
+
+    def generate_intervention(
+        self,
+        *,
+        chunk: UtteranceChunk,
+        metric: FactCheckAuditMetric,
+        all_chunks: list[UtteranceChunk],
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+    ) -> DirectorIntervention:
+        """Score >= 3 のチャンクに対して、愛嬌あるカットイン訂正スクリプトを生成する."""
 
 
 @dataclass(frozen=True)
