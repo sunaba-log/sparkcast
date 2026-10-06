@@ -85,8 +85,15 @@ cloudflare provider の `cloudflare_calls_sfu_app` / `cloudflare_calls_turn_app`
 - **R2**: 保存は月 10GB まで無料。録音は 30 日で消える。
 - 使用量の通知は、Cloudflare の Billing → Notifications で設定する。GCP の予算アラート（`infra/budget.tf`）には含まれない。
 
-## prod の有効化（電気通信事業の届出が済んでから）
+## 使える人（#174）
+
+収録ルームを作成・操作できるのは、admin と、管理画面（`/admin`）で制限を解除したユーザーだけ。お試しの共有アカウントは使えない。招待 URL から入るゲストには登録は要らない。
+制限を解除するのは運営者の番組の仲間に限る（他の番組に使わせると電気通信事業の届出が要る。[ADR](../adr/20261006-recording-room-private-use.md)）。
+
+## prod の有効化（#174 で実施済み）
 
 1. `infra/environments/prod/variables.tfvars` に `enable_recording = true` と `realtime_hostname = "sparkcast-realtime.sunabalog.com"` を書く。
 2. リポジトリ変数 `RECORDING_PROD_ENABLED=true` を設定する（CD が prod に Worker を出すようになる）。
-3. プライバシーポリシーに、音声の取得と利用目的を書き足す。
+3. CD を `workflow_dispatch`（main、`deploy_realtime = true`）で動かし、Worker のデプロイと secret の投入を行う。
+4. UI の Cloud Run に env を足すので、`infra/ui_cloud_run.tf` の `template[0].revision` の ignore を apply の間だけ外す（409 の回避）。
+5. プライバシーポリシーに、音声の取得と利用目的を書き足す。

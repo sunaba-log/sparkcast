@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function RecordPage() {
   if (!isRecordingEnabled()) notFound();
   const user = await requireRegisteredUser();
+  if (!user.canRecord) notFound();
   const podcastId = await requireSelectedPodcast(user);
   const pool = await getDbPool();
   const sessions = await listRecordingSessions(pool, podcastId);

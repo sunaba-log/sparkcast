@@ -7,13 +7,14 @@ import type { AdminUser } from "@/server/admin/users-repository";
 
 type AdminUserItem = AdminUser & { isAdmin: boolean };
 
-
 export function AdminUsersPanel({
   users,
   isAdmin,
+  recordingEnabled,
 }: {
   users: AdminUserItem[];
   isAdmin: boolean;
+  recordingEnabled: boolean;
 }) {
   const router = useRouter();
   const [pendingUid, setPendingUid] = useState<string | null>(null);
@@ -105,6 +106,11 @@ export function AdminUsersPanel({
           <p className="text-xs text-gray-500 mt-1">
             「制限あり」のユーザーは AI チャット・エピソードアップロードがお試し枠（少回数）のみ。制限を解除すると通常枠で利用できます。
           </p>
+          {recordingEnabled && (
+            <p className="text-xs text-gray-500 mt-1">
+              制限を解除したユーザーは、収録ルームも使えます。解除するのは番組の仲間だけにしてください（招待 URL から入るゲストには登録は不要です）。
+            </p>
+          )}
         </div>
 
         {users.length === 0 ? (
@@ -120,7 +126,7 @@ export function AdminUsersPanel({
                   key={user.uid}
                   className="rounded-xs border border-brand/20 p-4"
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-gray-900 truncate">
@@ -145,13 +151,13 @@ export function AdminUsersPanel({
                     </div>
 
                     {!user.isAdmin && (
-                      <div className="shrink-0 flex gap-2">
+                      <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
                         {user.approvalStatus === "pending_approval" ? (
                           <button
                             type="button"
                             onClick={() => setApprovalStatus(user.uid, "active")}
                             disabled={busy}
-                            className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
+                            className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 whitespace-nowrap"
                           >
                             {pendingUid === user.uid ? "処理中..." : "制限を解除"}
                           </button>
@@ -162,7 +168,7 @@ export function AdminUsersPanel({
                               setApprovalStatus(user.uid, "pending_approval")
                             }
                             disabled={busy}
-                            className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50"
+                            className="px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 disabled:opacity-50 whitespace-nowrap"
                           >
                             {pendingUid === user.uid ? "処理中..." : "制限をかける"}
                           </button>

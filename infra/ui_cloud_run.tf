@@ -95,7 +95,7 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
           value = var.rate_limit_hourly
         }
       }
-      # ブラウザ収録ルーム（#166）。enable_recording = false の環境（prod）では何も足さない。
+      # ブラウザ収録ルーム（#166）。enable_recording = false の環境では何も足さない。
       dynamic "env" {
         for_each = var.enable_recording ? {
           RECORDING_ENABLED = "true"
@@ -149,7 +149,10 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
       # 一時的にここを外して Cloud Run に自動採番させること
       # （#72 Stage 8 の SA 改名では実際にそうした）。
       # （#166 で収録用の env を足したときも、dev への反映の間だけ外して戻した）。
-      template[0].revision,
+      #
+      # ⚠️ #174: prod に収録用の env を足すため、いま一時的に外している。
+      # prod への apply が済んだら、次のリリースで元に戻す。
+      # template[0].revision,
       template[0].labels,
       template[0].annotations,
       # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。
