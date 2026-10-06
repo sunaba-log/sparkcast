@@ -8,7 +8,8 @@
 # Worker 本体（apps/realtime）は wrangler で CD がデプロイし、secret は下の
 # sparkcast-recording-worker-secrets（JSON）を `wrangler secret bulk` で入れる。
 #
-# 電気通信事業（オンライン会議型）の届出が済むまで prod は enable_recording = false のまま。
+# 使えるのは admin と管理画面で許可したユーザー（番組の仲間）だけで、運営者の番組の収録に使う
+# （自己の需要。電気通信事業にあたらない）。判断の根拠は ADR 20261006-recording-room-private-use。
 
 locals {
   recording_enabled        = var.enable_recording ? 1 : 0
