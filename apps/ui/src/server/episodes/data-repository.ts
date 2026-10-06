@@ -270,6 +270,13 @@ export async function listEpisodesAndPromotionsPaginated(
   return { episodes, hasMore };
 }
 
+// 利用者が設定できる状態。posting / failed は自動投稿ジョブだけが書く。
+const EDITABLE_SNS_STATUSES = new Set(["pending", "posted"]);
+
+function isValidPromotionId(id: string): boolean {
+  return /^[A-Za-z0-9_-]{1,128}$/.test(id);
+}
+
 export async function updateSnsPromotion(input: {
   podcastId: number;
   episodeId: number;
@@ -281,6 +288,10 @@ export async function updateSnsPromotion(input: {
   hashtags?: string[];
   updatedBy: string;
 }): Promise<void> {
+  if (!isValidPromotionId(input.promotionId)) throw new Error("INVALID_INPUT");
+  if (input.status !== undefined && !EDITABLE_SNS_STATUSES.has(input.status)) {
+    throw new Error("INVALID_INPUT");
+  }
   const firestore = getAdminFirestore();
   const docRef = firestore
     .collection("podcasts")
@@ -300,7 +311,17 @@ export async function updateSnsPromotion(input: {
   if (input.platformUrls !== undefined) updateData.platform_urls = input.platformUrls;
   if (input.hashtags !== undefined) updateData.hashtags = input.hashtags;
 
-  await docRef.set(updateData, { merge: true });
+  // 既存の投稿だけを更新する（存在しない ID で投稿予約を作らない）。
+  // 送信中（posting）の投稿は状態を戻せない（自動投稿ジョブとの二重送信を防ぐ）。
+  await firestore.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef);
+    if (!snapshot.exists) throw new Error("NOT_FOUND");
+    const current = String(snapshot.get("status") ?? "pending");
+    if (input.status !== undefined && input.status !== current && current === "posting") {
+      throw new Error("CONFLICT");
+    }
+    transaction.update(docRef, updateData);
+  });
 }
 
 export async function deleteSnsPromotion(input: {
@@ -308,6 +329,7 @@ export async function deleteSnsPromotion(input: {
   episodeId: number;
   promotionId: string;
 }): Promise<void> {
+  if (!isValidPromotionId(input.promotionId)) throw new Error("INVALID_INPUT");
   const firestore = getAdminFirestore();
   await firestore
     .collection("podcasts")

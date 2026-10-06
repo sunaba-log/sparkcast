@@ -180,6 +180,19 @@ describe.skipIf(!enabled)('local integration (PG + Firestore emulator)', () => {
     expect({ rejected, created }).toEqual(SNS_PATCH_EXPECT);
   });
 
+  test('INT-SNS-02 edit of an existing promotion works; posting promotion cannot be reset to pending', async () => {
+    const fs = getAdminFirestore();
+    const col = fs.collection('podcasts').doc(String(PA)).collection('episodes_contents').doc(String(EA1)).collection('sns_promotions');
+    await updateSnsPromotion({ podcastId: PA, episodeId: EA1, promotionId: 'a1', message: 'A_EDITED', status: 'pending', updatedBy: A.uid });
+    expect((await col.doc('a1').get()).get('message')).toBe('A_EDITED');
+    await col.doc('sending').set({ status: 'posting', message: 'IN_FLIGHT' });
+    let rejected = false;
+    try { await updateSnsPromotion({ podcastId: PA, episodeId: EA1, promotionId: 'sending', status: 'pending', updatedBy: A.uid }); } catch { rejected = true; }
+    const status = (await col.doc('sending').get()).get('status');
+    console.log(JSON.stringify({ case: 'INT-SNS-02', rejected, status }));
+    expect({ rejected, status }).toEqual(FIXED ? { rejected: true, status: 'posting' } : { rejected: false, status: 'pending' });
+  });
+
   test('INT-USAGE-01 concurrent chat requests at 9/10 hourly, 5 trials (real PostgreSQL)', async () => {
     const pool = await getDbPool();
     const trials: { allowed: number; recorded: number }[] = [];
@@ -197,7 +210,8 @@ describe.skipIf(!enabled)('local integration (PG + Firestore emulator)', () => {
 });
 
 // ---- 修正前後で切り替える期待値（修正前の観測をそのまま期待値にしている） ----
-const SNS_PATCH_EXPECT = { rejected: false, created: true };
+const FIXED = process.env.EVAL_EXPECT_FIXED === '1';
+const SNS_PATCH_EXPECT = FIXED ? { rejected: true, created: false } : { rejected: false, created: true };
 // 修正前の観測：残り1枠に対して複数件が許可され、上限を超えて記録される
 const USAGE_EXPECT = (t: { allowed: number; recorded: number }) => t.allowed > 1 && t.recorded > 10;
 // ルートと同じ「確認→記録」の2段階

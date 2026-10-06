@@ -117,6 +117,15 @@ export async function PATCH(request: Request) {
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });
     }
+    if (error instanceof Error && error.message === "INVALID_INPUT") {
+      return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
+    }
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return NextResponse.json({ error: "投稿が見つかりません" }, { status: 404 });
+    }
+    if (error instanceof Error && error.message === "CONFLICT") {
+      return NextResponse.json({ error: "送信処理中のため変更できません" }, { status: 409 });
+    }
     console.error("Failed to update sns promotion", error);
     return NextResponse.json({ error: "保存に失敗しました" }, { status: 500 });
   }
@@ -153,6 +162,9 @@ export async function DELETE(request: Request) {
     }
     if (error instanceof Error && error.message === "FORBIDDEN") {
       return NextResponse.json({ error: "操作権限がありません" }, { status: 403 });
+    }
+    if (error instanceof Error && error.message === "INVALID_INPUT") {
+      return NextResponse.json({ error: "入力内容が不正です" }, { status: 400 });
     }
     console.error("Failed to delete sns promotion", error);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
