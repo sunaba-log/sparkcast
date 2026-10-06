@@ -11,6 +11,7 @@ SparkCast の Web 管理アプリです。Next.jsのUIとWeb APIを
 - エピソード作成とGCS V4署名付きURL発行
 - ブラウザからGCSへの音声ファイル直接アップロード
 - Cloud SQLの処理状態を使ったエピソード一覧・詳細表示
+- AIディレクターの訂正案を確認・編集・承認し、カットイン音声編集を起動
 - Firestoreの議事録、X投稿候補、収録アジェンダの閲覧・編集
 - 配信済み議事録を横断するRAGチャット（Vertex AI Gemini + Firestoreベクトル検索）
 - アップロード結果通知と放置アップロードの定期クリーンアップ
@@ -89,12 +90,19 @@ podcasts/{podcast_id}/episodes/{episode_id}/source/{filename}
 ## アップロード状態
 
 ```text
-upload_pending -> uploaded -> processing -> completed
+upload_pending -> uploaded -> processing -> auditing -> awaiting_approval -> editing -> completed
                                       \-> failed
 ```
 
 ブラウザから結果通知が届かない`upload_pending`レコードは、Cloud Schedulerによって
 24時間後に`failed`へ更新されます（1日1回実行）。
+
+AIディレクターの監査結果は Firestore の
+`podcasts/{podcastId}/episodes_contents/{episodeId}/director_interventions` に保存されます。
+各ドキュメントには `insert_at`（秒）、`source_text`、`speaker`、`severity`（1〜5）、
+`category`、`correction_script`、`status`（`pending` / `approved` / `rejected`）を持たせます。
+承認後の音声編集ジョブには `AUDIO_EDITOR_URL` を設定します。必要に応じて
+`AUDIO_EDITOR_API_TOKEN` を設定すると、呼び出し時に Bearer トークンとして送信されます。
 
 ## 議事録チャット（RAG）
 

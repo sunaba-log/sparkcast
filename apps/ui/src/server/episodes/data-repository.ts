@@ -5,6 +5,8 @@ import { getDbPool } from "@/server/db";
 import { getAdminFirestore } from "@/server/firebase-admin";
 import type {
   Episode,
+  DirectorIntervention,
+  DirectorInterventionStatus,
   EpisodePromotion,
   EpisodeStatus,
   TranscriptSegment,
@@ -41,6 +43,16 @@ type EpisodeContent = {
   minutes: string;
   transcriptAvailable: boolean;
   promotions: EpisodePromotion[];
+};
+
+type FirestoreDirectorIntervention = {
+  insert_at?: number;
+  source_text?: string;
+  speaker?: string;
+  severity?: number;
+  category?: string;
+  correction_script?: string;
+  status?: string;
 };
 
 function audioFileName(path: string | null): string {
@@ -133,6 +145,78 @@ export async function listTranscriptSegments(
       };
     })
     .filter((segment) => segment.text.trim().length > 0);
+}
+
+function toDirectorIntervention(
+  id: string,
+  data: FirestoreDirectorIntervention,
+): DirectorIntervention {
+  const severity = Math.min(5, Math.max(1, Math.round(Number(data.severity ?? 1)))) as 1 | 2 | 3 | 4 | 5;
+  const status: DirectorInterventionStatus =
+    data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  return {
+    id,
+    insertAt: Number(data.insert_at ?? 0),
+    sourceText: String(data.source_text ?? ""),
+    speaker: String(data.speaker ?? ""),
+    severity,
+    category: String(data.category ?? "未分類"),
+    correctionScript: String(data.correction_script ?? ""),
+    status,
+  };
+}
+
+export async function listDirectorInterventions(
+  podcastId: number,
+  episodeId: number,
+): Promise<DirectorIntervention[]> {
+  const snapshot = await episodeContentRef(podcastId, episodeId)
+    .collection("director_interventions")
+    .orderBy("insert_at")
+    .get();
+  return snapshot.docs.map((document) =>
+    toDirectorIntervention(
+      document.id,
+      document.data() as FirestoreDirectorIntervention,
+    ),
+  );
+}
+
+export async function updateDirectorInterventions(input: {
+  podcastId: number;
+  episodeId: number;
+  interventions: Array<Pick<DirectorIntervention, "id" | "correctionScript" | "status">>;
+  updatedBy: string;
+}): Promise<void> {
+  const batch = getAdminFirestore().batch();
+  const collection = episodeContentRef(input.podcastId, input.episodeId)
+    .collection("director_interventions");
+  for (const intervention of input.interventions) {
+    batch.set(
+      collection.doc(intervention.id),
+      {
+        correction_script: intervention.correctionScript,
+        status: intervention.status,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: input.updatedBy,
+      },
+      { merge: true },
+    );
+  }
+  await batch.commit();
+}
+
+export async function markEpisodeEditing(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'editing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_approval'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
 }
 
 function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {

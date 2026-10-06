@@ -8,8 +8,12 @@ import remarkGfm from "remark-gfm";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { formatJstDate, jstParts } from "@/lib/datetime";
 import { htmlToPlainText } from "@/lib/text";
+import {
+  DirectorInterventionMarkers,
+  DirectorInterventionsPanel,
+} from "@/components/DirectorInterventionsPanel";
 
-type TabType = "overview" | "minutes" | "transcript" | "promotions";
+type TabType = "overview" | "minutes" | "transcript" | "promotions" | "director";
 
 // 日本時間で固定して書式化する（サーバーとブラウザで同じ文字列にし、描画の食い違いを防ぐ）
 function formatDate(dateStr: string) {
@@ -30,6 +34,9 @@ const EPISODE_STATUS_LABELS: Record<string, string> = {
   upload_pending: "アップロード待ち",
   uploaded: "処理待ち",
   processing: "処理中",
+  auditing: "監査中",
+  awaiting_approval: "承認待ち",
+  editing: "音声編集中",
   completed: "完了",
   failed: "失敗",
 };
@@ -149,6 +156,13 @@ export function EpisodeMasterDetail({
     const newTime = percentage * duration;
     audioRef.current.currentTime = newTime;
     setCurrentTime(newTime);
+  };
+
+  const seekTo = (seconds: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = seconds;
+    setCurrentTime(seconds);
+    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => undefined);
   };
 
   function formatTime(seconds: number): string {
@@ -338,6 +352,22 @@ export function EpisodeMasterDetail({
                 >
                   SNS投稿文
                 </button>
+                <button
+                  onClick={() => setActiveTab("director")}
+                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "director"
+                    ? "border-brand text-brand"
+                    : selectedEpisode.status === "awaiting_approval"
+                      ? "border-amber-400 text-amber-800 hover:text-amber-900"
+                      : "border-transparent text-gray-500 hover:text-gray-800"
+                    }`}
+                >
+                  AIディレクター監査
+                  {selectedEpisode.status === "awaiting_approval" && (
+                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                      要確認
+                    </span>
+                  )}
+                </button>
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
@@ -420,6 +450,11 @@ export function EpisodeMasterDetail({
                       <div
                         className="bg-brand h-full rounded-full transition-all duration-100 ease-out"
                         style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                      />
+                      <DirectorInterventionMarkers
+                        episodeId={selectedEpisode.id}
+                        duration={duration}
+                        onSeek={seekTo}
                       />
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-500 font-medium">
@@ -551,13 +586,7 @@ export function EpisodeMasterDetail({
                   currentTime={currentTime}
                   canSeek={Boolean(selectedEpisode.audioUrl)}
                   onSeek={(seconds) => {
-                    if (!audioRef.current) return;
-                    audioRef.current.currentTime = seconds;
-                    setCurrentTime(seconds);
-                    audioRef.current
-                      .play()
-                      .then(() => setIsPlaying(true))
-                      .catch(() => undefined);
+                    seekTo(seconds);
                   }}
                 />
               )}
@@ -592,7 +621,27 @@ export function EpisodeMasterDetail({
                       </div>
                     ))
                   )}
+
                 </div>
+              )}
+
+              {activeTab === "director" && (
+                <DirectorInterventionsPanel
+                  key={selectedEpisode.id}
+                  episodeId={selectedEpisode.id}
+                  episodeStatus={selectedEpisode.status}
+                  canSeek={Boolean(selectedEpisode.audioUrl)}
+                  onSeek={seekTo}
+                  onEditingStarted={() => {
+                    setEpisodes((previous) =>
+                      previous.map((episode) =>
+                        episode.id === selectedEpisode.id
+                          ? { ...episode, status: "editing" }
+                          : episode,
+                      ),
+                    );
+                  }}
+                />
               )}
             </div>
 
