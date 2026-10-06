@@ -264,7 +264,11 @@ export function PreJoin({
             className="mt-1 accent-brand"
           />
           <span>
-            この会話が録音され、編集のうえポッドキャストのエピソードとして公開される場合があることに同意します。
+            この会話が録音され、編集のうえポッドキャストのエピソードとして公開される場合があることに同意します（
+            <a href="/privacy" target="_blank" rel="noopener" className="text-brand underline">
+              プライバシーポリシー
+            </a>
+            ）。
           </span>
         </label>
       )}
