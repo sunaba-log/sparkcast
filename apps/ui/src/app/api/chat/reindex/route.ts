@@ -3,7 +3,7 @@ import { getSessionUser } from "@/server/auth";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import { reindexPodcastKnowledge } from "@/server/chat/reindex";
 import { getDbPool } from "@/server/db";
-import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
+import { reserveUsage } from "@/server/usage-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,12 +24,10 @@ export async function POST() {
     }
 
     const pool = await getDbPool();
-    const usageCheck = await checkUsageAllowed(pool, auth.user, "chat");
+    const usageCheck = await reserveUsage(pool, auth.user, "chat");
     if (!usageCheck.allowed) {
       return NextResponse.json({ error: usageCheck.reason }, { status: 429 });
     }
-
-    await recordUsage(pool, auth.user.uid, "chat");
 
     const result = await reindexPodcastKnowledge(auth.podcastId);
     return NextResponse.json({ ok: true, ...result });

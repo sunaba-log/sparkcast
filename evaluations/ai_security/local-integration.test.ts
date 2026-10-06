@@ -212,10 +212,13 @@ describe.skipIf(!enabled)('local integration (PG + Firestore emulator)', () => {
 // ---- 修正前後で切り替える期待値（修正前の観測をそのまま期待値にしている） ----
 const FIXED = process.env.EVAL_EXPECT_FIXED === '1';
 const SNS_PATCH_EXPECT = FIXED ? { rejected: true, created: false } : { rejected: false, created: true };
-// 修正前の観測：残り1枠に対して複数件が許可され、上限を超えて記録される
-const USAGE_EXPECT = (t: { allowed: number; recorded: number }) => t.allowed > 1 && t.recorded > 10;
-// ルートと同じ「確認→記録」の2段階
+// 修正前：ルートと同じ「確認→記録」の2段階。残り1枠に対して複数件が許可され、上限を超えて記録される
+// 修正後：reserveUsage（利用者・操作ごとのロック内で確認と記録）。ちょうど1件だけ許可される
+const USAGE_EXPECT = FIXED
+  ? (t: { allowed: number; recorded: number }) => t.allowed === 1 && t.recorded === 10
+  : (t: { allowed: number; recorded: number }) => t.allowed > 1 && t.recorded > 10;
 const USAGE_ATTEMPT = (pool: any) => async (u: any) => {
+  if (FIXED) return (await (usage as any).reserveUsage(pool, u, 'chat')).allowed as boolean;
   const r = await usage.checkUsageAllowed(pool, u, 'chat');
   if (!r.allowed) return false;
   await usage.recordUsage(pool, u.uid, 'chat');

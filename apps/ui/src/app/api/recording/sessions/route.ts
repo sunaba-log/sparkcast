@@ -10,7 +10,7 @@ import {
   recordingNotAllowedResponse,
 } from "@/server/recording/context";
 import { createSession } from "@/server/recording/service";
-import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
+import { reserveUsage } from "@/server/usage-limit";
 
 export const runtime = "nodejs";
 
@@ -35,11 +35,10 @@ export async function POST(request: Request) {
     await requirePodcastAccess(user.uid, input.podcastId);
 
     const pool = await getDbPool();
-    const usage = await checkUsageAllowed(pool, user, "recording_session");
+    const usage = await reserveUsage(pool, user, "recording_session");
     if (!usage.allowed) {
       return NextResponse.json({ error: usage.reason }, { status: 429 });
     }
-    await recordUsage(pool, user.uid, "recording_session");
 
     const deps = await buildRecordingDeps();
 

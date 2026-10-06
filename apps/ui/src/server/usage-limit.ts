@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import type { SessionUser } from "@/server/auth";
 import {
   getPendingChatLimit,
@@ -28,8 +28,10 @@ function getPendingLimit(action: UsageAction): number {
   }
 }
 
+type Queryable = Pick<Pool, "query"> | PoolClient;
+
 export async function checkUsageAllowed(
-  pool: Pool,
+  pool: Queryable,
   user: SessionUser,
   action: UsageAction,
 ): Promise<UsageCheckResult> {
@@ -89,7 +91,7 @@ export async function checkUsageAllowed(
 }
 
 export async function recordUsage(
-  pool: Pool,
+  pool: Queryable,
   userId: string,
   action: UsageAction,
 ): Promise<void> {
@@ -98,4 +100,31 @@ export async function recordUsage(
      VALUES ($1, $2, now())`,
     [userId, action],
   );
+}
+
+/**
+ * 利用可否の確認と記録を、利用者・操作ごとのロックの中で一体に行う。
+ * 確認と記録が別だと、同時実行で残り枠を複数のリクエストが使えてしまう。
+ */
+export async function reserveUsage(
+  pool: Pool,
+  user: SessionUser,
+  action: UsageAction,
+): Promise<UsageCheckResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `usage:${user.uid}:${action}`,
+    ]);
+    const result = await checkUsageAllowed(client, user, action);
+    if (result.allowed) await recordUsage(client, user.uid, action);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }

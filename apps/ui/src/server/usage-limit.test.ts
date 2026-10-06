@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Pool } from "pg";
 import type { SessionUser } from "@/server/auth";
-import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
+import { checkUsageAllowed, recordUsage, reserveUsage } from "@/server/usage-limit";
 
 const mockPool = {
   query: vi.fn(),
@@ -138,5 +138,35 @@ describe("usage-limit", () => {
         ["user-123", "chat"],
       );
     });
+  });
+});
+
+describe("reserveUsage", () => {
+  function clientWith(count: number) {
+    const query = vi.fn(async (sql: string) =>
+      sql.includes("COUNT(*)") ? { rows: [{ count }] } : { rows: [] },
+    );
+    const client = { query, release: vi.fn() };
+    const pool = { connect: vi.fn(async () => client) } as unknown as Pool;
+    return { pool, client, query };
+  }
+
+  it("checks and records under a per-user lock in one transaction", async () => {
+    const { pool, client, query } = clientWith(0);
+    const result = await reserveUsage(pool, activeUser, "chat");
+    expect(result.allowed).toBe(true);
+    const sqls = query.mock.calls.map(([sql]) => String(sql));
+    expect(sqls[0]).toBe("BEGIN");
+    expect(sqls[1]).toContain("pg_advisory_xact_lock");
+    expect(sqls.some((sql) => sql.includes("INSERT INTO api_usage_logs"))).toBe(true);
+    expect(sqls.at(-1)).toBe("COMMIT");
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  it("does not record when the limit is reached", async () => {
+    const { pool, query } = clientWith(5);
+    const result = await reserveUsage(pool, pendingUser, "chat");
+    expect(result.allowed).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("INSERT"))).toBe(false);
   });
 });
