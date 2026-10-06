@@ -12,11 +12,10 @@ module "cloud_run_job" {
   job_name                       = "${local.automator_name_prefix}-app-${var.environment}"
   service_account_email          = local.default_compute_service_account
 
-  # 音声認識を急がない処理（ダイナミックバッチ）にしたので、結果を待つ時間が延びうる（#166）。
-  # 認識を待つ上限（SPEECH_TIMEOUT_SECONDS = 5 時間）に、その前後の処理の分を足した長さ
-  timeout            = "21600s"
-  memory             = "8Gi"
-  cpu                = "2"
+  # 動的文字起こしの待機に加え、Pydub/ffmpeg の音声差し替えを行うため余裕を持たせる（#173）。
+  timeout            = "25200s"
+  memory             = "12Gi"
+  cpu                = "4"
   max_instance_count = 1
 
   environment_variables = {
@@ -54,6 +53,7 @@ module "cloud_run_job" {
   secret_environment_variables = {
     DATABASE_URL = var.database_url_secret_name
     CRON_SECRET  = data.google_secret_manager_secret.cron_secret.secret_id
+    JEV_API_KEY  = google_secret_manager_secret.jev_api_key.secret_id
   }
 
   depends_on = [
