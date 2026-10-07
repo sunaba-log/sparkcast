@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Trash2, Clock, CheckCircle2, X } from "lucide-react";
 
 export type SNSPostItem = {
@@ -21,15 +20,12 @@ export function SNSPostMasterDetail({
   initialPosts = [],
   initialHasMore = false,
   initialSelectedId,
-  detailOnly = false,
 }: {
   initialPosts?: SNSPostItem[];
   initialHasMore?: boolean;
   /** ディープリンク（/sns?post=...）で初期選択する投稿 ID。 */
   initialSelectedId?: string;
-  detailOnly?: boolean;
 }) {
-  const router = useRouter();
   const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (
@@ -159,10 +155,6 @@ export function SNSPostMasterDetail({
   }, [hasMore, isLoading, loadMore]);
 
   const handleSelect = (post: SNSPostItem) => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      router.push(`/sns/${post.episodeId}/${post.id}`);
-      return;
-    }
     setSelectedId(post.id);
   };
 
@@ -262,20 +254,19 @@ export function SNSPostMasterDetail({
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      {!detailOnly && (
-        <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">SNS投稿</span>
-        </div>
-      )}
+      {/* Breadcrumb Header */}
+      <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
+        <span>ホーム</span>
+        <span>&gt;</span>
+        <span className="font-medium text-gray-800">SNS投稿</span>
+      </div>
 
       {/* Master-Detail Container */}
-      <div className={detailOnly ? "flex-1 min-h-0" : "flex-1 grid min-h-0 grid-cols-1 gap-5 md:grid-cols-12"}>
+      <div className="flex-1 grid grid-cols-1 gap-5 md:grid-cols-12 md:min-h-0">
         {/* Left Column: Timeline Master List (6 cols) */}
-        {!detailOnly && <div
+        <div
           ref={containerRef}
-          className="col-span-1 flex min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative md:col-span-6"
+          className="col-span-1 flex flex-col space-y-4 pr-2 relative md:col-span-6 md:overflow-y-auto"
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -365,11 +356,11 @@ export function SNSPostMasterDetail({
               SNS投稿文が見つかりません
             </div>
           )}
-        </div>}
+        </div>
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost ? (
-          <div className={`${detailOnly ? "h-full flex" : "hidden md:col-span-6 md:flex"} rounded-sm border-t border-brand/30 flex-col overflow-hidden md:border-t-0 md:border-l`}>
+          <div className="col-span-1 rounded-sm border-t border-brand/30 flex flex-col overflow-hidden md:col-span-6 md:border-t-0 md:border-l">
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
@@ -537,7 +528,7 @@ export function SNSPostMasterDetail({
             </div>
           </div>
         ) : (
-          <div className={`${detailOnly ? "h-full flex" : "hidden md:col-span-6 md:flex"} rounded-sm border-t border-brand/30 items-center justify-center text-sm text-gray-400 md:border-t-0 md:border-l`}>
+          <div className="col-span-1 rounded-sm border-t border-brand/30 flex items-center justify-center text-sm text-gray-400 md:col-span-6 md:border-t-0 md:border-l">
             投稿文を選択してください
           </div>
         )}

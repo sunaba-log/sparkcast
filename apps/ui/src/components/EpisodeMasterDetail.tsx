@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import type { Episode, EpisodePromotion } from "@/types/episode";
 import { Check, Minus, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -52,7 +51,6 @@ export function EpisodeMasterDetail({
   /** ディープリンク（/?episode=...）で初期選択するエピソード ID。 */
   initialSelectedId?: string;
 }) {
-  const router = useRouter();
   const [episodes, setEpisodes] = useState<Episode[]>(initialEpisodes);
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (
@@ -184,10 +182,6 @@ export function EpisodeMasterDetail({
 
   // When selected episode changes, sync form state
   const handleSelectEpisode = (ep: Episode) => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      router.push(`/episodes/${ep.id}`);
-      return;
-    }
     setSelectedId(ep.id);
     setTitle(ep.title);
     setDescription(ep.description);
@@ -257,9 +251,9 @@ export function EpisodeMasterDetail({
       </div>
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid min-h-0 grid-cols-1 gap-5 md:grid-cols-12">
+      <div className="flex-1 grid grid-cols-1 gap-5 md:grid-cols-12 md:min-h-0">
         {/* Left Column: Master List (5 cols) */}
-        <div className="col-span-1 flex min-h-0 flex-col space-y-3 overflow-y-auto pr-1 md:col-span-5">
+        <div className="col-span-1 flex flex-col space-y-3 md:col-span-5 md:overflow-y-auto md:pr-1">
           {episodes.map((ep) => {
             const isSelected = ep.id === selectedEpisode?.id;
             return (
@@ -317,7 +311,7 @@ export function EpisodeMasterDetail({
 
         {/* Right Column: Inspector Panel (7 cols) */}
         {selectedEpisode && (
-          <div className="hidden rounded-xs border-t border-brand/30 overflow-hidden md:col-span-7 md:flex md:flex-col md:border-t-0 md:border-l">
+          <div className="col-span-1 rounded-xs border-t border-brand/30 flex flex-col overflow-hidden md:col-span-7 md:border-t-0 md:border-l">
             {/* Top Bar Tabs & Actions */}
             {/* 幅が狭いとき、タブの文字を縦に折らずにタブごと折り返す */}
             <div className="px-5 py-1 border-b border-brand flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
