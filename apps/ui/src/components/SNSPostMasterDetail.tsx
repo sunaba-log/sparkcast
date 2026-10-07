@@ -17,6 +17,29 @@ export type SNSPostItem = {
   updatedAt: string;
 };
 
+export function getPostSortTimestamp(post: SNSPostItem): number {
+  const { yyyy, mm, dd, hh, min } = post.scheduledDate || {};
+  if (yyyy && mm && dd) {
+    const y = yyyy.padStart(4, "0");
+    const m = mm.padStart(2, "0");
+    const d = dd.padStart(2, "0");
+    const h = (hh || "00").padStart(2, "0");
+    const mi = (min || "00").padStart(2, "0");
+    const parsed = new Date(`${y}-${m}-${d}T${h}:${mi}:00`).getTime();
+    if (!isNaN(parsed)) return parsed;
+  }
+  const gen = post.generatedAt ? new Date(post.generatedAt).getTime() : 0;
+  return isNaN(gen) ? 0 : gen;
+}
+
+export function sortPostsDesc(posts: SNSPostItem[]): SNSPostItem[] {
+  return [...posts].sort((a, b) => {
+    const diff = getPostSortTimestamp(b) - getPostSortTimestamp(a);
+    if (diff !== 0) return diff;
+    return (b.id || "").localeCompare(a.id || "");
+  });
+}
+
 export function SNSPostMasterDetail({
   initialPosts = [],
   initialHasMore = false,
@@ -30,7 +53,7 @@ export function SNSPostMasterDetail({
   detailOnly?: boolean;
 }) {
   const router = useRouter();
-  const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
+  const [posts, setPosts] = useState<SNSPostItem[]>(() => sortPostsDesc(initialPosts));
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (
       initialSelectedId &&
@@ -38,7 +61,8 @@ export function SNSPostMasterDetail({
     ) {
       return initialSelectedId;
     }
-    return initialPosts.length > 0 ? initialPosts[0].id : "";
+    const sorted = sortPostsDesc(initialPosts);
+    return sorted.length > 0 ? sorted[0].id : "";
   });
 
   // クライアント遷移（チャットのリンク等）では再マウントされないため、
@@ -53,7 +77,7 @@ export function SNSPostMasterDetail({
       setPosts((prev) => {
         const existing = new Set(prev.map((p) => p.id));
         const added = initialPosts.filter((p) => !existing.has(p.id));
-        return added.length > 0 ? [...prev, ...added] : prev;
+        return added.length > 0 ? sortPostsDesc([...prev, ...added]) : prev;
       });
       setSelectedId(initialSelectedId);
     }
@@ -123,7 +147,7 @@ export function SNSPostMasterDetail({
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
         const newPosts = data.posts.filter((p) => !existingIds.has(p.id));
-        return [...prev, ...newPosts];
+        return sortPostsDesc([...prev, ...newPosts]);
       });
       setHasMore(data.hasMore);
       setOffset((prev) => prev + 5);
@@ -205,16 +229,18 @@ export function SNSPostMasterDetail({
       }
 
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === selectedPost.id
-            ? {
-              ...p,
-              scheduledDate,
-              message,
-              platformUrls,
-              hashtags,
-            }
-            : p
+        sortPostsDesc(
+          prev.map((p) =>
+            p.id === selectedPost.id
+              ? {
+                ...p,
+                scheduledDate,
+                message,
+                platformUrls,
+                hashtags,
+              }
+              : p
+          )
         )
       );
       setSaveStatus("saved");
@@ -272,7 +298,7 @@ export function SNSPostMasterDetail({
         {/* Left Column: Timeline Master List (6 cols) */}
         {!detailOnly && <div
           ref={containerRef}
-          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:col-span-6`}
+          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:col-span-6 @container`}
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -285,7 +311,7 @@ export function SNSPostMasterDetail({
                 ref={(el) => {
                   listItemRefs.current[post.id] = el;
                 }}
-                className="flex items-start gap-4 relative z-10"
+                className="flex items-start gap-3 relative z-10 min-w-0 w-full"
               >
                 {/* Timeline Icon Node */}
                 <div className="mt-1 shrink-0 bg-app-bg p-1 rounded-full">
@@ -296,46 +322,49 @@ export function SNSPostMasterDetail({
                   )}
                 </div>
 
-                {/* Date Label Pill */}
-                <div className="mt-2 shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700">
-                  {post.scheduledDate.yyyy}/{post.scheduledDate.mm}/{post.scheduledDate.dd}
-                </div>
-
-                {/* Post Preview Card */}
-                <div
-                  onClick={() => handleSelect(post)}
-                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
-                    ? "border-2 border-brand shadow-sm"
-                    : "border-gray-200 hover:border-brand/50 shadow-sm"
-                    }`}
-                >
-                  {/* Mock Twitter Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
-                        SC
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-gray-900 leading-none">
-                          SparkCast Official
-                        </div>
-                        <div className="text-[10px] text-gray-400">@sparkcast_jp</div>
-                      </div>
-                    </div>
+                {/* Content wrapper: responsive column (narrow) or row (wide) */}
+                <div className="flex-1 min-w-0 w-full flex flex-col @[500px]:flex-row items-start gap-1.5 @[500px]:gap-3">
+                  {/* Date Label Pill */}
+                  <div className="shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700 @[500px]:mt-1.5">
+                    {post.scheduledDate.yyyy}/{post.scheduledDate.mm}/{post.scheduledDate.dd}
                   </div>
 
-                  <p className="text-xs text-gray-800 leading-relaxed line-clamp-3 mb-2">
-                    {post.message}
-                  </p>
+                  {/* Post Preview Card */}
+                  <div
+                    onClick={() => handleSelect(post)}
+                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
+                      ? "border-2 border-brand shadow-sm"
+                      : "border-gray-200 hover:border-brand/50 shadow-sm"
+                      }`}
+                  >
+                    {/* Mock Twitter Header */}
+                    <div className="flex items-center justify-between mb-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs shrink-0">
+                          SC
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-900 leading-none truncate">
+                            SparkCast Official
+                          </div>
+                          <div className="text-[10px] text-gray-400 truncate">@sparkcast_jp</div>
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono">
-                    <span>
-                      {post.scheduledDate.hh}:{post.scheduledDate.min}
-                    </span>
-                    <span>・</span>
-                    <span className="text-brand font-medium">
-                      #{post.episodeId} {post.episodeTitle}
-                    </span>
+                    <p className="text-xs text-gray-800 leading-relaxed line-clamp-3 mb-2 break-words [overflow-wrap:anywhere]">
+                      {post.message}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono min-w-0">
+                      <span className="shrink-0">
+                        {post.scheduledDate.hh}:{post.scheduledDate.min}
+                      </span>
+                      <span className="shrink-0">・</span>
+                      <span className="text-brand font-medium truncate min-w-0">
+                        #{post.episodeId} {post.episodeTitle}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -445,8 +474,9 @@ export function SNSPostMasterDetail({
 
               {/* Form: Message */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Message</label>
+                <label htmlFor="sns-post-message" className="block text-xs font-semibold text-gray-700 mb-1.5">Message</label>
                 <textarea
+                  id="sns-post-message"
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}

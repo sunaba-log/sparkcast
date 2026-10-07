@@ -1,4 +1,4 @@
-import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
+import { SNSPostMasterDetail, sortPostsDesc } from "@/components/SNSPostMasterDetail";
 import { requireRegisteredUser } from "@/server/auth";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
 import {
@@ -39,6 +39,8 @@ export default async function SNSPostPage({
       initialPosts = [...initialPosts, ...targetPosts];
     }
   }
+
+  initialPosts = sortPostsDesc(initialPosts);
 
   return (
     <SNSPostMasterDetail

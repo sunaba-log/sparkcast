@@ -114,6 +114,14 @@ async function loadEpisodeContent(
     };
   });
 
+  promotions.sort((a, b) => {
+    const timeA = new Date(a.scheduledTime || a.generatedAt).getTime();
+    const timeB = new Date(b.scheduledTime || b.generatedAt).getTime();
+    const diff = (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    if (diff !== 0) return diff;
+    return b.id.localeCompare(a.id);
+  });
+
   return { minutes, transcriptAvailable, promotions };
 }
 

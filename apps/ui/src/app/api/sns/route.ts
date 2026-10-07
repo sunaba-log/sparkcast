@@ -7,7 +7,7 @@ import {
   deleteSnsPromotion,
 } from "@/server/episodes/data-repository";
 import type { Episode, EpisodePromotion } from "@/types/episode";
-import type { SNSPostItem } from "@/components/SNSPostMasterDetail";
+import { type SNSPostItem, sortPostsDesc } from "@/components/SNSPostMasterDetail";
 
 export function mapToSNSPostItem(ep: Episode, p: EpisodePromotion): SNSPostItem {
   const schedTime = p.scheduledTime ? new Date(p.scheduledTime) : new Date(p.generatedAt || ep.createdAt);
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
       ep.xPosts.map((p) => mapToSNSPostItem(ep, p))
     );
 
-    return NextResponse.json({ posts, hasMore });
+    return NextResponse.json({ posts: sortPostsDesc(posts), hasMore });
   } catch (error) {
     if (error instanceof Error && error.message === "NO_PODCAST_SELECTED") {
       return NextResponse.json(
