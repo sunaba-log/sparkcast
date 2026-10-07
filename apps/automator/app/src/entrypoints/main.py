@@ -111,7 +111,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     work_bucket = environ.get("WORK_BUCKET") or None
     app_base_url = environ.get("APP_BASE_URL") or None
     cron_secret = environ.get("CRON_SECRET") or None
-    typesafe_api_key = environ.get("TYPESAFE_API_KEY") or None
+    typesafe_api_key = environ.get("TYPESAFE_API_KEY") or environ.get("JEV_API_KEY") or None
     jev_enabled = environ.get("JEV_ENABLED", "true").lower() != "false"
     director_enabled = environ.get("DIRECTOR_ENABLED", "true").lower() != "false"
 
@@ -175,6 +175,8 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     )
     logger.info("WORK_BUCKET: %s", config.work_bucket)
     logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
+    logger.info("JEV_ENABLED: %s (api_key configured: %s)", config.jev_enabled, bool(config.typesafe_api_key))
+    logger.info("DIRECTOR_ENABLED: %s", config.director_enabled)
     logger.info("###########################\n")
 
 

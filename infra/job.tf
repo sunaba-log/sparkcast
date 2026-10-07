@@ -51,9 +51,10 @@ module "cloud_run_job" {
   }
 
   secret_environment_variables = {
-    DATABASE_URL = var.database_url_secret_name
-    CRON_SECRET  = data.google_secret_manager_secret.cron_secret.secret_id
-    JEV_API_KEY  = google_secret_manager_secret.jev_api_key.secret_id
+    DATABASE_URL     = var.database_url_secret_name
+    CRON_SECRET      = data.google_secret_manager_secret.cron_secret.secret_id
+    JEV_API_KEY      = google_secret_manager_secret.jev_api_key.secret_id
+    TYPESAFE_API_KEY = google_secret_manager_secret.jev_api_key.secret_id
   }
 
   depends_on = [
