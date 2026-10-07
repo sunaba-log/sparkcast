@@ -62,15 +62,16 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
     let active = true;
 
     async function completeRedirectLogin() {
-      const isPendingRedirect =
-        typeof window !== "undefined" &&
-        sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
-      if (isPendingRedirect) {
-        try {
+      let isPendingRedirect = false;
+      try {
+        isPendingRedirect =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
+        if (isPendingRedirect) {
           sessionStorage.removeItem(REDIRECT_PENDING_KEY);
-        } catch {
-          // ignore storage error
         }
+      } catch {
+        // ignore storage error
       }
 
       try {
