@@ -33,9 +33,18 @@
 | DISCORD_WEBHOOK_INFO_URL | No | - | Discord webhook URL for notifications |
 | AI_MODEL_ID | No | gemini-2.5-flash | Gemini model ID |
 | R2_CUSTOM_DOMAIN | No | podcast.sunabalog.com | Public domain for generated audio URL |
+| JEV_ENABLED | No | true | `false` の場合のみ監査を無効化。それ以外は監査完了を公開条件とする |
+| TYPESAFE_API_KEY | When JEV_ENABLED is enabled | - | Jev監査用。利用可能な認証がない場合は監査を完了できず公開しない |
+| DIRECTOR_ENABLED | No | true | `false` なら訂正生成を無効化。監査で要訂正と判定された場合は公開を停止する |
 
 Cloud TTS の認証には Cloud Run のサービスアカウントまたは Application Default Credentials を使用します。
 訂正音声を生成するサービスアカウントには `roles/texttospeech.user` が必要です。
+
+### 公開前監査が完了しない場合
+
+`JEV_ENABLED` が有効な場合、API失敗・必須回答の欠落や不正値・監査用セグメントの欠落・一部発話の評価欠落を正常な低スコアに置き換えず、音声とRSSの公開前に停止する。要訂正なのに訂正生成が無効、訂正文が空、保存先がない、または保存に失敗した場合も停止する。
+
+監査が正常に完了して要訂正の発話がない場合は自動公開を継続する。訂正提案を保存できた場合は `awaiting_approval` へ進む。`JEV_ENABLED=false` は監査完了を保証しない明示的な運用であり、障害時に自動でこの設定へ切り替えない。
 
 Conditional rule:
 
