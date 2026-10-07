@@ -115,7 +115,7 @@ export function TopicProposalEditor({
           <button
             onClick={handlePrev}
             disabled={currentIndex <= 0}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 min-h-[44px] px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
@@ -134,7 +134,7 @@ export function TopicProposalEditor({
               <button
                 key={p.id}
                 onClick={() => setSelectedProposalId(p.id)}
-                className={`px-2.5 py-1 rounded transition-colors shrink-0 ${isSelected
+                className={`min-h-[44px] px-3 py-2 rounded transition-colors shrink-0 ${isSelected
                   ? "bg-brand text-white font-medium"
                   : "border border-brand/30 text-gray-700 hover:bg-gray-50"
                   }`}
@@ -147,7 +147,7 @@ export function TopicProposalEditor({
           <button
             onClick={handleNext}
             disabled={currentIndex >= sortedProposals.length - 1}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 min-h-[44px] px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             Next <ArrowRight className="w-3.5 h-3.5" />
           </button>
@@ -277,9 +277,9 @@ function TopicProposalInnerEditor({
             {/* Header Bar / Collapsed view */}
             <div
               onClick={() => toggleAccordion(index)}
-              className="p-5 flex items-start justify-between cursor-pointer"
+              className="p-4 sm:p-5 flex items-start justify-between cursor-pointer gap-2"
             >
-              <div className="space-y-1 pr-4 flex-1">
+              <div className="space-y-1 pr-2 sm:pr-4 flex-1">
                 <h2 className="text-base font-bold text-gray-900 leading-snug">
                   {topic.title || "Google Cloud、Cloud SQLの次世代アーキテクチャを発表"}
                 </h2>
@@ -295,14 +295,18 @@ function TopicProposalInnerEditor({
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-brand hover:underline"
+                      className="text-brand hover:underline break-all"
                     >
                       {relatedNewsItem.url}
                     </a>
                   </div>
                 )}
               </div>
-              <button className="p-1 text-gray-500 hover:text-gray-800 shrink-0">
+              <button
+                type="button"
+                aria-label={isExpanded ? "トピックを閉じる" : "トピックを開く"}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-gray-500 hover:text-gray-800 shrink-0"
+              >
                 {isExpanded ? (
                   <ChevronUp className="w-5 h-5 text-brand" />
                 ) : (
@@ -313,7 +317,7 @@ function TopicProposalInnerEditor({
 
             {/* Expanded Content View (Form Fields) */}
             {isExpanded && (
-              <div className="px-5 pb-5 pt-2 border-t border-gray-100 space-y-4">
+              <div className="px-4 sm:px-5 pb-5 pt-3 border-t border-gray-100 space-y-4">
                 {/* Field: トピックの提案 */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -328,7 +332,7 @@ function TopicProposalInnerEditor({
                         prev.map((t, i) => (i === index ? { ...t, title: val } : t))
                       );
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900"
+                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -346,7 +350,7 @@ function TopicProposalInnerEditor({
                         prev.map((t, i) => (i === index ? { ...t, description: val } : t))
                       );
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed"
+                    className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -388,7 +392,7 @@ function TopicProposalInnerEditor({
                                 )
                               );
                             }}
-                            className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-brand"
+                            className="w-full min-h-[44px] px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-hidden focus:ring-1 focus:ring-brand"
                           />
                         );
                       }
@@ -397,7 +401,7 @@ function TopicProposalInnerEditor({
                         <div
                           key={ptIdx}
                           onClick={() => setEditingPoint({ topicIdx: index, ptIdx })}
-                          className="group w-full h-[38px] px-3.5 py-2 rounded-xs border border-brand/50 text-sm text-gray-900 flex items-center overflow-hidden cursor-pointer hover:border-brand transition-colors"
+                          className="group w-full min-h-[44px] px-3.5 py-2 rounded-xs border border-brand/50 text-sm text-gray-900 flex items-center overflow-hidden cursor-pointer hover:border-brand transition-colors"
                         >
                           <MarqueeText text={point} />
                         </div>
@@ -407,7 +411,7 @@ function TopicProposalInnerEditor({
                   <button
                     type="button"
                     onClick={() => handleAddPoint(index)}
-                    className="w-full py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                    className="w-full min-h-[44px] py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" /> 新規提案ポイントを追加
                   </button>
@@ -428,7 +432,8 @@ function TopicProposalInnerEditor({
                         <button
                           type="button"
                           onClick={() => handleRemoveEpisodeTag(index, epId)}
-                          className="text-gray-500 hover:text-gray-900"
+                          aria-label={`エピソード ${epId} を削除`}
+                          className="min-w-[28px] min-h-[28px] flex items-center justify-center text-gray-500 hover:text-gray-900"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -438,7 +443,7 @@ function TopicProposalInnerEditor({
                 </div>
 
                 {/* Action Buttons Right Aligned */}
-                <div className="pt-2 flex items-center justify-between border-t border-gray-200/60">
+                <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-200/60">
                   <div>
                     {status === "saved" && (
                       <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
@@ -447,11 +452,11 @@ function TopicProposalInnerEditor({
                       <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => toggleAccordion(index)}
-                      className="px-5 py-2 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors"
+                      className="min-h-[44px] px-5 py-2.5 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors flex items-center justify-center"
                     >
                       破棄
                     </button>
@@ -459,7 +464,7 @@ function TopicProposalInnerEditor({
                       type="button"
                       onClick={handleSave}
                       disabled={status === "saving"}
-                      className="px-6 py-2 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50"
+                      className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       {status === "saving" ? "保存中..." : "保存"}
                     </button>

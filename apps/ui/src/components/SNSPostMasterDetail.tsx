@@ -408,21 +408,21 @@ export function SNSPostMasterDetail({
                     type="text"
                     value={scheduledDate.yyyy}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, yyyy: e.target.value })}
-                    className="col-span-3 px-1 py-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-3 px-1 py-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="YYYY"
                   />
                   <input
                     type="text"
                     value={scheduledDate.mm}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, mm: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="MM"
                   />
                   <input
                     type="text"
                     value={scheduledDate.dd}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, dd: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="DD"
                   />
                   <div className="col-span-1 flex items-center justify-center font-bold">:</div>
@@ -430,14 +430,14 @@ export function SNSPostMasterDetail({
                     type="text"
                     value={scheduledDate.hh}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, hh: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="HH"
                   />
                   <input
                     type="text"
                     value={scheduledDate.min}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, min: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="mm"
                   />
                 </div>
@@ -450,7 +450,7 @@ export function SNSPostMasterDetail({
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 />
               </div>
 
@@ -462,21 +462,21 @@ export function SNSPostMasterDetail({
                   value={platformUrls.apple}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, apple: e.target.value })}
                   placeholder="Apple Podcast"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.amazon}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, amazon: e.target.value })}
                   placeholder="Amazon Music"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.spotify}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, spotify: e.target.value })}
                   placeholder="Spotify"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
               </div>
 
@@ -507,7 +507,7 @@ export function SNSPostMasterDetail({
                     onChange={(e) => setNewTagInput(e.target.value)}
                     onKeyDown={handleAddHashtag}
                     placeholder="+ タグを入力してEnter"
-                    className="px-2 py-1 text-xs bg-transparent text-gray-700 focus:outline-none placeholder:text-gray-400"
+                    className="px-2 py-1 text-base md:text-xs bg-transparent text-gray-700 focus:outline-none placeholder:text-gray-400"
                   />
                 </div>
               </div>
@@ -529,7 +529,7 @@ export function SNSPostMasterDetail({
                     setPlatformUrls(selectedPost.platformUrls);
                     setHashtags(selectedPost.hashtags);
                   }}
-                  className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
+                  className="min-h-[44px] px-5 py-2.5 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -537,7 +537,7 @@ export function SNSPostMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50"
+                  className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {isSaving ? "保存中..." : "変更"}
                 </button>

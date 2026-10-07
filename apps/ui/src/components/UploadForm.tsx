@@ -136,7 +136,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
   const isBusy = status === "preparing" || status === "uploading";
 
   return (
-    <div className="border border-brand rounded-xs p-8 max-w-xl">
+    <div className="border border-brand rounded-xs p-4 sm:p-6 md:p-8 max-w-xl">
       <div className="space-y-4 mb-6">
         <label className="block">
           <span className="text-sm font-medium text-black">仮タイトル（任意）</span>
@@ -146,7 +146,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             disabled={isBusy}
-            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-sm text-black"
+            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-base md:text-sm text-black focus:outline-none focus:border-brand"
             placeholder="未入力の場合はファイル名を仮タイトルにします"
           />
           <span className="mt-1 block text-xs text-gray-500">
@@ -161,20 +161,29 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
             onChange={(event) => setDescription(event.target.value)}
             disabled={isBusy}
             rows={3}
-            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-sm text-black"
+            className="mt-1 w-full rounded-xs border border-gray-300 px-3 py-2 text-base md:text-sm text-black focus:outline-none focus:border-brand"
           />
         </label>
       </div>
 
       <div
-        className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center hover:border-blue-400 transition-colors cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-label="音声ファイルを選択"
+        className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 md:p-10 text-center hover:border-blue-400 bg-white/40 active:bg-blue-50/50 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 min-h-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         onClick={() => !isBusy && inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (!isBusy) inputRef.current?.click();
+          }
+        }}
       >
-        <svg className="mx-auto w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="mx-auto w-10 h-10 sm:w-12 sm:h-12 text-brand/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
-        <p className="mt-3 text-sm text-gray-600">クリックして音声ファイルを選択</p>
-        <p className="mt-1 text-xs text-gray-400">MP3 / M4Aファイルに対応</p>
+        <p className="mt-2 text-sm font-medium text-gray-700">タップまたはクリックして音声ファイルを選択</p>
+        <p className="text-xs text-gray-400">PCではドラッグ＆ドロップも可能（MP3 / M4Aファイルに対応）</p>
         <input
           ref={inputRef}
           type="file"
@@ -220,11 +229,11 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         </div>
       )}
 
-      <div className="mt-4 flex gap-3">
+      <div className="mt-6 flex flex-col sm:flex-row gap-3">
         <button
           onClick={handleUpload}
           disabled={!selectedFile || status === "success" || isBusy}
-          className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-xs hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="min-h-[44px] px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xs hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
         >
           {isBusy ? "処理中..." : "アップロード開始"}
         </button>
@@ -232,7 +241,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
           <button
             onClick={handleReset}
             disabled={isBusy}
-            className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-xs hover:bg-gray-50 transition-colors"
+            className="min-h-[44px] px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-300 rounded-xs hover:bg-gray-50 transition-colors flex items-center justify-center"
           >
             リセット
           </button>
