@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Episode, EpisodePromotion } from "@/types/episode";
 import { Check, Minus, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
@@ -396,13 +397,13 @@ export function EpisodeMasterDetail({
               {/* Audio Player Preview */}
               <div className="rounded-xs p-4 border border-brand flex items-center gap-4 backdrop-blur-xs">
                 {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
-                  // アートワークは任意ホストのリモート画像で、next/image 化には
-                  // images.remotePatterns の網羅的な許可が必要になり実運用リスクが高い。
-                  // 固定サイズ表示のため最適化の恩恵も薄いので通常の img を許容する。
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
                     alt={selectedEpisode.title}
+                    width={96}
+                    height={96}
+                    sizes="96px"
+                    priority
                     className="w-24 h-24 object-cover rounded-lg shrink-0 border border-brand/20 shadow-sm"
                   />
                 ) : (
@@ -513,7 +514,7 @@ export function EpisodeMasterDetail({
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
                     />
                   </div>
                   <div>
@@ -524,7 +525,7 @@ export function EpisodeMasterDetail({
                       rows={6}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                     />
                   </div>
                 </div>
@@ -578,7 +579,7 @@ export function EpisodeMasterDetail({
                       rows={12}
                       value={minutes}
                       onChange={(e) => setMinutes(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
+                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                       placeholder="まだ議事録が生成されていません"
                     />
                   )}
@@ -619,7 +620,7 @@ export function EpisodeMasterDetail({
                               )
                             );
                           }}
-                          className="w-full px-3 py-2 rounded-xs border border-brand/30 text-sm text-gray-900 focus:outline-none"
+                          className="w-full px-3 py-2 rounded-xs border border-brand/30 text-base md:text-sm text-gray-900 focus:outline-none"
                         />
                         <div className="text-right text-[11px] text-gray-400">
                           {post.message.length} 文字
@@ -671,7 +672,7 @@ export function EpisodeMasterDetail({
                     setPosts(selectedEpisode.xPosts);
                     setMinutesTab("preview");
                   }}
-                  className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
+                  className="min-h-[44px] px-5 py-2.5 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -679,7 +680,7 @@ export function EpisodeMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={status === "saving"}
-                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50"
+                  className="min-h-[44px] px-6 py-2.5 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {status === "saving" ? "保存中..." : "変更"}
                 </button>

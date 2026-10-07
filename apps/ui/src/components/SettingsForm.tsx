@@ -156,7 +156,7 @@ export function SettingsForm({
         </p>
       )}
 
-      <div className="rounded-xs border border-brand/30 p-6 space-y-6">
+      <div className="rounded-xs border border-brand/30 p-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Radio className="w-5 h-5 text-brand" />
@@ -181,7 +181,7 @@ export function SettingsForm({
               }}
               required
               maxLength={255}
-              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -197,7 +197,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={2000}
-              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -213,7 +213,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={2000}
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
             />
           </div>
 
@@ -234,21 +234,21 @@ export function SettingsForm({
               }}
               maxLength={500}
               placeholder="例: さとう、すずき、たかはし"
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base sm:text-sm text-gray-900 focus:outline-none focus:border-brand"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
             />
             <p className="text-xs text-gray-500 mt-1">
               読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
             </p>
           </div>
 
-          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+          <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
             <span className="text-xs text-emerald-600 font-semibold">
               {saved ? "設定を更新しました" : ""}
             </span>
             <button
               type="submit"
               disabled={saving || title.trim().length === 0}
-              className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> {saving ? "保存中..." : "設定を保存"}
             </button>
@@ -256,7 +256,7 @@ export function SettingsForm({
         </form>
       </div>
 
-      <div className="rounded-xs border border-brand/30 p-6 space-y-6">
+      <div className="rounded-xs border border-brand/30 p-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Key className="w-5 h-5 text-brand" />
@@ -299,12 +299,13 @@ export function SettingsForm({
                           setXApiKey(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXApiKey ? "API Keyを隠す" : "API Keyを表示"}
                         onClick={() => setShowXApiKey(!showXApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -323,12 +324,13 @@ export function SettingsForm({
                           setXApiSecret(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXApiSecret ? "API Secretを隠す" : "API Secretを表示"}
                         onClick={() => setShowXApiSecret(!showXApiSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXApiSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -347,12 +349,13 @@ export function SettingsForm({
                           setXAccessToken(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXAccessToken ? "Access Tokenを隠す" : "Access Tokenを表示"}
                         onClick={() => setShowXAccessToken(!showXAccessToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXAccessToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -371,12 +374,13 @@ export function SettingsForm({
                           setXAccessTokenSecret(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXAccessTokenSecret ? "Access Token Secretを隠す" : "Access Token Secretを表示"}
                         onClick={() => setShowXAccessTokenSecret(!showXAccessTokenSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXAccessTokenSecret ? (
                           <EyeOff className="w-4 h-4" />
@@ -407,12 +411,13 @@ export function SettingsForm({
                           setDiscordBotToken(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showDiscordBotToken ? "Discord Bot Tokenを隠す" : "Discord Bot Tokenを表示"}
                         onClick={() => setShowDiscordBotToken(!showDiscordBotToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showDiscordBotToken ? (
                           <EyeOff className="w-4 h-4" />
@@ -427,37 +432,37 @@ export function SettingsForm({
             </div>
 
             <div>
-            <label
-              htmlFor="cast-members"
-              className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
-            >
-              <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
-            </label>
-            <input
-              id="cast-members"
-              type="text"
-              value={castMembers}
-              onChange={(e) => {
-                setCastMembers(e.target.value);
-                setSaved(false);
-              }}
-              maxLength={500}
-              placeholder="例: さとう、すずき、たかはし"
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
-            </p>
-          </div>
+              <label
+                htmlFor="cast-members-secrets"
+                className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
+              >
+                <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
+              </label>
+              <input
+                id="cast-members-secrets"
+                type="text"
+                value={castMembers}
+                onChange={(e) => {
+                  setCastMembers(e.target.value);
+                  setSaved(false);
+                }}
+                maxLength={500}
+                placeholder="例: さとう、すずき、たかはし"
+                className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
+              </p>
+            </div>
 
-          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+            <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
               <span className="text-xs text-emerald-600 font-semibold">
                 {savedSecrets ? "シークレット設定を更新しました" : ""}
               </span>
               <button
                 type="submit"
                 disabled={savingSecrets}
-                className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />{" "}
                 {savingSecrets ? "保存中..." : "シークレットを保存"}

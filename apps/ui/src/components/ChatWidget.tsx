@@ -364,12 +364,12 @@ export function ChatWidget() {
   return (
     <>
       <div
-        className={`fixed top-16 right-6 z-50 flex h-[calc(100vh-6rem)] max-h-[48rem] w-[36rem] max-w-[calc(100vw-3rem)] flex-col rounded-sm border border-brand/60 bg-app-bg transition-all duration-300 ease-out origin-top-right ${isOpen
-          ? "opacity-100 translate-x-0 translate-y-0 scale-100 pointer-events-auto"
-          : "opacity-0 translate-x-4 -translate-y-4 scale-95 pointer-events-none"
+        className={`fixed inset-0 z-50 flex h-[100dvh] w-full flex-col bg-app-bg transition-all duration-300 ease-out md:inset-auto md:top-16 md:right-6 md:h-[calc(100vh-6rem)] md:max-h-[48rem] md:w-[36rem] md:max-w-[calc(100vw-3rem)] md:rounded-sm md:border md:border-brand/60 md:origin-top-right ${isOpen
+          ? "opacity-100 translate-y-0 md:translate-x-0 md:translate-y-0 md:scale-100 pointer-events-auto"
+          : "opacity-0 translate-y-full md:translate-y-[-1rem] md:translate-x-4 md:scale-95 pointer-events-none"
           }`}
       >
-        <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-3">
+        <div className="flex items-center gap-2 border-b border-gray-200 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-2 md:py-2 shrink-0">
           {view === "chat" ? (
             <>
               <button
@@ -380,9 +380,9 @@ export function ChatWidget() {
                 }}
                 aria-label="履歴を開く"
                 title="履歴"
-                className="text-gray-500 hover:text-blue-600"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-gray-500 hover:text-blue-600 transition-colors"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="3" y1="6" x2="21" y2="6" />
                   <line x1="3" y1="12" x2="21" y2="12" />
                   <line x1="3" y1="18" x2="21" y2="18" />
@@ -397,7 +397,7 @@ export function ChatWidget() {
                 disabled={activeSessionId === null && messages.length === 0}
                 aria-label="新しいチャット"
                 title="新しいチャット"
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600"
+                className="min-h-[44px] flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <line x1="12" y1="5" x2="12" y2="19" />
@@ -407,13 +407,13 @@ export function ChatWidget() {
               </button>
             </>
           ) : (
-            <h2 className="flex-1 text-sm font-semibold text-gray-900">履歴</h2>
+            <h2 className="flex-1 text-sm font-semibold text-gray-900 pl-2">履歴</h2>
           )}
           <button
             type="button"
             onClick={() => setIsOpen(false)}
             aria-label="チャットを閉じる"
-            className="text-gray-400 hover:text-gray-600"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 transition-colors text-lg"
           >
             ✕
           </button>
@@ -421,11 +421,11 @@ export function ChatWidget() {
 
         {view === "history" ? (
           <>
-            <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex-1 overflow-y-auto p-3">
               <button
                 type="button"
                 onClick={startNewChat}
-                className="mb-2 flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600"
+                className="mb-3 min-h-[44px] flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600"
               >
                 ＋ 新しいチャット
               </button>
@@ -438,13 +438,13 @@ export function ChatWidget() {
                   {sessions.map((session) => (
                     <li
                       key={session.id}
-                      className={`flex items-center gap-1 rounded-md px-2 py-2 hover:bg-gray-100 ${session.id === activeSessionId ? "bg-blue-50" : ""
+                      className={`flex items-center gap-1 rounded-md px-2 py-1.5 hover:bg-gray-100 ${session.id === activeSessionId ? "bg-blue-50" : ""
                         }`}
                     >
                       <button
                         type="button"
                         onClick={() => void openSession(session.id)}
-                        className="flex-1 truncate text-left text-sm text-gray-800"
+                        className="flex-1 min-h-[44px] truncate text-left text-sm text-gray-800 flex items-center"
                       >
                         {session.title}
                       </button>
@@ -453,9 +453,9 @@ export function ChatWidget() {
                         onClick={() => void renameSession(session.id, session.title)}
                         aria-label="名前を変更"
                         title="名前を変更"
-                        className="text-gray-300 hover:text-blue-500"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-blue-500 rounded-md transition-colors"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 20h9" />
                           <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
                         </svg>
@@ -465,9 +465,9 @@ export function ChatWidget() {
                         onClick={() => void removeSession(session.id)}
                         aria-label="このチャットを削除"
                         title="削除"
-                        className="text-gray-300 hover:text-red-500"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-500 rounded-md transition-colors"
                       >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <polyline points="3 6 5 6 21 6" />
                           <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                         </svg>
@@ -477,12 +477,12 @@ export function ChatWidget() {
                 </ul>
               )}
             </div>
-            <div className="border-t border-gray-200 p-2">
+            <div className="border-t border-gray-200 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-2 shrink-0">
               <button
                 type="button"
                 onClick={() => void reindex()}
                 disabled={reindexState === "running"}
-                className="w-full rounded-md px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 disabled:opacity-50"
+                className="w-full min-h-[44px] rounded-md px-3 py-2 text-xs text-gray-500 hover:text-blue-600 disabled:opacity-50 flex items-center justify-center"
               >
                 {reindexState === "running"
                   ? "ナレッジを更新中…"
@@ -502,7 +502,7 @@ export function ChatWidget() {
                   el.scrollHeight - el.scrollTop - el.clientHeight <
                   SCROLL_THRESHOLD;
               }}
-              className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
+              className="flex-1 space-y-3 overflow-y-auto px-4 py-3 min-h-0"
             >
               {messages.length === 0 ? (
                 <div className="space-y-3">
@@ -513,7 +513,7 @@ export function ChatWidget() {
                         key={question}
                         type="button"
                         onClick={() => void sendSuggestion(question)}
-                        className="rounded-full border border-gray-300 px-3 py-1.5 text-left text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600"
+                        className="min-h-[44px] rounded-full border border-gray-300 px-4 py-2 text-left text-xs text-gray-600 hover:border-blue-400 hover:text-blue-600 flex items-center"
                       >
                         {question}
                       </button>
@@ -560,7 +560,7 @@ export function ChatWidget() {
                     <button
                       type="button"
                       onClick={() => void retry()}
-                      className="text-xs font-medium text-blue-600 hover:underline"
+                      className="min-h-[44px] inline-flex items-center text-xs font-medium text-blue-600 hover:underline px-2"
                     >
                       再試行
                     </button>
@@ -569,7 +569,7 @@ export function ChatWidget() {
               )}
             </div>
 
-            <div className="border-t border-gray-200 p-3">
+            <div className="border-t border-gray-200 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3 shrink-0">
               <textarea
                 id="chat-input"
                 name="chat-input"
@@ -589,9 +589,9 @@ export function ChatWidget() {
                 }}
                 rows={2}
                 placeholder="質問や相談を入力…"
-                className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
+                className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-base md:text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
               />
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-[11px] text-gray-400">
                   Enterで送信 / Shift+Enterで改行
                 </span>
@@ -599,7 +599,7 @@ export function ChatWidget() {
                   <button
                     type="button"
                     onClick={stop}
-                    className="rounded-md border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    className="min-h-[44px] px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 flex items-center justify-center"
                   >
                     停止
                   </button>
@@ -608,7 +608,7 @@ export function ChatWidget() {
                     type="button"
                     onClick={() => void send()}
                     disabled={!input.trim()}
-                    className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="min-h-[44px] px-4 py-2 rounded-md bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
                   >
                     送信
                   </button>
@@ -623,7 +623,7 @@ export function ChatWidget() {
         type="button"
         onClick={toggleOpen}
         aria-label={isOpen ? "チャットを閉じる" : "チャットを開く"}
-        className={`px-4 py-2 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
+        className={`min-h-[44px] px-4 py-2 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
           ? "bg-brand text-white border-brand hover:bg-brand-hover"
           : "text-gray-600 hover:text-gray-900 border-gray-400 hover:bg-gray-200"
           }`}

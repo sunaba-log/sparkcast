@@ -1,6 +1,6 @@
 "use client";
 
-import type { DirectorIntervention, DirectorInterventionStatus } from "@/types/episode";
+import type { DirectorIntervention } from "@/types/episode";
 
 const severityStyles: Record<DirectorIntervention["severity"], string> = {
   1: "bg-gray-100 text-gray-700",
@@ -63,16 +63,16 @@ export function DirectorInterventionCard({
           disabled={disabled || intervention.status === "rejected"}
           value={intervention.correctionScript}
           onChange={(event) => onChange({ correctionScript: event.target.value })}
-          className="w-full rounded-xs border border-brand/40 px-3 py-2 text-sm leading-relaxed text-gray-900 disabled:bg-gray-100"
+          className="w-full rounded-xs border border-brand/40 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
         />
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
           type="button"
           disabled={disabled}
           onClick={() => onChange({ status: "approved" })}
           aria-pressed={intervention.status === "approved"}
-          className={`rounded-xs px-3 py-1.5 text-xs font-semibold ${intervention.status === "approved" ? "bg-emerald-600 text-white" : "border border-emerald-600 text-emerald-700"}`}
+          className={`min-h-[44px] rounded-xs px-4 py-2 text-xs font-semibold flex items-center justify-center ${intervention.status === "approved" ? "bg-emerald-600 text-white" : "border border-emerald-600 text-emerald-700 hover:bg-emerald-50"}`}
         >
           承認
         </button>
@@ -81,7 +81,7 @@ export function DirectorInterventionCard({
           disabled={disabled}
           onClick={() => onChange({ status: "rejected" })}
           aria-pressed={intervention.status === "rejected"}
-          className={`rounded-xs px-3 py-1.5 text-xs font-semibold ${intervention.status === "rejected" ? "bg-gray-600 text-white" : "border border-gray-400 text-gray-700"}`}
+          className={`min-h-[44px] rounded-xs px-4 py-2 text-xs font-semibold flex items-center justify-center ${intervention.status === "rejected" ? "bg-gray-600 text-white" : "border border-gray-400 text-gray-700 hover:bg-gray-100"}`}
         >
           スキップ / 却下
         </button>

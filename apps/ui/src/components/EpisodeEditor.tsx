@@ -46,7 +46,7 @@ export function EpisodeEditor({ episode }: { episode: Episode }) {
             setStatus("idle");
           }}
           rows={18}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm leading-relaxed text-gray-800"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-800"
           placeholder="まだ議事録が生成されていません"
         />
       </section>
@@ -76,7 +76,7 @@ export function EpisodeEditor({ episode }: { episode: Episode }) {
                     setStatus("idle");
                   }}
                   rows={5}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-base md:text-sm text-gray-800"
                 />
                 <span className="text-xs text-gray-400">
                   {post.message.length}文字
@@ -92,7 +92,7 @@ export function EpisodeEditor({ episode }: { episode: Episode }) {
           type="button"
           onClick={save}
           disabled={status === "saving"}
-          className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="min-h-[44px] px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
         >
           {status === "saving" ? "保存中..." : "変更を保存"}
         </button>

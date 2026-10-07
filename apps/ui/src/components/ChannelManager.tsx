@@ -176,7 +176,7 @@ export function ChannelManager({
         </p>
       )}
 
-      <div className="rounded-xs border border-brand/30 p-6 space-y-4">
+      <div className="rounded-xs border border-brand/30 p-4 sm:p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -190,7 +190,7 @@ export function ChannelManager({
           <button
             type="button"
             onClick={() => setShowCreateForm((show) => !show)}
-            className="shrink-0 px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center gap-1.5"
+            className="shrink-0 min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center justify-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> 新規チャンネル
           </button>
@@ -199,7 +199,7 @@ export function ChannelManager({
         {showCreateForm && (
           <form
             onSubmit={createChannel}
-            className="space-y-3 border border-brand/20 rounded-xs p-4 bg-brand-subtle/20"
+            className="space-y-3 border border-brand/20 rounded-xs p-3 sm:p-4 bg-brand-subtle/20"
           >
             <div>
               <label
@@ -215,7 +215,7 @@ export function ChannelManager({
                 onChange={(event) => setTitle(event.target.value)}
                 required
                 maxLength={255}
-                className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
             <div>
@@ -231,21 +231,21 @@ export function ChannelManager({
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={2000}
-                className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="submit"
                 disabled={creating || title.trim().length === 0}
-                className="px-5 py-2 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors disabled:opacity-50"
+                className="min-h-[44px] px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
               >
                 {creating ? "作成中..." : "作成する"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="px-5 py-2 border border-gray-400 text-gray-700 rounded-xs text-sm hover:bg-gray-100"
+                className="min-h-[44px] px-5 py-2.5 border border-gray-400 text-gray-700 rounded-xs text-sm hover:bg-gray-100 flex items-center justify-center"
               >
                 キャンセル
               </button>
@@ -263,7 +263,7 @@ export function ChannelManager({
             return (
               <li
                 key={podcast.id}
-                className={`rounded-xs border p-4 ${
+                className={`rounded-xs border p-3 sm:p-4 ${
                   isSelected ? "border-brand bg-brand-light/40" : "border-brand/20"
                 }`}
               >
@@ -275,7 +275,7 @@ export function ChannelManager({
                       onChange={(event) => setEditTitle(event.target.value)}
                       required
                       maxLength={255}
-                      className="w-full px-3 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      className="w-full px-3 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
                     <textarea
                       value={editDescription}
@@ -283,14 +283,14 @@ export function ChannelManager({
                       rows={2}
                       maxLength={2000}
                       placeholder="概要（任意）"
-                      className="w-full px-3 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      className="w-full px-3 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <button
                         type="button"
                         onClick={() => saveEdit(podcast.id)}
                         disabled={savingEdit || editTitle.trim().length === 0}
-                        className="px-4 py-1.5 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
+                        className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
                       >
                         {savingEdit ? "保存中..." : "保存"}
                       </button>
@@ -298,64 +298,67 @@ export function ChannelManager({
                         type="button"
                         onClick={() => setEditingId(null)}
                         disabled={savingEdit}
-                        className="px-4 py-1.5 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100"
+                        className="min-h-[44px] px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setDefault(podcast.id)}
-                      disabled={isDefault || settingDefaultId !== null}
-                      title={isDefault ? "デフォルトのチャンネル" : "デフォルトに設定"}
-                      className={`shrink-0 p-1 rounded-xs transition-colors ${
-                        isDefault
-                          ? "text-amber-500"
-                          : "text-gray-300 hover:text-amber-500"
-                      } disabled:cursor-default`}
-                    >
-                      <Star
-                        className="w-5 h-5"
-                        fill={isDefault ? "currentColor" : "none"}
-                      />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-gray-900 truncate">
-                          {podcast.title}
-                        </span>
-                        {podcast.role !== "owner" && (
-                          <span className="text-[10px] text-gray-600 border border-gray-300 rounded-full px-2 py-0.5 shrink-0">
-                            {ROLE_LABELS[podcast.role]}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                    <div className="flex items-start sm:items-center gap-3 w-full sm:w-auto flex-1 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setDefault(podcast.id)}
+                        disabled={isDefault || settingDefaultId !== null}
+                        title={isDefault ? "デフォルトのチャンネル" : "デフォルトに設定"}
+                        aria-label={isDefault ? "デフォルトのチャンネル" : "デフォルトに設定"}
+                        className={`shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xs transition-colors ${
+                          isDefault
+                            ? "text-amber-500"
+                            : "text-gray-300 hover:text-amber-500"
+                        } disabled:cursor-default`}
+                      >
+                        <Star
+                          className="w-5 h-5"
+                          fill={isDefault ? "currentColor" : "none"}
+                        />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-gray-900 truncate">
+                            {podcast.title}
                           </span>
-                        )}
-                        {isSelected && (
-                          <span className="text-[10px] font-semibold text-brand border border-brand rounded-full px-2 py-0.5 shrink-0 flex items-center gap-1">
-                            <Check className="w-3 h-3" /> 選択中
-                          </span>
-                        )}
-                        {isDefault && (
-                          <span className="text-[10px] font-semibold text-amber-600 border border-amber-300 rounded-full px-2 py-0.5 shrink-0">
-                            デフォルト
-                          </span>
+                          {podcast.role !== "owner" && (
+                            <span className="text-[10px] text-gray-600 border border-gray-300 rounded-full px-2 py-0.5 shrink-0">
+                              {ROLE_LABELS[podcast.role]}
+                            </span>
+                          )}
+                          {isSelected && (
+                            <span className="text-[10px] font-semibold text-brand border border-brand rounded-full px-2 py-0.5 shrink-0 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> 選択中
+                            </span>
+                          )}
+                          {isDefault && (
+                            <span className="text-[10px] font-semibold text-amber-600 border border-amber-300 rounded-full px-2 py-0.5 shrink-0">
+                              デフォルト
+                            </span>
+                          )}
+                        </div>
+                        {podcast.description && (
+                          <p className="mt-1 text-xs text-gray-500 truncate">
+                            {podcast.description}
+                          </p>
                         )}
                       </div>
-                      {podcast.description && (
-                        <p className="mt-1 text-xs text-gray-500 truncate">
-                          {podcast.description}
-                        </p>
-                      )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end shrink-0">
                       {!isSelected && (
                         <button
                           type="button"
                           onClick={() => selectChannel(podcast.id)}
                           disabled={pendingId !== null}
-                          className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50"
+                          className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
                         >
                           {pendingId === podcast.id ? "切り替え中..." : "切り替え"}
                         </button>
@@ -364,7 +367,7 @@ export function ChannelManager({
                         <button
                           type="button"
                           onClick={() => router.push("/episodes")}
-                          className="px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover"
+                          className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover flex items-center justify-center"
                         >
                           エピソード管理
                         </button>
@@ -375,7 +378,8 @@ export function ChannelManager({
                             type="button"
                             onClick={() => startEdit(podcast)}
                             title="編集"
-                            className="p-2 text-gray-500 hover:text-brand rounded-xs hover:bg-brand-subtle/40"
+                            aria-label="チャンネルを編集"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-gray-500 hover:text-brand rounded-xs hover:bg-brand-subtle/40"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -383,7 +387,8 @@ export function ChannelManager({
                             type="button"
                             onClick={() => setConfirmingDeleteId(podcast.id)}
                             title="削除"
-                            className="p-2 text-gray-500 hover:text-red-600 rounded-xs hover:bg-red-50"
+                            aria-label="チャンネルを削除"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-gray-500 hover:text-red-600 rounded-xs hover:bg-red-50"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -394,23 +399,23 @@ export function ChannelManager({
                 )}
 
                 {isConfirmingDelete && (
-                  <div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between gap-3">
+                  <div className="mt-3 border-t border-gray-100 pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <span className="text-xs text-red-700">
                       このチャンネルとそのエピソードを削除します。取り消せません。
                     </span>
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                       <button
                         type="button"
                         onClick={() => deleteChannel(podcast.id)}
                         disabled={pendingId !== null}
-                        className="px-4 py-1.5 text-xs font-medium bg-red-600 text-white rounded-xs hover:bg-red-700 disabled:opacity-50"
+                        className="min-h-[44px] px-4 py-2 text-xs font-medium bg-red-600 text-white rounded-xs hover:bg-red-700 disabled:opacity-50 flex items-center justify-center"
                       >
                         {pendingId === podcast.id ? "削除中..." : "削除する"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmingDeleteId(null)}
-                        className="px-4 py-1.5 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100"
+                        className="min-h-[44px] px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>
