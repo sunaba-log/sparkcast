@@ -116,6 +116,13 @@ export function EpisodeMasterDetail({
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    setTitle(selectedEpisode?.title ?? "");
+    setDescription(selectedEpisode?.description ?? "");
+    setMinutes(selectedEpisode?.minutes ?? "");
+    setPosts(selectedEpisode?.xPosts ?? []);
+    setMinutesTab("preview");
+    setStatus("idle");
+    setErrorMsg("");
   }
 
   // Reload the audio element (external system) when the source changes.
@@ -185,10 +192,7 @@ export function EpisodeMasterDetail({
 
   // When selected episode changes, sync form state
   const handleSelectEpisode = (ep: Episode) => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      router.push(`/episodes/${ep.id}`);
-      return;
-    }
+    router.push(`/episodes?episode=${encodeURIComponent(ep.id)}`);
     setSelectedId(ep.id);
     setTitle(ep.title);
     setDescription(ep.description);
@@ -258,9 +262,9 @@ export function EpisodeMasterDetail({
       </div>
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid min-h-0 grid-cols-1 gap-5 md:grid-cols-12">
+      <div className="flex-1 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-12">
         {/* Left Column: Master List (5 cols) */}
-        <div className="col-span-1 flex min-h-0 flex-col space-y-3 overflow-y-auto pr-1 md:col-span-5">
+        <div className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-3 overflow-y-auto pr-1 lg:col-span-5`}>
           {episodes.map((ep) => {
             const isSelected = ep.id === selectedEpisode?.id;
             return (
@@ -318,11 +322,20 @@ export function EpisodeMasterDetail({
 
         {/* Right Column: Inspector Panel (7 cols) */}
         {selectedEpisode && (
-          <div className="hidden rounded-xs border-t border-brand/30 overflow-hidden md:col-span-7 md:flex md:flex-col md:border-t-0 md:border-l">
+          <div className={`${initialSelectedId ? "flex" : "hidden"} rounded-xs border-t border-brand/30 overflow-hidden flex-col lg:col-span-7 lg:flex lg:border-t-0 lg:border-l`}>
+            <div className="lg:hidden border-b border-brand/30 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => router.push("/episodes")}
+                className="min-h-11 px-2 text-sm font-medium text-brand hover:text-brand-hover"
+              >
+                ← エピソード一覧に戻る
+              </button>
+            </div>
             {/* Top Bar Tabs & Actions */}
             {/* 幅が狭いとき、タブの文字を縦に折らずにタブごと折り返す */}
-            <div className="px-5 py-1 border-b border-brand flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-1 min-w-0">
+            <div className="px-5 py-1 border-b border-brand flex flex-col items-stretch gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 gap-x-6 overflow-x-auto no-scrollbar">
                 <button
                   onClick={() => setActiveTab("overview")}
                   className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "overview"
@@ -395,19 +408,19 @@ export function EpisodeMasterDetail({
               </div>
 
               {/* Audio Player Preview */}
-              <div className="rounded-xs p-4 border border-brand flex items-center gap-4 backdrop-blur-xs">
+              <div className="rounded-xs p-4 border border-brand flex flex-col gap-4 backdrop-blur-xs sm:flex-row sm:items-center">
                 {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
                   <Image
                     src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
                     alt={selectedEpisode.title}
                     width={96}
                     height={96}
-                    sizes="96px"
+                    sizes="(max-width: 640px) 56px, 96px"
                     priority
-                    className="w-24 h-24 object-cover rounded-lg shrink-0 border border-brand/20 shadow-sm"
+                    className="w-14 h-14 object-cover rounded-lg shrink-0 border border-brand/20 shadow-sm sm:w-24 sm:h-24"
                   />
                 ) : (
-                  <div className="w-24 h-24 bg-gradient-to-br from-brand/60 to-brand/20 rounded-lg shrink-0 flex flex-col items-center justify-center text-white/90 border border-brand/20 shadow-sm">
+                  <div className="w-14 h-14 bg-gradient-to-br from-brand/60 to-brand/20 rounded-lg shrink-0 flex flex-col items-center justify-center text-white/90 border border-brand/20 shadow-sm sm:w-24 sm:h-24">
                     <Radio className={`w-8 h-8 stroke-[1.5] mb-1 ${isPlaying ? "animate-pulse" : ""}`} />
                     <span className="text-[9px] font-bold tracking-wider uppercase opacity-80">
                       No Cover
@@ -415,12 +428,12 @@ export function EpisodeMasterDetail({
                   </div>
                 )}
 
-                <div className="flex-1 space-y-3">
+                <div className="w-full flex-1 space-y-3">
                   <div className="flex items-center justify-center gap-6">
                     <button
                       onClick={handleSkipBackward}
                       disabled={!selectedEpisode.audioUrl}
-                      className="text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
                       title="15秒戻る"
                     >
                       <SkipBack className="w-5 h-5 fill-current" />
@@ -428,7 +441,7 @@ export function EpisodeMasterDetail({
                     <button
                       onClick={togglePlay}
                       disabled={!selectedEpisode.audioUrl}
-                      className="w-10 h-10 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-brand text-white cursor-pointer"
+                      className="w-11 h-11 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-brand text-white cursor-pointer"
                       title={isPlaying ? "一時停止" : "再生"}
                     >
                       {isPlaying ? (
@@ -440,7 +453,7 @@ export function EpisodeMasterDetail({
                     <button
                       onClick={handleSkipForward}
                       disabled={!selectedEpisode.audioUrl}
-                      className="text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
                       title="15秒進む"
                     >
                       <SkipForward className="w-5 h-5 fill-current" />
@@ -451,7 +464,7 @@ export function EpisodeMasterDetail({
                   <div className="space-y-1">
                     <div
                       onClick={handleProgressBarClick}
-                      className={`w-full bg-gray-200 h-2 rounded-full overflow-hidden relative ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
+                      className={`w-full bg-gray-200 h-4 rounded-full overflow-hidden relative touch-none ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
                         }`}
                     >
                       <div

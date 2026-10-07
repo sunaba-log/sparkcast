@@ -107,7 +107,7 @@ export function TranscriptPanel({
               type="button"
               disabled={!canSeek}
               onClick={() => onSeek(segment.start)}
-              className="text-left font-mono text-xs text-gray-500 tabular-nums pt-0.5 hover:text-brand disabled:hover:text-gray-500 disabled:cursor-default"
+              className="min-h-11 -my-1 flex items-center text-left font-mono text-xs text-gray-500 tabular-nums hover:text-brand disabled:hover:text-gray-500 disabled:cursor-default"
               title={canSeek ? "この位置から再生" : undefined}
             >
               {formatTimestamp(segment.start)}

@@ -159,10 +159,7 @@ export function SNSPostMasterDetail({
   }, [hasMore, isLoading, loadMore]);
 
   const handleSelect = (post: SNSPostItem) => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      router.push(`/sns/${post.episodeId}/${post.id}`);
-      return;
-    }
+    router.push(`/sns?episode=${encodeURIComponent(post.episodeId)}&post=${encodeURIComponent(post.id)}`);
     setSelectedId(post.id);
   };
 
@@ -271,11 +268,11 @@ export function SNSPostMasterDetail({
       )}
 
       {/* Master-Detail Container */}
-      <div className={detailOnly ? "flex-1 min-h-0" : "flex-1 grid min-h-0 grid-cols-1 gap-5 md:grid-cols-12"}>
+      <div className={detailOnly ? "flex-1 min-h-0" : "flex-1 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-12"}>
         {/* Left Column: Timeline Master List (6 cols) */}
         {!detailOnly && <div
           ref={containerRef}
-          className="col-span-1 flex min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative md:col-span-6"
+          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:col-span-6`}
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -369,7 +366,18 @@ export function SNSPostMasterDetail({
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost ? (
-          <div className={`${detailOnly ? "h-full flex" : "hidden md:col-span-6 md:flex"} rounded-sm border-t border-brand/30 flex-col overflow-hidden md:border-t-0 md:border-l`}>
+          <div className={`${detailOnly || initialSelectedId ? "flex" : "hidden"} ${detailOnly ? "h-full" : "lg:col-span-6 lg:flex"} rounded-sm border-t border-brand/30 flex-col overflow-hidden lg:border-t-0 lg:border-l`}>
+            {!detailOnly && (
+              <div className="border-b border-brand/30 px-4 py-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => router.push("/sns")}
+                  className="min-h-11 px-2 text-sm font-medium text-brand hover:text-brand-hover"
+                >
+                  ← SNS投稿一覧に戻る
+                </button>
+              </div>
+            )}
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
@@ -537,7 +545,7 @@ export function SNSPostMasterDetail({
             </div>
           </div>
         ) : (
-          <div className={`${detailOnly ? "h-full flex" : "hidden md:col-span-6 md:flex"} rounded-sm border-t border-brand/30 items-center justify-center text-sm text-gray-400 md:border-t-0 md:border-l`}>
+          <div className={`${detailOnly ? "h-full flex" : "hidden lg:col-span-6 lg:flex"} rounded-sm border-t border-brand/30 items-center justify-center text-sm text-gray-400 lg:border-t-0 lg:border-l`}>
             投稿文を選択してください
           </div>
         )}
