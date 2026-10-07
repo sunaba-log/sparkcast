@@ -113,8 +113,17 @@ describe("Forms mobile UX & accessibility", () => {
           proposals={[
             {
               id: "prop-1",
+              podcastId: 1,
+              targetPeriod: "2026-10-01",
               generatedAt: "2026-10-01T12:00:00Z",
-              relatedNews: [{ title: "News 1", url: "https://example.com" }],
+              relatedNews: [
+                {
+                  title: "News 1",
+                  url: "https://example.com",
+                  summary: "Summary 1",
+                  sourceReason: "Reason 1",
+                },
+              ],
               suggestedTopics: [
                 {
                   title: "Topic 1",
