@@ -262,11 +262,11 @@ export function SNSPostMasterDetail({
       </div>
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid grid-cols-12 gap-5 min-h-0">
+      <div className="flex-1 grid grid-cols-1 gap-5 md:grid-cols-12 md:min-h-0">
         {/* Left Column: Timeline Master List (6 cols) */}
         <div
           ref={containerRef}
-          className="col-span-6 flex flex-col space-y-4 overflow-y-auto pr-2 relative"
+          className="col-span-1 flex flex-col space-y-4 pr-2 relative md:col-span-6 md:overflow-y-auto"
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -360,7 +360,7 @@ export function SNSPostMasterDetail({
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost ? (
-          <div className="col-span-6 rounded-sm border-l border-brand/30 flex flex-col overflow-hidden">
+          <div className="col-span-1 rounded-sm border-t border-brand/30 flex flex-col overflow-hidden md:col-span-6 md:border-t-0 md:border-l">
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
@@ -528,7 +528,7 @@ export function SNSPostMasterDetail({
             </div>
           </div>
         ) : (
-          <div className="col-span-6 rounded-sm border-l border-brand/30 flex items-center justify-center text-sm text-gray-400">
+          <div className="col-span-1 rounded-sm border-t border-brand/30 flex items-center justify-center text-sm text-gray-400 md:col-span-6 md:border-t-0 md:border-l">
             投稿文を選択してください
           </div>
         )}
