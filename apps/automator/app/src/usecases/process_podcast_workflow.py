@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from domain.errors import ReviewIncompleteError
 from domain.models import EpisodeObjectReference, UtteranceChunk
 from domain.models.transcript import extract_topics
 from services.episode_transcription import EpisodeTranscription
@@ -193,7 +194,11 @@ class ProcessPodcastWorkflow:
             )
 
             # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170)
-            if self._fact_check_auditor is not None and transcription.segments:
+            if self._fact_check_auditor is not None:
+                if not transcription.segments:
+                    raise ReviewIncompleteError(
+                        "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。"
+                    )
                 self._logger.info("\n## Step2.5: Running Jev Fast Audit and Gemini Director Pipeline... ##")
                 self._episode_repository.mark_auditing(
                     podcast_id=episode_ref.podcast_id,
@@ -203,6 +208,13 @@ class ProcessPodcastWorkflow:
                     UtteranceChunk.from_segment(seg, idx) for idx, seg in enumerate(transcription.segments, start=1)
                 ]
                 audit_results = self._fact_check_auditor.audit_chunks(chunks)
+                expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
+                if (
+                    len(audit_results) != len(chunks)
+                    or len({chunk.chunk_id for chunk, _ in audit_results}) != len(chunks)
+                    or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
+                ):
+                    raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
                 severe_items = [(c, m) for c, m in audit_results if m.score >= INTERVENTION_THRESHOLD_SCORE]
                 self._logger.info(
                     "Jev audit finished: %d chunks, %d severe errors (Score >= %d)",
@@ -212,6 +224,8 @@ class ProcessPodcastWorkflow:
                 )
 
                 interventions = []
+                if severe_items and self._director_script_generator is None:
+                    raise ReviewIncompleteError("要訂正の発話がありますが、訂正生成が無効のため公開を停止しました。")
                 if severe_items and self._director_script_generator is not None:
                     cast_names = self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id)
                     for c, m in severe_items:
@@ -222,9 +236,13 @@ class ProcessPodcastWorkflow:
                             cast_names=cast_names,
                             model_id=request.ai_model_id,
                         )
+                        if intervention is None or not intervention.correction_script.strip():
+                            raise ReviewIncompleteError("訂正案を生成できなかったため公開を停止しました。")
                         interventions.append(intervention)
 
                 if interventions:
+                    if self._firestore_manager is None:
+                        raise ReviewIncompleteError("訂正案の保存先がないため公開を停止しました。")
                     if self._firestore_manager is not None:
                         generated_at = datetime.now(UTC).isoformat()
                         show_notes_summary = {
