@@ -17,16 +17,17 @@ vi.mock("./AccountMenu", () => ({
   ),
 }));
 
+import type { PodcastSummary } from "@/types/podcast";
+
 describe("Sidebar and Mobile Navigation", () => {
-  const dummyPodcasts = [
+  const dummyPodcasts: PodcastSummary[] = [
     {
       id: 1,
       title: "Tech Podcast",
       description: "A show about tech",
       coverImageUrl: null,
       rssFeedPath: "/feed.xml",
-      createdAt: "2026-01-01",
-      updatedAt: "2026-01-01",
+      role: "owner",
     },
     {
       id: 2,
@@ -34,8 +35,7 @@ describe("Sidebar and Mobile Navigation", () => {
       description: "A show about design",
       coverImageUrl: null,
       rssFeedPath: "/feed2.xml",
-      createdAt: "2026-01-01",
-      updatedAt: "2026-01-01",
+      role: "editor",
     },
   ];
 
