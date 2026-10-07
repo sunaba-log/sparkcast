@@ -6,35 +6,13 @@ import {
   updateSnsPromotion,
   deleteSnsPromotion,
 } from "@/server/episodes/data-repository";
-import type { Episode, EpisodePromotion } from "@/types/episode";
-import { type SNSPostItem, sortPostsDesc } from "@/components/SNSPostMasterDetail";
+import {
+  type SNSPostItem,
+  mapToSNSPostItem,
+  sortPostsDesc,
+} from "@/lib/sns";
 
-export function mapToSNSPostItem(ep: Episode, p: EpisodePromotion): SNSPostItem {
-  const schedTime = p.scheduledTime ? new Date(p.scheduledTime) : new Date(p.generatedAt || ep.createdAt);
-
-  const yyyy = String(schedTime.getFullYear());
-  const mm = String(schedTime.getMonth() + 1).padStart(2, "0");
-  const dd = String(schedTime.getDate()).padStart(2, "0");
-  const hh = String(schedTime.getHours()).padStart(2, "0");
-  const min = String(schedTime.getMinutes()).padStart(2, "0");
-
-  return {
-    id: p.id,
-    episodeId: ep.id,
-    episodeTitle: ep.title,
-    status: p.status === "posted" ? "posted" : "pending",
-    scheduledDate: { yyyy, mm, dd, hh, min },
-    message: p.message,
-    platformUrls: {
-      apple: p.platformUrls?.apple ?? "",
-      amazon: p.platformUrls?.amazon ?? "",
-      spotify: p.platformUrls?.spotify ?? "",
-    },
-    hashtags: p.hashtags ?? [],
-    generatedAt: p.generatedAt ?? ep.createdAt,
-    updatedAt: p.updatedAt ?? ep.createdAt,
-  };
-}
+export { mapToSNSPostItem };
 
 async function authorize() {
   const user = await getSessionUser();
