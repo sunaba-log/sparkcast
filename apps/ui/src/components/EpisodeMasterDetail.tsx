@@ -251,9 +251,9 @@ export function EpisodeMasterDetail({
       </div>
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid grid-cols-12 gap-5 min-h-0">
+      <div className="flex-1 grid grid-cols-1 gap-5 md:grid-cols-12 md:min-h-0">
         {/* Left Column: Master List (5 cols) */}
-        <div className="col-span-5 flex flex-col space-y-3 overflow-y-auto pr-1">
+        <div className="col-span-1 flex flex-col space-y-3 md:col-span-5 md:overflow-y-auto md:pr-1">
           {episodes.map((ep) => {
             const isSelected = ep.id === selectedEpisode?.id;
             return (
@@ -311,7 +311,7 @@ export function EpisodeMasterDetail({
 
         {/* Right Column: Inspector Panel (7 cols) */}
         {selectedEpisode && (
-          <div className="col-span-7 rounded-xs border-l border-brand/30 flex flex-col overflow-hidden">
+          <div className="col-span-1 rounded-xs border-t border-brand/30 flex flex-col overflow-hidden md:col-span-7 md:border-t-0 md:border-l">
             {/* Top Bar Tabs & Actions */}
             {/* 幅が狭いとき、タブの文字を縦に折らずにタブごと折り返す */}
             <div className="px-5 py-1 border-b border-brand flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
