@@ -31,7 +31,7 @@ export default async function EpisodeDetailPage({ params }: { params: Promise<{ 
   return (
     <div>
       <div className="mb-6">
-        <Link href="/" className="text-sm text-blue-600 hover:underline">
+        <Link href="/episodes" className="text-sm text-blue-600 hover:underline">
           ← エピソード一覧に戻る
         </Link>
       </div>
