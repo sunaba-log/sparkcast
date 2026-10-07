@@ -78,7 +78,7 @@ class FactCheckAuditor:
         logger_instance: logging.Logger | None = None,
     ) -> None:
         """Initialize Jev client and configurations."""
-        self._api_key = api_key or os.environ.get("TYPESAFE_API_KEY")
+        self._api_key = api_key or os.environ.get("TYPESAFE_API_KEY") or os.environ.get("JEV_API_KEY")
         self._model = model
         self._logger = logger_instance or logger
         self._client = client
