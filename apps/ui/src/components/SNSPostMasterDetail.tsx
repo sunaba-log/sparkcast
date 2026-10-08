@@ -4,41 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Clock, CheckCircle2, X } from "lucide-react";
 
-export type SNSPostItem = {
-  id: string;
-  episodeId: string;
-  episodeTitle: string;
-  status: "pending" | "posted";
-  scheduledDate: { yyyy: string; mm: string; dd: string; hh: string; min: string };
-  message: string;
-  platformUrls: { apple: string; amazon: string; spotify: string };
-  hashtags: string[];
-  generatedAt: string;
-  updatedAt: string;
-};
+import {
+  type SNSPostItem,
+  sortPostsDesc,
+} from "@/lib/sns";
 
-export function getPostSortTimestamp(post: SNSPostItem): number {
-  const { yyyy, mm, dd, hh, min } = post.scheduledDate || {};
-  if (yyyy && mm && dd) {
-    const y = yyyy.padStart(4, "0");
-    const m = mm.padStart(2, "0");
-    const d = dd.padStart(2, "0");
-    const h = (hh || "00").padStart(2, "0");
-    const mi = (min || "00").padStart(2, "0");
-    const parsed = new Date(`${y}-${m}-${d}T${h}:${mi}:00`).getTime();
-    if (!isNaN(parsed)) return parsed;
-  }
-  const gen = post.generatedAt ? new Date(post.generatedAt).getTime() : 0;
-  return isNaN(gen) ? 0 : gen;
-}
-
-export function sortPostsDesc(posts: SNSPostItem[]): SNSPostItem[] {
-  return [...posts].sort((a, b) => {
-    const diff = getPostSortTimestamp(b) - getPostSortTimestamp(a);
-    if (diff !== 0) return diff;
-    return (b.id || "").localeCompare(a.id || "");
-  });
-}
+export type { SNSPostItem } from "@/lib/sns";
+export { getPostSortTimestamp, sortPostsDesc } from "@/lib/sns";
 
 export function SNSPostMasterDetail({
   initialPosts = [],

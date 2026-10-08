@@ -1,11 +1,11 @@
-import { SNSPostMasterDetail, sortPostsDesc } from "@/components/SNSPostMasterDetail";
+import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
 import { requireRegisteredUser } from "@/server/auth";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
 import {
   findEpisode,
   listEpisodesAndPromotionsPaginated,
 } from "@/server/episodes/data-repository";
-import { mapToSNSPostItem } from "@/app/api/sns/route";
+import { mapToSNSPostItem, sortPostsDesc } from "@/lib/sns";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { mapToSNSPostItem } from "@/app/api/sns/route";
+import { mapToSNSPostItem } from "@/lib/sns";
 import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
 import { requireRegisteredUser } from "@/server/auth";
 import { findEpisode } from "@/server/episodes/data-repository";
