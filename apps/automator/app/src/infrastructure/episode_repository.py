@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import psycopg
 
 from domain.interfaces import RecordingSpeaker, RecordingSpeakers
+from domain.models import AudioAuditPolicy
 
 
 class PostgresEpisodeRepository:
@@ -138,6 +139,30 @@ class PostgresEpisodeRepository:
             cursor.execute("SELECT cast_members FROM podcasts WHERE podcast_id = %s", (podcast_id,))
             row = cursor.fetchone()
         return split_cast_names(row[0] if row else None)
+
+    def get_audio_audit_policy(self, *, podcast_id: str) -> AudioAuditPolicy:
+        """Return validated program-level confidential terms and allowlist."""
+        with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT audio_audit_policy FROM podcasts WHERE podcast_id = %s", (podcast_id,))
+            row = cursor.fetchone()
+        raw = row[0] if row else {}
+        if not isinstance(raw, dict):
+            return AudioAuditPolicy()
+        version = raw.get("version", "v1")
+        confidential_terms = raw.get("confidential_terms", [])
+        allowed_terms = raw.get("allowed_terms", [])
+        if (
+            not isinstance(version, str)
+            or not isinstance(confidential_terms, list)
+            or not isinstance(allowed_terms, list)
+            or not all(isinstance(term, str) for term in confidential_terms + allowed_terms)
+        ):
+            raise ValueError("Invalid audio audit policy configuration")
+        return AudioAuditPolicy(
+            version=version,
+            confidential_terms=tuple(cast("list[str]", confidential_terms)),
+            allowed_terms=tuple(cast("list[str]", allowed_terms)),
+        )
 
     def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
         """ブラウザ収録(#166)で作られたエピソードなら、位置合わせ済みトラックのある参加者を返す."""

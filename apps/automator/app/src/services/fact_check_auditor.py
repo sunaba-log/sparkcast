@@ -16,7 +16,16 @@ from typing import TYPE_CHECKING, cast
 from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, Score
 
 from domain.errors import ReviewIncompleteError
-from domain.models.director import ChoiceCategory, FactCheckAuditMetric, UtteranceChunk
+from domain.models.director import (
+    AudioAuditPolicy,
+    AuditBundle,
+    ChoiceCategory,
+    FactCheckAuditMetric,
+    PolicyFinding,
+    PolicyFindingCategory,
+    UtteranceChunk,
+)
+from services.pii_detector import PresidioPiiDetector
 
 if TYPE_CHECKING:
     from typesafe_sdk._core.response_types import SystemOneResponse
@@ -54,6 +63,17 @@ CHOICE_CRITERIA: dict[str, str] = {
 }
 
 VALID_CHOICES: set[str] = {"technology", "proper_noun", "numerical_data", "historical_fact", "other"}
+POLICY_FINDING_NOUL_THRESHOLD = 0.5
+POLICY_QUESTIONS = {
+    "confidential_information": (
+        "発話に未公開の認証情報、営業秘密、契約条件、個人の非公開情報など、"
+        "公開してはならない機密情報が含まれていますか?"
+    ),
+    "third_party_risk": (
+        "発話に第三者を特定可能な状態で中傷、未確認の非難、名誉・プライバシーを害する"
+        "内容、または公開に人手確認を要する第三者リスクが含まれていますか?"
+    ),
+}
 
 
 def _bounded_number(
@@ -84,6 +104,7 @@ class FactCheckAuditor:
         client: AsyncTypeSafeClient | None = None,
         api_key: str | None = None,
         model: str | None = None,
+        pii_detector: PresidioPiiDetector | None = None,
         logger_instance: logging.Logger | None = None,
     ) -> None:
         """Initialize Jev client and configurations."""
@@ -91,6 +112,7 @@ class FactCheckAuditor:
         self._model = model
         self._logger = logger_instance or logger
         self._client = client
+        self._pii_detector = pii_detector
 
     def _get_client(self) -> AsyncTypeSafeClient:
         if self._client is not None:
@@ -220,3 +242,102 @@ class FactCheckAuditor:
                 ).result()
 
         return asyncio.run(self.audit_chunks_async(chunks, concurrency_limit=concurrency_limit))
+
+    def audit_bundle(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        policy: AudioAuditPolicy,
+        concurrency_limit: int = 10,
+    ) -> AuditBundle:
+        """Run the compatible fact check plus the fail-closed audio policy audit."""
+        fact_check_results = self.audit_chunks(chunks, concurrency_limit=concurrency_limit)
+        detector = self._pii_detector or PresidioPiiDetector()
+        policy_findings: list[PolicyFinding] = []
+        for chunk in chunks:
+            policy_findings.extend(
+                PolicyFinding.create(
+                    chunk=chunk,
+                    category="pii",
+                    source="presidio",
+                    policy_version=policy.version,
+                    entity_type=entity.entity_type,
+                )
+                for entity in detector.detect(chunk, policy)
+            )
+            allowed = {term.casefold() for term in policy.allowed_terms}
+            if any(
+                term
+                and term.casefold() not in allowed
+                and term.casefold() in chunk.text.casefold()
+                for term in policy.confidential_terms
+            ):
+                policy_findings.append(
+                    PolicyFinding.create(
+                        chunk=chunk,
+                        category="confidential_information",
+                        source="presidio",
+                        policy_version=policy.version,
+                        entity_type="CUSTOM_TERM",
+                    )
+                )
+        policy_findings.extend(self._audit_jev_policy_questions(chunks, policy))
+        return AuditBundle(fact_check_results=fact_check_results, policy_findings=policy_findings)
+
+    def _audit_jev_policy_questions(
+        self,
+        chunks: list[UtteranceChunk],
+        policy: AudioAuditPolicy,
+    ) -> list[PolicyFinding]:
+        """Run both required typed Noul policy questions and reject partial responses."""
+        if not chunks:
+            return []
+
+        async def audit() -> list[PolicyFinding]:
+            client = self._get_client()
+
+            async def one(chunk: UtteranceChunk) -> list[PolicyFinding]:
+                try:
+                    response: SystemOneResponse = await client.system_one(
+                        state=f"話者: {chunk.speaker}\n発話: {chunk.text}",
+                        questions={
+                            category: Noul(instructions=instructions)
+                            for category, instructions in POLICY_QUESTIONS.items()
+                        },
+                        model=self._model,
+                    )
+                    answers = response.answers
+                    if set(answers) != set(POLICY_QUESTIONS):
+                        raise ValueError("Incomplete policy audit response")
+                    findings: list[PolicyFinding] = []
+                    for category in POLICY_QUESTIONS:
+                        value = _bounded_number(getattr(answers[category], "noul", None), 0.0, 1.0)
+                        if value >= POLICY_FINDING_NOUL_THRESHOLD:
+                            findings.append(
+                                PolicyFinding.create(
+                                    chunk=chunk,
+                                    category=cast("PolicyFindingCategory", category),
+                                    source="jev",
+                                    policy_version=policy.version,
+                                )
+                            )
+                    return findings
+                except Exception as error:  # noqa: BLE001 - policy audit must fail closed
+                    self._logger.exception(
+                        "Policy audit incomplete for chunk %s (%s)",
+                        chunk.chunk_id,
+                        type(error).__name__,
+                    )
+                    raise ReviewIncompleteError("音声校正ポリシー監査を完了できませんでした。") from None
+
+            results = await asyncio.gather(*(one(chunk) for chunk in chunks))
+            return [finding for result in results for finding in result]
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(asyncio.run, audit()).result()
+        return asyncio.run(audit())

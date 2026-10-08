@@ -26,6 +26,10 @@ dependencies = [
     "google-cloud-speech>=2.30",
     "google-cloud-texttospeech>=2.38.0",
     "typesafe-sdk>=0.7.2",
+    "presidio-analyzer>=2.2.358",
+    "spacy>=3.8.0",
+    "ginza>=5.2.0",
+    "ja-ginza>=5.2.0",
 ]
 
 [dependency-groups]

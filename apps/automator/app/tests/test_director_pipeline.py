@@ -11,6 +11,7 @@ import pytest
 from domain.errors import ReviewIncompleteError
 from domain.models.common import SnsPromotionsResponse, Summary
 from domain.models.director import (
+    AudioAuditPolicy,
     DirectorIntervention,
     FactCheckAuditMetric,
     UtteranceChunk,
@@ -182,6 +183,62 @@ async def test_fact_check_auditor_marks_incomplete_chunk_in_state():
 
     state = mock_client.system_one.call_args.kwargs["state"]
     assert "切れている可能性があります" in state
+
+
+def test_fact_check_auditor_bundle_fails_closed_for_partial_policy_response():
+    """機密・第三者リスクのどちらかが欠けた Jev 応答では公開可能な bundle を返さないこと."""
+    mock_client = AsyncMock()
+    mock_client.system_one.side_effect = [
+        MagicMock(
+            answers={
+                "noul": MagicMock(noul=0.5),
+                "score": MagicMock(score=0.0, confidence=0.9),
+                "choice": MagicMock(choice="other"),
+            }
+        ),
+        MagicMock(answers={"confidential_information": MagicMock(noul=0.0)}),
+    ]
+    detector = MagicMock()
+    detector.detect.return_value = []
+    auditor = FactCheckAuditor(client=mock_client, pii_detector=detector)
+
+    with pytest.raises(ReviewIncompleteError, match="音声校正ポリシー"):
+        auditor.audit_bundle(
+            [UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")],
+            policy=AudioAuditPolicy(),
+        )
+
+
+def test_fact_check_auditor_bundle_creates_timestamped_policy_findings():
+    """ローカル PII と型付き Jev 判定の検知を、同じチャンク時刻で保存用 finding にすること."""
+    mock_client = AsyncMock()
+    mock_client.system_one.side_effect = [
+        MagicMock(
+            answers={
+                "noul": MagicMock(noul=0.5),
+                "score": MagicMock(score=0.0, confidence=0.9),
+                "choice": MagicMock(choice="other"),
+            }
+        ),
+        MagicMock(
+            answers={
+                "confidential_information": MagicMock(noul=1.0),
+                "third_party_risk": MagicMock(noul=0.0),
+            }
+        ),
+    ]
+    detector = MagicMock()
+    detector.detect.return_value = [MagicMock(entity_type="EMAIL_ADDRESS")]
+    auditor = FactCheckAuditor(client=mock_client, pii_detector=detector)
+    chunk = UtteranceChunk("seg_00001", "小野", 1200, 3400, "test@example.com")
+
+    bundle = auditor.audit_bundle([chunk], policy=AudioAuditPolicy(version="v7"))
+
+    assert {(finding.category, finding.source) for finding in bundle.policy_findings} == {
+        ("pii", "presidio"),
+        ("confidential_information", "jev"),
+    }
+    assert all((finding.start_ms, finding.end_ms, finding.policy_version) == (1200, 3400, "v7") for finding in bundle.policy_findings)
 
 
 def test_fact_check_auditor_sync_batch_multiple_chunks():

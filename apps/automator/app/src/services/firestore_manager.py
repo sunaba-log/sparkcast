@@ -11,7 +11,7 @@ from google.cloud import firestore
 from domain.models.transcript import TranscriptSegment
 
 if TYPE_CHECKING:
-    from domain.models.director import DirectorIntervention
+    from domain.models.director import DirectorIntervention, PolicyFinding
 
 # Firestore の 1 バッチの書き込み上限(500)より少し小さく区切る
 BATCH_LIMIT = 400
@@ -168,6 +168,29 @@ class FirestoreManager:
             data["id"] = doc.id
             results.append(data)
         return results
+
+    def save_policy_findings(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        findings: list[PolicyFinding],
+    ) -> int:
+        """Persist the separate audio-policy findings without altering director interventions."""
+        collection = self._policy_findings_collection(podcast_id, episode_id)
+        self._clear_collection(collection)
+        batch = self._client.batch()
+        pending = 0
+        for finding in findings:
+            batch.set(collection.document(finding.finding_id), finding.to_dict())
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+        return len(findings)
 
     def save_transcript_chunks(
         self,
@@ -348,6 +371,9 @@ class FirestoreManager:
 
     def _director_interventions_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
         return self._episode_contents_collection(podcast_id).document(episode_id).collection("director_interventions")
+
+    def _policy_findings_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
+        return self._episode_contents_collection(podcast_id).document(episode_id).collection("policy_findings")
 
     def _clear_collection(self, collection: firestore.CollectionReference) -> None:
         """再処理で古い文字起こしが残らないよう、サブコレクションを空にする."""

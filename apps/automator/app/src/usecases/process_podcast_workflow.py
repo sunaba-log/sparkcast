@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from domain.errors import ReviewIncompleteError
-from domain.models import EpisodeObjectReference, UtteranceChunk
+from domain.models import AudioAuditPolicy, EpisodeObjectReference, UtteranceChunk
 from domain.models.common import Summary
 from domain.models.transcript import extract_topics
 from services.episode_transcription import EpisodeTranscription, TranscriptionResult
@@ -299,7 +299,20 @@ class ProcessPodcastWorkflow:
                     episode_id=episode_ref.episode_id,
                 )
                 chunks = UtteranceChunk.from_segments(transcription.segments)
-                audit_results = self._fact_check_auditor.audit_chunks(chunks)
+                audit_bundle_method = getattr(type(self._fact_check_auditor), "audit_bundle", None)
+                if callable(audit_bundle_method):
+                    policy_method = getattr(type(self._episode_repository), "get_audio_audit_policy", None)
+                    policy = (
+                        self._episode_repository.get_audio_audit_policy(podcast_id=episode_ref.podcast_id)
+                        if callable(policy_method)
+                        else AudioAuditPolicy()
+                    )
+                    audit_bundle = self._fact_check_auditor.audit_bundle(chunks, policy=policy)
+                    audit_results = audit_bundle.fact_check_results
+                    policy_findings = audit_bundle.policy_findings
+                else:
+                    audit_results = self._fact_check_auditor.audit_chunks(chunks)
+                    policy_findings = []
                 expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
                 if (
                     len(audit_results) != len(chunks)
@@ -307,6 +320,22 @@ class ProcessPodcastWorkflow:
                     or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
                 ):
                     raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
+                if policy_findings:
+                    if self._firestore_manager is None:
+                        raise ReviewIncompleteError("音声校正の検知結果の保存先がないため公開を停止しました。")
+                    self._firestore_manager.save_policy_findings(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                        findings=policy_findings,
+                    )
+                    self._episode_repository.mark_awaiting_approval(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                    )
+                    self._notifier.send_discord_message(
+                        message=f"#{latest_episode_number} 音声校正ポリシーの要確認項目が {len(policy_findings)} 件あります。"
+                    )
+                    return
                 severe_items = [(c, m) for c, m in audit_results if m.should_intervene()]
                 self._logger.info(
                     "Jev audit finished: %d chunks, %d interventions needed (composite criteria)",

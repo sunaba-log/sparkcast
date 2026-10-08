@@ -22,9 +22,12 @@ from .common import (
     Summary,
 )
 from .director import (
+    AudioAuditPolicy,
+    AuditBundle,
     ChoiceCategory,
     DirectorIntervention,
     FactCheckAuditMetric,
+    PolicyFinding,
     UtteranceChunk,
 )
 from .episode import EpisodeObjectReference
@@ -35,6 +38,8 @@ __all__ = [
     "ActionItem",
     "AgendaMetadata",
     "AgendaResult",
+    "AudioAuditPolicy",
+    "AuditBundle",
     "ChoiceCategory",
     "DirectorIntervention",
     "DiscordMessage",
@@ -44,6 +49,7 @@ __all__ = [
     "FactCheckAuditMetric",
     "MentionEvidence",
     "NewsItem",
+    "PolicyFinding",
     "PromptType",
     "SeedTopic",
     "SnsPost",
