@@ -115,7 +115,7 @@ export function TopicProposalEditor({
           <button
             onClick={handlePrev}
             disabled={currentIndex <= 0}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 min-h-[44px] px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center justify-center gap-1 rounded-none px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
@@ -134,7 +134,7 @@ export function TopicProposalEditor({
               <button
                 key={p.id}
                 onClick={() => setSelectedProposalId(p.id)}
-                className={`min-h-[44px] px-3 py-2 rounded transition-colors shrink-0 ${isSelected
+                className={`rounded-none px-4 py-2 text-xs transition-colors shrink-0 ${isSelected
                   ? "bg-brand text-white font-medium"
                   : "border border-brand/30 text-gray-700 hover:bg-gray-50"
                   }`}
@@ -147,7 +147,7 @@ export function TopicProposalEditor({
           <button
             onClick={handleNext}
             disabled={currentIndex >= sortedProposals.length - 1}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-900 min-h-[44px] px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center justify-center gap-1 rounded-none px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             Next <ArrowRight className="w-3.5 h-3.5" />
           </button>
@@ -456,7 +456,7 @@ function TopicProposalInnerEditor({
                     <button
                       type="button"
                       onClick={() => toggleAccordion(index)}
-                      className="min-h-[44px] px-5 py-2.5 bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 rounded-xs text-xs font-medium transition-colors flex items-center justify-center"
+                      className="px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                     >
                       破棄
                     </button>
@@ -464,7 +464,7 @@ function TopicProposalInnerEditor({
                       type="button"
                       onClick={handleSave}
                       disabled={status === "saving"}
-                      className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                      className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       {status === "saving" ? "保存中..." : "保存"}
                     </button>

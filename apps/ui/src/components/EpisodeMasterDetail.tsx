@@ -692,26 +692,28 @@ export function EpisodeMasterDetail({
                   </div>
                 </div>
 
-                <audio
-                  ref={audioRef}
-                  src={selectedEpisode.audioUrl || ""}
-                  onTimeUpdate={() => {
-                    if (audioRef.current) {
-                      setCurrentTime(audioRef.current.currentTime);
-                    }
-                  }}
-                  onDurationChange={() => {
-                    if (audioRef.current) {
-                      setDuration(audioRef.current.duration);
-                    }
-                  }}
-                  onPause={() => setIsPlaying(false)}
-                  onPlay={() => setIsPlaying(true)}
-                  onEnded={() => {
-                    setIsPlaying(false);
-                    setCurrentTime(0);
-                  }}
-                />
+                {selectedEpisode.audioUrl && (
+                  <audio
+                    ref={audioRef}
+                    src={selectedEpisode.audioUrl}
+                    onTimeUpdate={() => {
+                      if (audioRef.current) {
+                        setCurrentTime(audioRef.current.currentTime);
+                      }
+                    }}
+                    onDurationChange={() => {
+                      if (audioRef.current) {
+                        setDuration(audioRef.current.duration);
+                      }
+                    }}
+                    onPause={() => setIsPlaying(false)}
+                    onPlay={() => setIsPlaying(true)}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                      setCurrentTime(0);
+                    }}
+                  />
+                )}
               </div>
 
               {/* Tab Form Views */}
@@ -891,7 +893,7 @@ export function EpisodeMasterDetail({
                   <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -901,7 +903,7 @@ export function EpisodeMasterDetail({
                     setPosts(selectedEpisode.xPosts);
                     setMinutesTab("preview");
                   }}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors flex items-center justify-center"
+                  className="px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -909,7 +911,7 @@ export function EpisodeMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={status === "saving"}
-                  className="min-h-[44px] px-6 py-2.5 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
+                  className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {status === "saving" ? "保存中..." : "変更"}
                 </button>

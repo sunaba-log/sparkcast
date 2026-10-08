@@ -27,6 +27,11 @@ body {
   background-size: 20px 20px;
 }
 
+/* 操作要素を除き、背景未指定のカード・パネルにアプリのサーフェス背景を付与する。 */
+.notebook-grid :where(div, section, article)[class*="border"][class*="rounded"]:not([class^="bg-"]):not([class*=" bg-"]) {
+  background-color: var(--color-app-bg);
+}
+
 /* Safe area insets utility classes */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -72,7 +72,7 @@ export function RegisterForm({
         <button
           type="submit"
           disabled={loading || displayName.trim().length === 0}
-          className="w-full min-h-[44px] px-4 py-2.5 bg-brand text-white text-sm font-medium rounded-xs hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
+          className="w-full px-4 py-2 rounded-none bg-brand text-white text-xs font-medium transition-colors hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
         >
           {loading ? "登録中..." : "登録して開始"}
         </button>

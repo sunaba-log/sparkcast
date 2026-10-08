@@ -531,7 +531,7 @@ export function SNSPostMasterDetail({
                     setPlatformUrls(selectedPost.platformUrls);
                     setHashtags(selectedPost.hashtags);
                   }}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors flex items-center justify-center"
+                  className="px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -539,7 +539,7 @@ export function SNSPostMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
+                  className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {isSaving ? "保存中..." : "変更"}
                 </button>
