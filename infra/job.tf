@@ -61,3 +61,12 @@ module "cloud_run_job" {
     google_project_service.required,
   ]
 }
+
+# UI のアプリ SA は、automator の Job を env の上書き（GCS_TRIGGER_OBJECT_NAME, RESUME_FROM_AUDIT 等）付きで起動できる（#204, #205）
+resource "google_cloud_run_v2_job_iam_member" "app_run_automator" {
+  project  = var.project_id
+  location = var.region
+  name     = module.cloud_run_job.job_name
+  role     = "roles/run.jobsExecutorWithOverrides"
+  member   = "serviceAccount:${google_service_account.app.email}"
+}

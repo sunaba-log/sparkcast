@@ -49,13 +49,21 @@ export async function POST(
       row?.source_audio_path ||
       `podcasts/${auth.podcastId}/episodes/${episodeId}/source/${episode.audioFileName}`;
 
-    await runAutomatorJob({
+    const result = await runAutomatorJob({
       gcsTriggerObjectName: gcsObject,
       resumeFromAudit: true,
       podcastId: auth.podcastId,
-    }).catch((err) => {
-      console.warn("Failed to trigger automator Cloud Run job for audit retry:", err);
     });
+
+    if (result.skipped) {
+      console.error(
+        "Failed to trigger automator Cloud Run job: AUTOMATOR_JOB_NAME is not set",
+      );
+      return NextResponse.json(
+        { error: "ジョブの実行設定（AUTOMATOR_JOB_NAME）が未設定のため再開できません" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

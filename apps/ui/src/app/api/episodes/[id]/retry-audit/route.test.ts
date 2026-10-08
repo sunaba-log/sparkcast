@@ -49,4 +49,35 @@ describe("api/episodes/[id]/retry-audit", () => {
       podcastId: 1,
     });
   });
+
+  it("returns 500 when automator job execution is skipped", async () => {
+    const { runAutomatorJob } = await import("@/server/episodes/automator-jobs");
+    vi.mocked(runAutomatorJob).mockResolvedValueOnce({
+      executionName: null,
+      skipped: true,
+    });
+
+    const request = new Request("http://localhost/api/episodes/42/retry-audit", {
+      method: "POST",
+    });
+
+    const response = await POST(request, { params: Promise.resolve({ id: "42" }) });
+    expect(response.status).toBe(500);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toContain("AUTOMATOR_JOB_NAME");
+  });
+
+  it("returns 500 when automator job throws an error", async () => {
+    const { runAutomatorJob } = await import("@/server/episodes/automator-jobs");
+    vi.mocked(runAutomatorJob).mockRejectedValueOnce(new Error("Cloud Run error"));
+
+    const request = new Request("http://localhost/api/episodes/42/retry-audit", {
+      method: "POST",
+    });
+
+    const response = await POST(request, { params: Promise.resolve({ id: "42" }) });
+    expect(response.status).toBe(500);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("再開に失敗しました");
+  });
 });
