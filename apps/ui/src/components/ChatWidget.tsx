@@ -533,7 +533,7 @@ export function ChatWidget() {
                         {message.content}
                       </div>
                     ) : (
-                      <div className="max-w-[85%] rounded-lg bg-white/80 border border-brand/30 px-3 py-2 text-sm text-gray-800">
+                      <div className="max-w-[85%] rounded-lg bg-app-bg border border-brand/30 px-3 py-2 text-sm text-gray-800">
                         {message.content ? (
                           <div className="text-sm leading-relaxed break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                             <ReactMarkdown

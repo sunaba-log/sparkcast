@@ -304,7 +304,7 @@ export function SNSPostMasterDetail({
                   {/* Post Preview Card */}
                   <div
                     onClick={() => handleSelect(post)}
-                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
+                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-app-bg ${isSelected
                       ? "border-2 border-brand shadow-sm"
                       : "border-gray-200 hover:border-brand/50 shadow-sm"
                       }`}

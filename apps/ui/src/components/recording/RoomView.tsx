@@ -116,7 +116,7 @@ export function RoomView({
 
   if (snapshot.ended) {
     return (
-      <div className="border border-brand/20 rounded-xs bg-white/60 p-6 text-center space-y-2">
+      <div className="border border-brand/20 rounded-xs bg-app-bg p-6 text-center space-y-2">
         <p className="text-gray-800">{ENDED_MESSAGES[snapshot.ended]}</p>
         {snapshot.upload.pending > 0 && snapshot.ended !== "kicked" && (
           <p className="text-sm text-yellow-700">
@@ -157,7 +157,7 @@ export function RoomView({
   return (
     <div ref={rootRef} className="space-y-4">
       {/* 状態とタイマー */}
-      <div className="flex flex-wrap items-center gap-3 border border-brand/20 rounded-xs bg-white/60 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 border border-brand/20 rounded-xs bg-app-bg px-4 py-3">
         {status === "recording" ? (
           <span className="inline-flex items-center gap-1.5 text-sm font-bold text-red-600">
             <CircleDot className="w-4 h-4 animate-pulse" /> 収録中
@@ -236,7 +236,7 @@ export function RoomView({
 
       {/* 招待 URL（ホスト） */}
       {isHost && inviteUrl && status !== "stopped" && (
-        <div className="border border-brand/20 rounded-xs bg-white/60 p-3 space-y-2">
+        <div className="border border-brand/20 rounded-xs bg-app-bg p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-gray-700">
               {entryLocked
@@ -286,7 +286,7 @@ export function RoomView({
       )}
 
       {/* 参加者 */}
-      <ul className="border border-brand/20 rounded-xs bg-white/60 divide-y divide-brand/10">
+      <ul className="border border-brand/20 rounded-xs bg-app-bg divide-y divide-brand/10">
         {participants.map((participant) => (
           <ParticipantRow
             key={participant.pid}
@@ -372,7 +372,7 @@ export function RoomView({
       {/* 収録後 */}
       {status === "stopped" && (
         // エピソード化のボタンはしばらく押せないことがあるので、案内の枠ごと焦点を受ける
-        <div data-focus-on="stopped" tabIndex={-1} className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-3 outline-none">
+        <div data-focus-on="stopped" tabIndex={-1} className="border border-brand/20 rounded-xs bg-app-bg p-4 space-y-3 outline-none">
           {isHost ? (
             <>
               <p className="text-sm text-gray-800">

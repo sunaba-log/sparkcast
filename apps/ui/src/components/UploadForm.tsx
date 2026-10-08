@@ -170,7 +170,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         role="button"
         tabIndex={0}
         aria-label="音声ファイルを選択"
-        className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 md:p-10 text-center hover:border-blue-400 bg-white/40 active:bg-blue-50/50 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 min-h-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 md:p-10 text-center hover:border-blue-400 bg-app-bg active:bg-blue-50/50 transition-colors cursor-pointer flex flex-col items-center justify-center gap-1.5 min-h-[140px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         onClick={() => !isBusy && inputRef.current?.click()}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

@@ -59,7 +59,7 @@ export function RecordingSessionList({
 
   return (
     <div className="mt-6 space-y-8">
-      <form onSubmit={createRoom} className="border border-brand/30 rounded-xs p-4 bg-white/60 space-y-3">
+      <form onSubmit={createRoom} className="border border-brand/30 rounded-xs p-4 bg-app-bg space-y-3">
         <label className="block text-sm font-medium text-gray-700" htmlFor="recording-title">
           タイトル（任意）
         </label>
@@ -89,7 +89,7 @@ export function RecordingSessionList({
         {sessions.length === 0 ? (
           <p className="text-sm text-gray-500">まだ収録ルームはありません。</p>
         ) : (
-          <ul className="divide-y divide-brand/10 border border-brand/20 rounded-xs bg-white/60">
+          <ul className="divide-y divide-brand/10 border border-brand/20 rounded-xs bg-app-bg">
             {sessions.map((session) => (
               <li key={session.sessionId}>
                 <Link
