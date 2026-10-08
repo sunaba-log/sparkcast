@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 from google.cloud import firestore
 
+from domain.models.transcript import TranscriptSegment
+
 if TYPE_CHECKING:
     from domain.models.director import DirectorIntervention
-    from domain.models.transcript import TranscriptSegment
 
 # Firestore の 1 バッチの書き込み上限(500)より少し小さく区切る
 BATCH_LIMIT = 400
@@ -61,6 +62,39 @@ class FirestoreManager:
             data["transcript_meta"] = transcript_meta
         doc_ref.set(data, merge=True)
         return doc_ref.id
+
+    def get_episode_content(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch episode content document."""
+        doc = self._episode_contents_collection(podcast_id).document(episode_id).get()
+        return doc.to_dict() if doc.exists else None
+
+    def get_transcript_segments(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> list[TranscriptSegment]:
+        """Fetch transcript segments ordered by chunk_id."""
+        collection = self._transcripts_collection(podcast_id, episode_id)
+        docs = collection.order_by("chunk_id").stream()
+        segments: list[TranscriptSegment] = []
+        for doc in docs:
+            data = doc.to_dict()
+            segments.append(
+                TranscriptSegment(
+                    start=float(data.get("start_time", 0.0)),
+                    end=float(data.get("end_time", 0.0)),
+                    speaker=str(data.get("speaker", "")),
+                    speaker_id=data.get("speaker_id"),
+                    text=str(data.get("text", "")),
+                )
+            )
+        return segments
 
     def save_transcript_segments(
         self,

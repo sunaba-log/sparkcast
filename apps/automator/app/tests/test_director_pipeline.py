@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from domain.errors import ReviewIncompleteError
 from domain.models.common import SnsPromotionsResponse, Summary
 from domain.models.director import (
     DirectorIntervention,
@@ -119,6 +120,32 @@ def test_fact_check_auditor_sync_batch_multiple_chunks():
     assert results[1][1].choice == "proper_noun"
 
 
+@pytest.mark.anyio
+async def test_fact_check_auditor_error_preserves_cause_and_details():
+    """Jev API 呼び出し失敗時に ReviewIncompleteError にエラー種別が含まれること."""
+    mock_client = AsyncMock()
+    mock_client.system_one.side_effect = RuntimeError("Connection timed out to Jev gateway")
+
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")
+
+    with pytest.raises(ReviewIncompleteError) as exc_info:
+        await auditor.audit_single_chunk_async(mock_client, chunk)
+
+    assert "RuntimeError" in str(exc_info.value)
+
+
+def test_fact_check_auditor_missing_api_key_raises_error(monkeypatch: pytest.MonkeyPatch):
+    """APIキーが未設定の場合に明確なエラーを発生させること."""
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("JEV_API_KEY", raising=False)
+
+    auditor = FactCheckAuditor(api_key=None)
+    with pytest.raises(ReviewIncompleteError, match="TypeSafe \\(Jev\\) API key is missing"):
+        auditor._get_client()
+
+
+
 # --- Director Script Generator Tests ---
 
 
@@ -184,6 +211,9 @@ class _FakeEpisodeRepository:
     def mark_completed(self, **kwargs) -> None:
         self.completed_called = True
         self.status = "completed"
+
+    def update_metadata(self, **kwargs) -> None:
+        self.metadata_updated = True
 
     def mark_failed(self, **kwargs) -> None:
         self.failed_called = True

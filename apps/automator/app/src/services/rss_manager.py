@@ -225,12 +225,11 @@ class PodcastRssManager:
         self.fg.language(self.podcast_basic_info.get("language", "ja"))
 
         # atom:linkの設定
-        show_link = self.podcast_basic_info.get("link", "")
-        if show_link != "":
-            # 番組サイト
-            self.fg.link(href=show_link, rel="alternate")
-            # ウェブサイトのHTML版へのリンク(alternate)
-            self.fg.link(href=show_link, rel="alternate", type="text/html")
+        show_link = self.podcast_basic_info.get("link") or "https://sunabalog.com"
+        # 番組サイト
+        self.fg.link(href=show_link, rel="alternate")
+        # ウェブサイトのHTML版へのリンク(alternate)
+        self.fg.link(href=show_link, rel="alternate", type="text/html")
         # rss_linkが指定されていればatom:linkも設定
         rss_link = self.podcast_basic_info.get("atom_link", "")
         if rss_link != "":
@@ -642,14 +641,20 @@ class PodcastRssManager:
         Args:
             episode_id: 削除するエピソードのID (guid).
         """
-        # 指定IDのエピソードを探す
+        # 指定IDまたは音声URL/番号のエピソードを探す
         episode_found = False
         episode_index = -1
         for i, episode in enumerate(self.episodes):
             episode_guid = episode.get("guid")
-            if episode_guid == episode_id:
+            audio_url = episode.get("audio_url")
+            ep_num = str(episode.get("itunes_episode_number") or "")
+            targets = {episode_guid, audio_url}
+            if ep_num:
+                targets.add(ep_num)
+            if episode_id in targets:
                 episode_found = True
                 episode_index = i
+                break
 
         if not episode_found:
             msg = f"Episode with ID '{episode_id}' not found"
@@ -738,11 +743,28 @@ class PodcastRssManager:
         self.fg.podcast.itunes_summary(description)  # iTunes概要
 
         # オーナー情報を設定
-        if owner_email != "":
-            self.fg.podcast.itunes_owner(name=owner_name, email=owner_email)
-        else:
-            # emailがない場合はダミーメールアドレスを使用
-            self.fg.podcast.itunes_owner(name=owner_name, email="noreply@example.com")
+        effective_email = owner_email if owner_email != "" else "noreply@example.com"
+        self.fg.podcast.itunes_owner(name=owner_name, email=effective_email)
+
+        # 内部キャッシュを同期
+        self._set_podcast_basic_info(
+            title=title,
+            description=description,
+            language=language,
+            category=category,
+            cover_url=cover_url,
+            itunes_owner_name=owner_name,
+            itunes_owner_email=effective_email,
+            itunes_author=author,
+            copyright=copyright_text,
+            link=show_link or "https://sunabalog.com",
+            itunes_type=podcast_type,
+            atom_link=rss_link,
+            itunes_image=cover_url,
+            itunes_summary=description,
+            itunes_category=category,
+            itunes_explicit="no",
+        )
 
         # --- RSS生成 ---
         # 文字列として取得(Cloudflare R2やS3にアップロードする場合など)  # noqa: RUF003

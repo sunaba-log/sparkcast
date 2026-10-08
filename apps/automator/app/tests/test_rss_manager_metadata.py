@@ -472,3 +472,78 @@ class TestDescriptionAndSummaryFormatting:
         # XMLとしてパース可能であることを確認
         feed = feedparser.parse(rss_xml)
         assert not feed.bozo or feed.bozo_exception is None
+
+
+class TestDeleteEpisode:
+    """エピソード削除機能のテスト (#205)."""
+
+    def test_delete_episode_by_guid(self) -> None:
+        rss_manager = PodcastRssManager()
+        rss_manager.generate_podcast_rss(
+            title="Test",
+            description="Test",
+            language="ja",
+            category="Technology",
+            cover_url="https://example.com/cover.jpg",
+            owner_name="Owner",
+        )
+        rss_manager.add_episode({
+            "guid": "guid-1",
+            "title": "Ep 1",
+            "description": "Desc 1",
+            "audio_url": "https://example.com/audio1.mp3",
+            "file_size": 100,
+            "mime_type": "audio/mpeg",
+            "itunes_duration": "00:10:00",
+        })
+        assert rss_manager.get_total_episodes() == 1
+        rss_manager.delete_episode("guid-1")
+        assert rss_manager.get_total_episodes() == 0
+
+    def test_delete_episode_by_audio_url(self) -> None:
+        rss_manager = PodcastRssManager()
+        rss_manager.generate_podcast_rss(
+            title="Test",
+            description="Test",
+            language="ja",
+            category="Technology",
+            cover_url="https://example.com/cover.jpg",
+            owner_name="Owner",
+        )
+        rss_manager.add_episode({
+            "guid": "guid-2",
+            "title": "Ep 2",
+            "description": "Desc 2",
+            "audio_url": "https://example.com/audio2.mp3",
+            "file_size": 100,
+            "mime_type": "audio/mpeg",
+            "itunes_duration": "00:10:00",
+        })
+        assert rss_manager.get_total_episodes() == 1
+        rss_manager.delete_episode("https://example.com/audio2.mp3")
+        assert rss_manager.get_total_episodes() == 0
+
+    def test_delete_episode_by_episode_number(self) -> None:
+        rss_manager = PodcastRssManager()
+        rss_manager.generate_podcast_rss(
+            title="Test",
+            description="Test",
+            language="ja",
+            category="Technology",
+            cover_url="https://example.com/cover.jpg",
+            owner_name="Owner",
+        )
+        rss_manager.add_episode({
+            "guid": "guid-3",
+            "title": "Ep 3",
+            "description": "Desc 3",
+            "audio_url": "https://example.com/audio3.mp3",
+            "file_size": 100,
+            "mime_type": "audio/mpeg",
+            "itunes_duration": "00:10:00",
+            "itunes_episode_number": 3,
+        })
+        assert rss_manager.get_total_episodes() == 1
+        rss_manager.delete_episode("3")
+        assert rss_manager.get_total_episodes() == 0
+

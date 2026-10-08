@@ -3,8 +3,21 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Episode, EpisodePromotion } from "@/types/episode";
-import { Check, Minus, Play, Pause, SkipBack, SkipForward, Trash2, Radio } from "lucide-react";
+import type { DirectorIntervention, Episode, EpisodePromotion } from "@/types/episode";
+import {
+  AlertTriangle,
+  Check,
+  Globe,
+  Lock,
+  Minus,
+  Play,
+  Pause,
+  RotateCcw,
+  SkipBack,
+  SkipForward,
+  Trash2,
+  Radio,
+} from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { TranscriptPanel } from "@/components/TranscriptPanel";
@@ -102,6 +115,14 @@ export function EpisodeMasterDetail({
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Publish / Action states
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [pendingInterventionsCount, setPendingInterventionsCount] = useState(0);
+  const [isTogglingPublish, setIsTogglingPublish] = useState(false);
+  const [isRetryingAudit, setIsRetryingAudit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
   // Audio player state
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -123,6 +144,7 @@ export function EpisodeMasterDetail({
     setMinutesTab("preview");
     setStatus("idle");
     setErrorMsg("");
+    setActionNotice(null);
   }
 
   // Reload the audio element (external system) when the source changes.
@@ -243,6 +265,127 @@ export function EpisodeMasterDetail({
     }
   }
 
+  async function performPublish(publish: boolean) {
+    if (!selectedEpisode) return;
+    try {
+      setIsTogglingPublish(true);
+      setActionNotice(null);
+      const response = await fetch(`/api/episodes/${selectedEpisode.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublished: publish }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "更新に失敗しました");
+
+      setEpisodes((prev) =>
+        prev.map((e) =>
+          e.id === selectedEpisode.id
+            ? {
+                ...e,
+                isPublished: publish,
+                publishedAt: publish ? new Date().toISOString() : null,
+              }
+            : e,
+        ),
+      );
+      setActionNotice(
+        publish
+          ? "エピソードを公開しました（RSSフィードに配信されます）"
+          : "エピソードを非公開にしました（RSSフィードから除外されます）",
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "更新に失敗しました");
+    } finally {
+      setIsTogglingPublish(false);
+    }
+  }
+
+  async function handleTogglePublish() {
+    if (!selectedEpisode) return;
+    if (selectedEpisode.isPublished) {
+      await performPublish(false);
+      return;
+    }
+
+    try {
+      setIsTogglingPublish(true);
+      const res = await fetch(`/api/episodes/${selectedEpisode.id}/interventions`);
+      if (res.ok) {
+        const data = (await res.json()) as { interventions?: DirectorIntervention[] };
+        const pendingCount = (data.interventions ?? []).filter((i) => i.status === "pending").length;
+        if (pendingCount > 0) {
+          setPendingInterventionsCount(pendingCount);
+          setIsPublishModalOpen(true);
+          setIsTogglingPublish(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to check director interventions before publishing:", e);
+    }
+    await performPublish(true);
+  }
+
+  async function handleRetryAudit() {
+    if (!selectedEpisode) return;
+    try {
+      setIsRetryingAudit(true);
+      setActionNotice(null);
+      const res = await fetch(`/api/episodes/${selectedEpisode.id}/retry-audit`, {
+        method: "POST",
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "再開に失敗しました");
+
+      setEpisodes((prev) =>
+        prev.map((e) =>
+          e.id === selectedEpisode.id
+            ? { ...e, status: "auditing", processingError: null }
+            : e,
+        ),
+      );
+      setActionNotice("監査を再開しました。しばらくお待ちください。");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "再開に失敗しました");
+    } finally {
+      setIsRetryingAudit(false);
+    }
+  }
+
+  async function handleDeleteEpisode() {
+    if (!selectedEpisode) return;
+    if (
+      !window.confirm(
+        `エピソード「${selectedEpisode.title}」を削除しますか？\n（公開中の場合はRSSフィードからも削除されます）`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      setActionNotice(null);
+      const res = await fetch(`/api/episodes/${selectedEpisode.id}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "削除に失敗しました");
+
+      const remaining = episodes.filter((e) => e.id !== selectedEpisode.id);
+      setEpisodes(remaining);
+      if (remaining.length > 0) {
+        handleSelectEpisode(remaining[0]);
+      } else {
+        router.push("/episodes");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "削除に失敗しました");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   if (episodes.length === 0) {
     return (
       <div className="rounded-xs border border-gray-200 p-12 text-center text-gray-500">
@@ -301,7 +444,7 @@ export function EpisodeMasterDetail({
                 {/* できているものだけに印を付ける（以前は処理の結果によらず 3 つとも付いていた） */}
                 <div className="flex items-center gap-4 text-[11px] text-gray-600 border-t border-brand/30 pt-2 font-medium">
                   {[
-                    { label: "配信済み", done: ep.status === "completed" && ep.audioUrl !== null },
+                    { label: "配信済み", done: ep.status === "completed" && ep.isPublished },
                     { label: "議事録", done: ep.minutesGenerated },
                     { label: "X投稿文", done: ep.xPostsGenerated },
                   ].map((item) => (
@@ -391,15 +534,68 @@ export function EpisodeMasterDetail({
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
-                <span className="px-3 py-1 whitespace-nowrap bg-emerald-600 text-white rounded-xs text-xs font-semibold">
-                  配信済み
-                </span>
-                <button className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-gray-50 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1">
+                {selectedEpisode.status === "failed" && (
+                  <button
+                    type="button"
+                    onClick={handleRetryAudit}
+                    disabled={isRetryingAudit}
+                    className="px-3 py-1 whitespace-nowrap bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isRetryingAudit ? "animate-spin" : ""}`} />
+                    {isRetryingAudit ? "再開中..." : "監査を再開"}
+                  </button>
+                )}
+
+                {selectedEpisode.status === "completed" && (
+                  <button
+                    type="button"
+                    onClick={handleTogglePublish}
+                    disabled={isTogglingPublish}
+                    className={`px-3 py-1 whitespace-nowrap rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
+                      selectedEpisode.isPublished
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                    }`}
+                    title={selectedEpisode.isPublished ? "クリックして非公開にする" : "クリックしてRSSに公開する"}
+                  >
+                    {selectedEpisode.isPublished ? (
+                      <>
+                        <Globe className="w-3.5 h-3.5" />
+                        公開中 (RSS配信)
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
+                        非公開 (下書き)
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleDeleteEpisode}
+                  disabled={isDeleting}
+                  className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
                   <Trash2 className="w-3.5 h-3.5 text-gray-500" />
-                  削除
+                  {isDeleting ? "削除中..." : "削除"}
                 </button>
               </div>
             </div>
+
+            {actionNotice && (
+              <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-2 text-xs text-emerald-800 font-medium flex items-center justify-between">
+                <span>{actionNotice}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionNotice(null)}
+                  className="text-emerald-600 hover:text-emerald-800 ml-2 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* Content Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -702,6 +898,44 @@ export function EpisodeMasterDetail({
           </div>
         )}
       </div>
+
+      {/* Jev Audit Warning Modal */}
+      {isPublishModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-3 text-amber-600">
+              <AlertTriangle className="w-6 h-6 shrink-0" />
+              <h3 className="text-base font-bold text-gray-900">
+                未承認の監査結果があります
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              AIディレクターによる事実確認・訂正提案に、未承認（保留中）の項目が{" "}
+              <span className="font-bold text-amber-700">{pendingInterventionsCount} 件</span> あります。
+              承認・却下を行わずにこのままポッドキャストを公開しますか？
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPublishModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xs transition-colors cursor-pointer"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsPublishModalOpen(false);
+                  await performPublish(true);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-xs transition-colors cursor-pointer"
+              >
+                このまま公開する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

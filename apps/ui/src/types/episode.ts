@@ -30,6 +30,8 @@ export type Episode = {
   audioUrl: string | null;
   artworkUrl: string | null;
   processingError: string | null;
+  publishedAt: string | null;
+  isPublished: boolean;
   minutesGenerated: boolean;
   // 話者・時刻つきの文字起こしがあるか（#166 以降に処理したエピソード）
   transcriptAvailable: boolean;

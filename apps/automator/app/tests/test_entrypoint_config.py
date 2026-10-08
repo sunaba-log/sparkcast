@@ -103,3 +103,18 @@ def test_fact_check_auditor_supports_jev_api_key_env(monkeypatch: pytest.MonkeyP
 
     auditor = FactCheckAuditor()
     assert auditor._api_key == "jev-env-key"
+
+
+def test_load_podcast_env_supports_resume_from_audit() -> None:
+    env = _base_env()
+    assert _load_podcast_env(env).resume_from_audit is False
+
+    env["RESUME_FROM_AUDIT"] = "true"
+    assert _load_podcast_env(env).resume_from_audit is True
+
+    env["RESUME_FROM_AUDIT"] = "1"
+    assert _load_podcast_env(env).resume_from_audit is True
+
+    env["RESUME_FROM_AUDIT"] = "false"
+    assert _load_podcast_env(env).resume_from_audit is False
+

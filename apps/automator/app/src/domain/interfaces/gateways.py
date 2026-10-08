@@ -143,6 +143,17 @@ class EpisodeRepository(Protocol):
     ) -> None:
         """Store published episode metadata and mark processing complete."""
 
+    def update_metadata(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        description: str,
+        duration_seconds: int | None = None,
+    ) -> None:
+        """Store interim metadata (title, description, duration) before audit."""
+
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
 
