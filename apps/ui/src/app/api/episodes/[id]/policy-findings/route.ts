@@ -2,12 +2,20 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/server/auth";
 import { findEpisode, listPolicyFindings } from "@/server/episodes/data-repository";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { UI_DEMO_POLICY_FINDINGS } from "@/server/ui-demo";
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (isLocalUiDemoEnabled()) {
+      const { id } = await context.params;
+      return NextResponse.json({
+        findings: id === "3" ? UI_DEMO_POLICY_FINDINGS : [],
+      }, { headers: { "Cache-Control": "no-store" } });
+    }
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     const podcastId = await requireSelectedPodcastForApi(user);

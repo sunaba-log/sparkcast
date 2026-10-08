@@ -7,6 +7,8 @@ import { getSessionUser } from "@/server/auth";
 import { isRecordingEnabled } from "@/server/env";
 import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
 import { resolveEffectivePodcastId } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { UI_DEMO_PODCAST, UI_DEMO_PODCASTS } from "@/server/ui-demo";
 import type { PodcastSummary } from "@/types/podcast";
 import "./globals.css";
 
@@ -35,12 +37,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let podcasts: PodcastSummary[] = [];
   let selectedPodcastId: number | null = null;
   if (user?.registered) {
-    podcasts = await listPodcastsForUser(user.uid);
-    // Cookie 未設定時もデフォルトチャンネルを「選択中」として表示する
-    const podcastId = await resolveEffectivePodcastId(user);
-    if (podcastId) {
-      selectedPodcastId = podcastId;
-      channelTitle = (await getPodcast(podcastId))?.title ?? null;
+    if (isLocalUiDemoEnabled()) {
+      podcasts = UI_DEMO_PODCASTS;
+      selectedPodcastId = UI_DEMO_PODCAST.id;
+      channelTitle = UI_DEMO_PODCAST.title;
+    } else {
+      podcasts = await listPodcastsForUser(user.uid);
+      // Cookie 未設定時もデフォルトチャンネルを「選択中」として表示する
+      const podcastId = await resolveEffectivePodcastId(user);
+      if (podcastId) {
+        selectedPodcastId = podcastId;
+        channelTitle = (await getPodcast(podcastId))?.title ?? null;
+      }
     }
   }
   return (

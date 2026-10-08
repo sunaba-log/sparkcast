@@ -5,6 +5,8 @@ import { SNSPostMasterDetail } from "@/components/SNSPostMasterDetail";
 import { requireRegisteredUser } from "@/server/auth";
 import { findEpisode } from "@/server/episodes/data-repository";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { mockEpisodes } from "@/lib/mockEpisodes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,11 @@ export default async function SNSPostDetailPage({
     notFound();
   }
 
-  const episode = await findEpisode(podcastId, parsedEpisodeId);
+  const episode = isLocalUiDemoEnabled()
+    ? mockEpisodes.find(
+        (item) => item.podcastId === podcastId && item.id === episodeId,
+      )
+    : await findEpisode(podcastId, parsedEpisodeId);
   const post = episode?.xPosts.find((item) => item.id === postId);
   if (!episode || !post) {
     notFound();
