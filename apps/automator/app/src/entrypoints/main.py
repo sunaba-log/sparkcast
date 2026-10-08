@@ -393,18 +393,20 @@ def sync_podcast_rss(environ: Mapping[str, str]) -> None:
             if dur_sec is not None
             else "00:00:00"
         )
-        rss_manager.add_episode({
-            "guid": f"sparkcast-ep-{ep_id}",
-            "title": title,
-            "description": desc or "",
-            "audio_url": audio_url,
-            "file_size": 10000000,
-            "mime_type": "audio/mpeg",
-            "itunes_duration": dur_str,
-            "pub_date": pub_date,
-            "itunes_episode_number": i + 1,
-            "itunes_episode_type": "full",
-        })
+        rss_manager.add_episode(
+            {
+                "guid": f"sparkcast-ep-{ep_id}",
+                "title": title,
+                "description": desc or "",
+                "audio_url": audio_url,
+                "file_size": 10000000,
+                "mime_type": "audio/mpeg",
+                "itunes_duration": dur_str,
+                "pub_date": pub_date,
+                "itunes_episode_number": i + 1,
+                "itunes_episode_type": "full",
+            }
+        )
 
     rss_xml = rss_manager.get_rss_xml()
     r2_client.upload_file(
@@ -429,4 +431,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

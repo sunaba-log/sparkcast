@@ -120,9 +120,7 @@ class FactCheckAuditor:
                 chunk.chunk_id,
                 error_type,
             )
-            error_message = (
-                f"公開前監査を完了できませんでした ({error_type})。設定・接続を確認して再実行してください。"
-            )
+            error_message = f"公開前監査を完了できませんでした ({error_type})。設定・接続を確認して再実行してください。"
             raise ReviewIncompleteError(error_message) from None
 
     def _parse_response(self, response: SystemOneResponse) -> FactCheckAuditMetric:

@@ -145,7 +145,6 @@ def test_fact_check_auditor_missing_api_key_raises_error(monkeypatch: pytest.Mon
         auditor._get_client()
 
 
-
 # --- Director Script Generator Tests ---
 
 

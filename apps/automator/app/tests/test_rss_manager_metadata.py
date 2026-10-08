@@ -487,15 +487,17 @@ class TestDeleteEpisode:
             cover_url="https://example.com/cover.jpg",
             owner_name="Owner",
         )
-        rss_manager.add_episode({
-            "guid": "guid-1",
-            "title": "Ep 1",
-            "description": "Desc 1",
-            "audio_url": "https://example.com/audio1.mp3",
-            "file_size": 100,
-            "mime_type": "audio/mpeg",
-            "itunes_duration": "00:10:00",
-        })
+        rss_manager.add_episode(
+            {
+                "guid": "guid-1",
+                "title": "Ep 1",
+                "description": "Desc 1",
+                "audio_url": "https://example.com/audio1.mp3",
+                "file_size": 100,
+                "mime_type": "audio/mpeg",
+                "itunes_duration": "00:10:00",
+            }
+        )
         assert rss_manager.get_total_episodes() == 1
         rss_manager.delete_episode("guid-1")
         assert rss_manager.get_total_episodes() == 0
@@ -510,15 +512,17 @@ class TestDeleteEpisode:
             cover_url="https://example.com/cover.jpg",
             owner_name="Owner",
         )
-        rss_manager.add_episode({
-            "guid": "guid-2",
-            "title": "Ep 2",
-            "description": "Desc 2",
-            "audio_url": "https://example.com/audio2.mp3",
-            "file_size": 100,
-            "mime_type": "audio/mpeg",
-            "itunes_duration": "00:10:00",
-        })
+        rss_manager.add_episode(
+            {
+                "guid": "guid-2",
+                "title": "Ep 2",
+                "description": "Desc 2",
+                "audio_url": "https://example.com/audio2.mp3",
+                "file_size": 100,
+                "mime_type": "audio/mpeg",
+                "itunes_duration": "00:10:00",
+            }
+        )
         assert rss_manager.get_total_episodes() == 1
         rss_manager.delete_episode("https://example.com/audio2.mp3")
         assert rss_manager.get_total_episodes() == 0
@@ -533,17 +537,18 @@ class TestDeleteEpisode:
             cover_url="https://example.com/cover.jpg",
             owner_name="Owner",
         )
-        rss_manager.add_episode({
-            "guid": "guid-3",
-            "title": "Ep 3",
-            "description": "Desc 3",
-            "audio_url": "https://example.com/audio3.mp3",
-            "file_size": 100,
-            "mime_type": "audio/mpeg",
-            "itunes_duration": "00:10:00",
-            "itunes_episode_number": 3,
-        })
+        rss_manager.add_episode(
+            {
+                "guid": "guid-3",
+                "title": "Ep 3",
+                "description": "Desc 3",
+                "audio_url": "https://example.com/audio3.mp3",
+                "file_size": 100,
+                "mime_type": "audio/mpeg",
+                "itunes_duration": "00:10:00",
+                "itunes_episode_number": 3,
+            }
+        )
         assert rss_manager.get_total_episodes() == 1
         rss_manager.delete_episode("3")
         assert rss_manager.get_total_episodes() == 0
-

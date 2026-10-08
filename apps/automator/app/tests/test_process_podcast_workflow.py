@@ -352,6 +352,7 @@ def test_workflow_saves_timestamped_segments_and_topics() -> None:
 
 def test_workflow_saves_interim_content_even_when_audit_fails() -> None:
     """Jev 監査でエラーが発生しても、文字起こし・要約・トピックが先行保存されていること (#204)."""
+
     class _FailingAuditor:
         def audit_chunks(self, chunks):
             raise ReviewIncompleteError("Jev audit failed intentionally for testing")
@@ -400,6 +401,7 @@ def test_workflow_saves_interim_content_even_when_audit_fails() -> None:
 
 def test_workflow_resumes_from_audit_skipping_speech_and_transcription() -> None:
     """resume_from_audit=True の場合、既存のFirestore成果物を用いてStep 1/2をスキップし監査から再開すること (#204)."""
+
     class _CountingTranscription:
         def __init__(self):
             self.call_count = 0
@@ -427,9 +429,7 @@ def test_workflow_resumes_from_audit_skipping_speech_and_transcription() -> None
         "audio_metadata": {"file_size_bytes": 500, "duration_str": "00:03:00", "mime_type": "audio/mpeg"},
         "transcript_meta": {"engine": "cached"},
     }
-    firestore.segments = {
-        "segments": [TranscriptSegment(start=0.0, end=3.0, text="既存セグメント", speaker="数森")]
-    }
+    firestore.segments = {"segments": [TranscriptSegment(start=0.0, end=3.0, text="既存セグメント", speaker="数森")]}
 
     mock_transcription = _CountingTranscription()
     mock_auditor = _CountingAuditor()
@@ -473,4 +473,3 @@ def test_workflow_resumes_from_audit_skipping_speech_and_transcription() -> None
     # 3. 正常に completed に遷移
     assert repository.completed is not None
     assert repository.completed["title"] == "#4 既存のタイトル"
-
