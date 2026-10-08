@@ -91,7 +91,7 @@ export function MobileMenuButton() {
       aria-label="メニューを開く"
       aria-expanded={isOpen}
       aria-controls="mobile-nav-drawer"
-      className="md:hidden p-1.5 sm:p-2 -ml-1 rounded-md text-brand hover:bg-brand-subtle/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      className="md:hidden h-8 w-8 p-1.5 -ml-1 rounded-md text-brand hover:bg-brand-subtle/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
     >
       <Menu className="w-5 h-5 text-brand" />
     </button>

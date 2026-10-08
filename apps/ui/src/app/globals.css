@@ -19,6 +19,14 @@ body {
   background-color: var(--color-app-bg);
 }
 
+.notebook-grid {
+  background-color: var(--color-app-bg);
+  background-image:
+    linear-gradient(to right, rgb(83 88 83 / 12%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(83 88 83 / 12%) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
 /* Safe area insets utility classes */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

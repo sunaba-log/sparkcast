@@ -623,7 +623,7 @@ export function ChatWidget() {
         type="button"
         onClick={toggleOpen}
         aria-label={isOpen ? "チャットを閉じる" : "チャットを開く"}
-        className={`min-h-[44px] px-4 py-2 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
+        className={`h-full px-4 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
           ? "bg-brand text-white border-brand hover:bg-brand-hover"
           : "text-gray-600 hover:text-gray-900 border-gray-400 hover:bg-gray-200"
           }`}

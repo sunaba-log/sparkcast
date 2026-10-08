@@ -41,7 +41,7 @@ export function RegisterForm({
   }
 
   return (
-    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
+    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto bg-app-bg">
       <h1 className="text-xl font-bold text-gray-900">ユーザ登録</h1>
       <p className="mt-2 text-sm text-gray-500">
         {email} で利用を開始します。表示名を確認して登録してください。

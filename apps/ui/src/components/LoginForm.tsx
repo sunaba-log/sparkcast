@@ -185,7 +185,7 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
   }
 
   return (
-    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
+    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto bg-app-bg">
       <h1 className="text-xl font-bold text-gray-900">SparkCast にログイン</h1>
       <p className="mt-2 text-sm text-gray-500">
         ポッドキャストの運営を自動化・支援するツールです。Google アカウントで開始できます。
