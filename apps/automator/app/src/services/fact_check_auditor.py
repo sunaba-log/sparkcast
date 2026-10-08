@@ -56,14 +56,23 @@ CHOICE_CRITERIA: dict[str, str] = {
 VALID_CHOICES: set[str] = {"technology", "proper_noun", "numerical_data", "historical_fact", "other"}
 
 
-def _bounded_number(value: object, minimum: float, maximum: float) -> float:
-    """Reject missing, non-finite, or out-of-range model values."""
+def _bounded_number(
+    value: object,
+    minimum: float,
+    maximum: float,
+    *,
+    tolerance: float = 1e-4,
+) -> float:
+    """Reject missing, non-finite, or out-of-range model values with a small margin for numerical jitter."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError("Invalid audit number")
     number = float(value)
-    if not math.isfinite(number) or not minimum <= number <= maximum:
-        raise ValueError("Audit number outside expected range")
-    return number
+    if not math.isfinite(number):
+        raise ValueError("Audit number is not finite")
+    if number < minimum - tolerance or number > maximum + tolerance:
+        msg = f"Audit number outside expected range [{minimum}, {maximum}]: {number}"
+        raise ValueError(msg)
+    return max(minimum, min(maximum, number))
 
 
 class FactCheckAuditor:
@@ -115,10 +124,12 @@ class FactCheckAuditor:
             return chunk, metric
         except Exception as error:  # noqa: BLE001 - all API/parse failures stop publication
             error_type = type(error).__name__
+            detail = str(error) if isinstance(error, (ValueError, TypeError)) else "upstream failure"
             self._logger.error(  # noqa: TRY400 - upstream payloads must not reach logs or notifications
-                "Audit incomplete for chunk %s (%s)",
+                "Audit incomplete for chunk %s (%s: %s)",
                 chunk.chunk_id,
                 error_type,
+                detail,
             )
             error_message = f"公開前監査を完了できませんでした ({error_type})。設定・接続を確認して再実行してください。"
             raise ReviewIncompleteError(error_message) from None
@@ -126,18 +137,35 @@ class FactCheckAuditor:
     def _parse_response(self, response: SystemOneResponse) -> FactCheckAuditMetric:
         """Validate the complete Jev response rather than assuming a low score."""
         answers = response.answers
-        noul_val = _bounded_number(answers["noul"].noul, 0, 1)
-        raw_score = _bounded_number(answers["score"].score, 1, 5)
-        raw_choice = answers["choice"].choice
+        if "noul" not in answers or "score" not in answers or "choice" not in answers:
+            raise ValueError("Incomplete audit response: missing required answer")
+
+        noul_raw = getattr(answers["noul"], "noul", None)
+        noul_val = _bounded_number(noul_raw, 0.0, 1.0)
+
+        # TypeSafe AI (Jev) Score primitive:
+        # criteria is an ordered list indexed 0 to (len - 1), and score is the probability-weighted average
+        # along these rubric levels (0.0 to len(SCORE_CRITERIA) - 1).
+        # We validate against [0.0, max_index], then map to 1-based severity score:
+        # Expected value on 1..5 scale is: raw_score (0-based) + 1.0.
+        max_score_idx = float(len(SCORE_CRITERIA) - 1)
+        score_raw = getattr(answers["score"], "score", None)
+        raw_score = _bounded_number(score_raw, 0.0, max_score_idx)
+        domain_score = round(raw_score + 1.0)
+        domain_score = max(1, min(len(SCORE_CRITERIA), domain_score))
+
+        raw_choice = getattr(answers["choice"], "choice", None)
         if not isinstance(raw_choice, str) or raw_choice not in VALID_CHOICES:
-            raise ValueError("Unknown audit category")
+            msg = f"Unknown audit category: {raw_choice}"
+            raise ValueError(msg)
+
         confidence = getattr(answers["score"], "confidence", None)
         if confidence is not None:
-            confidence = _bounded_number(confidence, 0, 1)
+            confidence = _bounded_number(confidence, 0.0, 1.0)
 
         return FactCheckAuditMetric(
             noul=noul_val,
-            score=round(raw_score),
+            score=domain_score,
             choice=cast("ChoiceCategory", raw_choice),
             confidence=confidence,
         )
