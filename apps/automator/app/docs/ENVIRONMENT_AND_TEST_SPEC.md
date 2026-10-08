@@ -36,9 +36,8 @@
 | JEV_ENABLED | No | true | `false` の場合のみ監査を無効化。それ以外は監査完了を公開条件とする |
 | TYPESAFE_API_KEY | When JEV_ENABLED is enabled | - | Jev監査用。利用可能な認証がない場合は監査を完了できず公開しない |
 | DIRECTOR_ENABLED | No | true | `false` なら訂正生成を無効化。監査で要訂正と判定された場合は公開を停止する |
-
 Cloud TTS の認証には Cloud Run のサービスアカウントまたは Application Default Credentials を使用します。
-訂正音声を生成するサービスアカウントには `roles/texttospeech.user` が必要です。
+プロジェクトで `texttospeech.googleapis.com` API の有効化が必要です（Text-to-Speech API には事前定義の `roles/texttospeech.*` IAM ロールは存在せず、API 有効化とサービスアカウントの標準権限で利用可能です）。
 
 ### 公開前監査が完了しない場合
 
