@@ -66,6 +66,10 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
         value = "900"
       }
       env {
+        name  = "AUTOMATOR_JOB_NAME"
+        value = "projects/${var.project_id}/locations/${var.region}/jobs/${local.automator_name_prefix}-app-${var.environment}"
+      }
+      env {
         name = "CRON_SECRET"
         value_source {
           secret_key_ref {
