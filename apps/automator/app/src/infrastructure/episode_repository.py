@@ -63,6 +63,30 @@ class PostgresEpisodeRepository:
             episode_id=episode_id,
         )
 
+    def update_metadata(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        description: str,
+        duration_seconds: int | None = None,
+    ) -> None:
+        """Store interim metadata (title, description, duration) before audit."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET title = %s,
+                description = %s,
+                duration_seconds = COALESCE(%s, duration_seconds),
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (title, description, duration_seconds, podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
         self._execute_update(

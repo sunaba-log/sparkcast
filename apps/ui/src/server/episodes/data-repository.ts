@@ -22,6 +22,7 @@ type EpisodeRow = QueryResultRow & {
   status: EpisodeStatus;
   processing_error: string | null;
   created_at: Date;
+  published_at: Date | null;
   artwork_url: string | null;
 };
 
@@ -253,6 +254,8 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
     audioUrl: row.status === "completed" ? row.audio_file_path : null,
     artworkUrl: row.artwork_url || null,
     processingError: row.processing_error,
+    publishedAt: row.published_at ? row.published_at.toISOString() : null,
+    isPublished: Boolean(row.published_at && row.status === "completed"),
     minutesGenerated: Boolean(content.minutes),
     transcriptAvailable: content.transcriptAvailable,
     xPostsGenerated: content.promotions.length > 0,
@@ -266,7 +269,7 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
 export async function listEpisodes(podcastId: number): Promise<Episode[]> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC`,
@@ -285,7 +288,7 @@ export async function findEpisode(
 ): Promise<Episode | null> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1 AND episode_id = $2`,
     [podcastId, episodeId],
@@ -357,7 +360,7 @@ export async function listEpisodesAndPromotionsPaginated(
 
   const result = await pool.query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC
@@ -424,3 +427,72 @@ export async function deleteSnsPromotion(input: {
     .doc(input.promotionId)
     .delete();
 }
+
+export async function setEpisodePublished(
+  podcastId: number,
+  episodeId: number,
+  published: boolean,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET published_at = $1, updated_at = now()
+     WHERE podcast_id = $2 AND episode_id = $3`,
+    [published ? new Date() : null, podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function deleteEpisodeRecord(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const pool = await getDbPool();
+  const result = await pool.query(
+    `DELETE FROM episodes
+     WHERE podcast_id = $1 AND episode_id = $2`,
+    [podcastId, episodeId],
+  );
+
+  // Firestore 内のコンテンツもクリーンアップ
+  try {
+    const contentRef = episodeContentRef(podcastId, episodeId);
+    await contentRef.delete();
+  } catch (error) {
+    console.warn(`Failed to delete firestore episode content for ${episodeId}:`, error);
+  }
+
+  return result.rowCount === 1;
+}
+
+export async function markEpisodeAuditing(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'auditing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function updateEpisodeMetadata(
+  podcastId: number,
+  episodeId: number,
+  title?: string,
+  description?: string,
+): Promise<boolean> {
+  if (title === undefined && description === undefined) return true;
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET title = COALESCE($1, title),
+         description = COALESCE($2, description),
+         updated_at = now()
+     WHERE podcast_id = $3 AND episode_id = $4`,
+    [title ?? null, description ?? null, podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+

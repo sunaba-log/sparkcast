@@ -6,9 +6,11 @@ from dataclasses import dataclass
 
 import pytest
 
+from domain.errors import ReviewIncompleteError
 from domain.models import SnsPromotionContent, SnsPromotionsResponse, Summary
+from domain.models.director import FactCheckAuditMetric
 from domain.models.transcript import TranscriptSegment
-from services.episode_transcription import EpisodeTranscription
+from services.episode_transcription import EpisodeTranscription, TranscriptionResult
 from usecases.process_podcast_workflow import (
     ProcessPodcastWorkflow,
     ProcessPodcastWorkflowInput,
@@ -101,6 +103,7 @@ class _EpisodeRepository:
     processing: tuple[str, str, str] | None = None
     completed: dict[str, object] | None = None
     failed: tuple[str, str, str] | None = None
+    interim_metadata: dict[str, object] | None = None
 
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         self.processing = (podcast_id, episode_id, source_audio_path)
@@ -108,8 +111,17 @@ class _EpisodeRepository:
     def mark_completed(self, **values: object) -> None:
         self.completed = values
 
+    def update_metadata(self, **values: object) -> None:
+        self.interim_metadata = values
+
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         self.failed = (podcast_id, episode_id, error_message)
+
+    def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
+        self.auditing = (podcast_id, episode_id)
+
+    def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
+        self.awaiting_approval = (podcast_id, episode_id)
 
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         return ["小野", "数森"]
@@ -127,6 +139,12 @@ class _FirestoreManager:
     def save_episode_content(self, **values: object) -> str:
         self.episode_content = values
         return str(values["episode_id"])
+
+    def get_episode_content(self, **values: object) -> dict[str, object] | None:
+        return self.episode_content
+
+    def get_transcript_segments(self, **values: object) -> list:
+        return getattr(self, "segments", {}).get("segments", [])
 
     def save_transcript_chunks(self, **values: object) -> list[str]:
         self.transcript = values
@@ -330,3 +348,128 @@ def test_workflow_saves_timestamped_segments_and_topics() -> None:
         {"time": "1:05", "title": "本題"},
     ]
     assert content["transcript_meta"]["engine"] == "speech_v2_long"
+
+
+def test_workflow_saves_interim_content_even_when_audit_fails() -> None:
+    """Jev 監査でエラーが発生しても、文字起こし・要約・トピックが先行保存されていること (#204)."""
+
+    class _FailingAuditor:
+        def audit_chunks(self, chunks):
+            raise ReviewIncompleteError("Jev audit failed intentionally for testing")
+
+    class _MockTranscription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="発話テキスト", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    repository = _EpisodeRepository()
+    firestore = _FirestoreManager()
+    provider = _TranscriptProvider()
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=provider,
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=firestore,
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_MockTranscription(),
+        fact_check_auditor=_FailingAuditor(),
+    )
+
+    with pytest.raises(ReviewIncompleteError):
+        workflow.run(_request())
+
+    # 1. DB ステータスは failed に更新された
+    assert repository.failed is not None
+    # 2. 先行保存されたメタデータ (タイトル・要約) が DB に残っている
+    assert repository.interim_metadata is not None
+    assert repository.interim_metadata["title"] == "#4 Generated title"
+    assert repository.interim_metadata["description"] == "Generated description"
+    # 3. Firestore にもエピソードコンテンツとセグメントが保存されている
+    assert firestore.episode_content is not None
+    assert firestore.episode_content["minutes"] == "## 要約\nテストエピソード\n## 【目次】\n0:00 本編"
+    assert len(firestore.segments["segments"]) == 1
+    assert firestore.segments["segments"][0].text == "発話テキスト"
+
+
+def test_workflow_resumes_from_audit_skipping_speech_and_transcription() -> None:
+    """resume_from_audit=True の場合、既存のFirestore成果物を用いてStep 1/2をスキップし監査から再開すること (#204)."""
+
+    class _CountingTranscription:
+        def __init__(self):
+            self.call_count = 0
+
+        def run(self, **kwargs):
+            self.call_count += 1
+            raise AssertionError("Transcription.run should NOT be called during resumption!")
+
+    class _CountingAuditor:
+        def __init__(self):
+            self.call_count = 0
+
+        def audit_chunks(self, chunks):
+            self.call_count += 1
+            return [(chunk, FactCheckAuditMetric(noul=0.1, score=1, choice="other")) for chunk in chunks]
+
+    repository = _EpisodeRepository()
+    firestore = _FirestoreManager()
+    # 既存のコンテンツとセグメントを Firestore にあらかじめセット
+    firestore.episode_content = {
+        "episode_id": "456",
+        "minutes": "既存の議事録テキスト",
+        "transcript_summary": "既存の要約",
+        "ai_generated_meta": {"title": "#4 既存のタイトル", "description": "既存の要約"},
+        "audio_metadata": {"file_size_bytes": 500, "duration_str": "00:03:00", "mime_type": "audio/mpeg"},
+        "transcript_meta": {"engine": "cached"},
+    }
+    firestore.segments = {"segments": [TranscriptSegment(start=0.0, end=3.0, text="既存セグメント", speaker="数森")]}
+
+    mock_transcription = _CountingTranscription()
+    mock_auditor = _CountingAuditor()
+    storage = _ObjectStorage()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=storage,
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [500, "00:03:00"],
+        firestore_manager=firestore,
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=mock_transcription,
+        fact_check_auditor=mock_auditor,
+    )
+
+    req = _request()
+    # resume_from_audit を True にして実行
+    resume_req = ProcessPodcastWorkflowInput(
+        project_id=req.project_id,
+        sns_schedule_offset_hours=req.sns_schedule_offset_hours,
+        gcs_bucket=req.gcs_bucket,
+        gcs_trigger_object_name=req.gcs_trigger_object_name,
+        r2_bucket=req.r2_bucket,
+        r2_key_prefix=req.r2_key_prefix,
+        ai_model_id=req.ai_model_id,
+        r2_custom_domain=req.r2_custom_domain,
+        resume_from_audit=True,
+    )
+
+    workflow.run(resume_req)
+
+    # 1. 音声認識 (transcription.run) は呼ばれていない
+    assert mock_transcription.call_count == 0
+    # 2. 監査 (auditor.audit_chunks) は実行された
+    assert mock_auditor.call_count == 1
+    # 3. 正常に completed に遷移
+    assert repository.completed is not None
+    assert repository.completed["title"] == "#4 既存のタイトル"

@@ -86,7 +86,11 @@ class FactCheckAuditor:
     def _get_client(self) -> AsyncTypeSafeClient:
         if self._client is not None:
             return self._client
-        return AsyncTypeSafeClient(api_key=self._api_key, model=self._model)
+        if not self._api_key or not self._api_key.strip():
+            raise ReviewIncompleteError(
+                "TypeSafe (Jev) API key is missing. TYPESAFE_API_KEY または JEV_API_KEY を設定してください。"
+            )
+        return AsyncTypeSafeClient(api_key=self._api_key.strip(), model=self._model)
 
     async def audit_single_chunk_async(
         self,
@@ -110,14 +114,14 @@ class FactCheckAuditor:
             metric = self._parse_response(response)
             return chunk, metric
         except Exception as error:  # noqa: BLE001 - all API/parse failures stop publication
+            error_type = type(error).__name__
             self._logger.error(  # noqa: TRY400 - upstream payloads must not reach logs or notifications
                 "Audit incomplete for chunk %s (%s)",
                 chunk.chunk_id,
-                type(error).__name__,
+                error_type,
             )
-            raise ReviewIncompleteError(
-                "公開前監査を完了できませんでした。設定・接続を確認して再実行してください。"
-            ) from None
+            error_message = f"公開前監査を完了できませんでした ({error_type})。設定・接続を確認して再実行してください。"
+            raise ReviewIncompleteError(error_message) from None
 
     def _parse_response(self, response: SystemOneResponse) -> FactCheckAuditMetric:
         """Validate the complete Jev response rather than assuming a low score."""

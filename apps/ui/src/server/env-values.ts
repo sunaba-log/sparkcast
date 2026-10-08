@@ -230,6 +230,11 @@ export function getMixerJobName(): string {
   return required("MIXER_JOB_NAME");
 }
 
+// automator の Cloud Run Job のリソース名（projects/{p}/locations/{r}/jobs/{name}）
+export function getAutomatorJobName(): string | undefined {
+  return process.env.AUTOMATOR_JOB_NAME;
+}
+
 export function getRecordingMaxParticipants(): number {
   const raw = process.env.RECORDING_MAX_PARTICIPANTS ?? "6";
   const value = Number(raw);
