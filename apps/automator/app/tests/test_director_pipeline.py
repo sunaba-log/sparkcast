@@ -35,12 +35,12 @@ async def test_fact_check_auditor_mock_success():
     """Jev API との疎通・モックテスト: Noul, Score, Choice の3基準が正しくパースされること."""
     mock_client = AsyncMock()
 
-    # モックレスポンスの作成
+    # モックレスポンスの作成 (重大な誤認: 深刻度4 -> Jev 0始まりインデックス: 3.0)
     mock_noul_ans = MagicMock()
     mock_noul_ans.noul = 0.95
 
     mock_score_ans = MagicMock()
-    mock_score_ans.score = 4.0
+    mock_score_ans.score = 3.0
     mock_score_ans.confidence = 0.92
 
     mock_choice_ans = MagicMock()
@@ -87,16 +87,16 @@ def test_fact_check_auditor_sync_batch_multiple_chunks():
     """複数チャンクの非同期バッチ監査が同期インターフェースで正しく実行されること."""
     mock_client = AsyncMock()
 
-    # 1つ目は軽微な言い間違い (Score 1)
+    # 1つ目は軽微な言い間違い (深刻度 1 -> Jev 0始まりインデックス: 0.0)
     ans1 = {
         "noul": MagicMock(noul=0.1),
-        "score": MagicMock(score=1.0, confidence=0.99),
+        "score": MagicMock(score=0.0, confidence=0.99),
         "choice": MagicMock(choice="other"),
     }
-    # 2つ目は重大な誤認 (Score 4)
+    # 2つ目は重大な誤認 (深刻度 4 -> Jev 0始まりインデックス: 3.0)
     ans2 = {
         "noul": MagicMock(noul=0.9),
-        "score": MagicMock(score=4.0, confidence=0.85),
+        "score": MagicMock(score=3.0, confidence=0.85),
         "choice": MagicMock(choice="proper_noun"),
     }
 
@@ -143,6 +143,85 @@ def test_fact_check_auditor_missing_api_key_raises_error(monkeypatch: pytest.Mon
     auditor = FactCheckAuditor(api_key=None)
     with pytest.raises(ReviewIncompleteError, match="TypeSafe \\(Jev\\) API key is missing"):
         auditor._get_client()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("jev_score", "expected_domain_score"),
+    [
+        (0.0, 1),
+        (0.4, 1),
+        (0.6, 2),
+        (1.0, 2),
+        (1.8, 3),
+        (2.0, 3),
+        (3.0, 4),
+        (3.7, 5),
+        (4.0, 5),
+    ],
+)
+async def test_fact_check_auditor_score_levels_mapping(jev_score: float, expected_domain_score: int):
+    """Jev の 0 始まりスコア (0.0〜4.0) がドメイン深刻度 (1〜5) に正しくマッピングされること."""
+    mock_client = AsyncMock()
+    mock_resp = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.5),
+            "score": MagicMock(score=jev_score, confidence=0.9),
+            "choice": MagicMock(choice="technology"),
+        }
+    )
+    mock_client.system_one.return_value = mock_resp
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")
+
+    _, metric = await auditor.audit_single_chunk_async(mock_client, chunk)
+    assert metric.score == expected_domain_score
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("invalid_score", [-0.5, 4.5, float("inf"), float("nan")])
+async def test_fact_check_auditor_rejects_out_of_bounds_score(invalid_score: float):
+    """Jev スコアが許容範囲外の場合に ReviewIncompleteError (ValueError) となること."""
+    mock_client = AsyncMock()
+    mock_resp = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.5),
+            "score": MagicMock(score=invalid_score, confidence=0.9),
+            "choice": MagicMock(choice="technology"),
+        }
+    )
+    mock_client.system_one.return_value = mock_resp
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")
+
+    with pytest.raises(ReviewIncompleteError, match="ValueError"):
+        await auditor.audit_single_chunk_async(mock_client, chunk)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("jitter_score", "expected_domain_score"),
+    [
+        (-0.00005, 1),
+        (4.00005, 5),
+    ],
+)
+async def test_fact_check_auditor_tolerates_numerical_jitter(jitter_score: float, expected_domain_score: int):
+    """浮動小数点数の微小なジッター (tolerance 内) が許容されクランプされること."""
+    mock_client = AsyncMock()
+    mock_resp = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.5),
+            "score": MagicMock(score=jitter_score, confidence=0.9),
+            "choice": MagicMock(choice="technology"),
+        }
+    )
+    mock_client.system_one.return_value = mock_resp
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")
+
+    _, metric = await auditor.audit_single_chunk_async(mock_client, chunk)
+    assert metric.score == expected_domain_score
 
 
 # --- Director Script Generator Tests ---
