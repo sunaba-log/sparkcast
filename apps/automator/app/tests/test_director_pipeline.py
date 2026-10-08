@@ -224,6 +224,47 @@ async def test_fact_check_auditor_tolerates_numerical_jitter(jitter_score: float
     assert metric.score == expected_domain_score
 
 
+# --- Metric Composite Intervention Criteria Tests ---
+
+
+@pytest.mark.parametrize(
+    ("score", "noul", "choice", "expected"),
+    [
+        # Score 1: 常に介入不要(事実に基づく・スルー可)
+        (1, 0.98, "technology", False),
+        (1, 0.18, "other", False),
+        # 低Noul (<0.6): 感想・挨拶・比喩表現等はScoreが高くても介入除外
+        (3, 0.59, "technology", False),
+        (4, 0.20, "other", False),
+        (5, 0.10, "proper_noun", False),
+        # Score >= 3 かつ noul >= 0.6: 明確・重大な事実誤認として介入対象
+        (3, 0.60, "other", True),
+        (3, 0.95, "technology", True),
+        (4, 0.97, "technology", True),
+        (5, 0.90, "numerical_data", True),
+        # Score 2 かつ 重要カテゴリ(technology, numerical_data, proper_noun) かつ noul >= 0.8: 介入対象
+        (2, 0.80, "technology", True),
+        (2, 0.95, "numerical_data", True),
+        (2, 0.85, "proper_noun", True),
+        # Score 2 かつ 重要カテゴリだが noul < 0.8: 確信度が不足しているためスルー
+        (2, 0.79, "technology", False),
+        (2, 0.75, "numerical_data", False),
+        # Score 2 かつ 非重要カテゴリ(historical_fact, other): noul が高くてもスルー
+        (2, 0.95, "historical_fact", False),
+        (2, 0.99, "other", False),
+    ],
+)
+def test_fact_check_audit_metric_should_intervene(
+    score: int,
+    noul: float,
+    choice: str,
+    expected: bool,
+):
+    """noul, score, choice の複合条件で介入要否が正しく判定されること."""
+    metric = FactCheckAuditMetric(noul=noul, score=score, choice=choice)
+    assert metric.should_intervene() is expected
+
+
 # --- Director Script Generator Tests ---
 
 
@@ -516,6 +557,129 @@ def test_pipeline_routing_routes_score_3_or_higher_to_gemini_and_awaits_approval
     # 通常の公開処理(mark_completed, R2へのマスター音源アップロード, RSS更新)はスキップされた
     assert repo.completed_called is False
     assert len(storage.uploads) == 0
+
+
+def test_pipeline_routing_routes_score_2_critical_category_to_gemini():
+    """Score 2 でも重要カテゴリかつ高Noulの発話は Gemini へルーティングされ、awaiting_approval になること."""
+    mock_auditor = MagicMock()
+    # Score 2, technology, noul=0.85 (技術仕様の軽微な誤り・高確信度)
+    critical_chunk = UtteranceChunk("seg_00001", "小野", 0, 3000, "Python 3.12 で GIL なくなったよね")
+    critical_metric = FactCheckAuditMetric(noul=0.85, score=2, choice="technology", confidence=0.8)
+
+    mock_auditor.audit_chunks.return_value = [
+        (critical_chunk, critical_metric),
+    ]
+
+    mock_generator = MagicMock()
+    mock_intervention = DirectorIntervention.create(
+        intervention_id="interv_tech_2",
+        chunk_id="seg_00001",
+        target_speaker="小野",
+        insert_timestamp_ms=3000,
+        correction_script="あ、小野さん! それは3.13ですね!",
+        reason="GIL無効化のバージョン誤り",
+        audit_metrics=critical_metric,
+    )
+    mock_generator.generate_intervention.return_value = mock_intervention
+
+    mock_firestore = MagicMock()
+    repo = _FakeEpisodeRepository()
+    storage = _FakeObjectStorage()
+    notifier = _FakeNotifier()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_FakeTranscriptProvider(),
+        object_storage=storage,
+        blob_source=_FakeBlobSource(),
+        notifier=notifier,
+        rss_manager_factory=lambda *, rss_xml: _FakeRssManager(),
+        audio_converter=lambda b, s: b"mp3",
+        audio_info_reader=lambda buf, fmt: [100, "00:01:00"],
+        firestore_manager=mock_firestore,
+        episode_repository=repo,
+        logger=logging.getLogger("test"),
+        transcription=_FakeTranscription(
+            [
+                TranscriptSegment(start=0.0, end=3.0, text="Python 3.12 で GIL なくなったよね", speaker="小野"),
+            ]
+        ),
+        fact_check_auditor=mock_auditor,
+        director_script_generator=mock_generator,
+    )
+
+    req = ProcessPodcastWorkflowInput(
+        project_id="test-proj",
+        sns_schedule_offset_hours=1,
+        gcs_bucket="input-bucket",
+        gcs_trigger_object_name="podcasts/p1/episodes/e1/source/audio.mp3",
+        r2_bucket="out-bucket",
+        r2_key_prefix="feed",
+        ai_model_id="gemini-2.0-flash",
+        r2_custom_domain="test.example.com",
+    )
+
+    workflow.run(req)
+
+    # Score 2 だが重要カテゴリ(technology)かつ高Noulのため Gemini が呼ばれる
+    assert mock_generator.generate_intervention.call_count == 1
+    assert repo.awaiting_approval_called is True
+    assert repo.status == "awaiting_approval"
+
+
+def test_pipeline_routing_skips_high_score_with_low_noul():
+    """Score が高くても Noul が低い (感想・挨拶・比喩表現) 場合はスキップされ通常公開されること."""
+    mock_auditor = MagicMock()
+    # Score 4 だが noul=0.2 (主観・感想・比喩等)
+    opinion_chunk = UtteranceChunk("seg_00001", "数森", 0, 3000, "絶対にありえないくらい最高でしたね")
+    opinion_metric = FactCheckAuditMetric(noul=0.2, score=4, choice="other")
+
+    mock_auditor.audit_chunks.return_value = [
+        (opinion_chunk, opinion_metric),
+    ]
+
+    mock_generator = MagicMock()
+    repo = _FakeEpisodeRepository()
+    storage = _FakeObjectStorage()
+    notifier = _FakeNotifier()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_FakeTranscriptProvider(),
+        object_storage=storage,
+        blob_source=_FakeBlobSource(),
+        notifier=notifier,
+        rss_manager_factory=lambda *, rss_xml: _FakeRssManager(),
+        audio_converter=lambda b, s: b"mp3",
+        audio_info_reader=lambda buf, fmt: [100, "00:01:00"],
+        firestore_manager=None,
+        episode_repository=repo,
+        logger=logging.getLogger("test"),
+        transcription=_FakeTranscription(
+            [
+                TranscriptSegment(start=0.0, end=3.0, text="絶対にありえないくらい最高でしたね", speaker="数森"),
+            ]
+        ),
+        fact_check_auditor=mock_auditor,
+        director_script_generator=mock_generator,
+    )
+
+    req = ProcessPodcastWorkflowInput(
+        project_id="test-proj",
+        sns_schedule_offset_hours=1,
+        gcs_bucket="input-bucket",
+        gcs_trigger_object_name="podcasts/p1/episodes/e1/source/audio.mp3",
+        r2_bucket="out-bucket",
+        r2_key_prefix="feed",
+        ai_model_id="gemini-2.0-flash",
+        r2_custom_domain="test.example.com",
+    )
+
+    workflow.run(req)
+
+    # Noul が低いため Gemini は呼ばれず、通常公開される
+    mock_generator.generate_intervention.assert_not_called()
+    assert repo.awaiting_approval_called is False
+    assert repo.completed_called is True
+    assert repo.status == "completed"
 
 
 # --- Firestore Persistence Tests ---

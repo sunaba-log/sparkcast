@@ -19,6 +19,26 @@ ChoiceCategory = Literal[
     "other",
 ]
 
+# 客観的事実主張と判定する最小のNoul閾値(感想・挨拶・相槌の除外)
+MIN_FACT_NOUL_THRESHOLD: float = 0.6
+
+# 軽微な誤り(Score 2)でもリスナーへの誤解防止のため訂正介入を検討する重要カテゴリ
+CRITICAL_INTERVENTION_CATEGORIES: frozenset[ChoiceCategory] = frozenset(
+    {
+        "technology",
+        "numerical_data",
+        "proper_noun",
+    }
+)
+
+# Score 2 の軽微な誤りにおいて、重要カテゴリで介入するための高いNoul確信度閾値
+HIGH_CONFIDENCE_FACT_NOUL_THRESHOLD: float = 0.8
+
+# 事実誤認判定スコアの定数
+BENIGN_SCORE_THRESHOLD: int = 1
+MINOR_ERROR_SCORE: int = 2
+SEVERE_ERROR_MIN_SCORE: int = 3
+
 
 @dataclass(frozen=True)
 class UtteranceChunk:
@@ -53,6 +73,33 @@ class FactCheckAuditMetric:
     choice: ChoiceCategory  # technology, proper_noun, numerical_data, historical_fact, other
     confidence: float | None = None
     raw_response: dict[str, Any] | None = None
+
+    def should_intervene(
+        self,
+        *,
+        min_noul: float = MIN_FACT_NOUL_THRESHOLD,
+        high_noul: float = HIGH_CONFIDENCE_FACT_NOUL_THRESHOLD,
+        critical_categories: frozenset[ChoiceCategory] = CRITICAL_INTERVENTION_CATEGORIES,
+    ) -> bool:
+        """Noul (事実性), score (深刻度), choice (カテゴリ) を組み合わせた複合介入判定.
+
+        1. 客観的事実主張の確率 (noul) が基準値未満(感想・挨拶・比喩など)は除外。
+        2. Score 3以上(明確・重大な事実誤認)かつ noul >= min_noul は介入対象。
+        3. Score 2(軽微な誤り/グレーゾーン)でも、厳密性が求められる重要カテゴリ
+           (technology, numerical_data, proper_noun) かつ noul >= high_noul であれば
+           リスナーへの誤解・信頼性低下防止のため介入対象とする。
+        4. Score 1(スルー可/事実に基づく)は常に介入不要。
+        """
+        if self.score <= BENIGN_SCORE_THRESHOLD:
+            return False
+
+        if self.noul < min_noul:
+            return False
+
+        if self.score >= SEVERE_ERROR_MIN_SCORE:
+            return True
+
+        return self.score == MINOR_ERROR_SCORE and self.choice in critical_categories and self.noul >= high_noul
 
 
 @dataclass(frozen=True)
