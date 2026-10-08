@@ -22,6 +22,79 @@ ChoiceCategory = Literal[
     "other",
 ]
 
+PolicyFindingCategory = Literal["pii", "confidential_information", "third_party_risk"]
+PolicyFindingSource = Literal["presidio", "jev"]
+
+
+@dataclass(frozen=True)
+class AudioAuditPolicy:
+    """番組ごとの音声監査ポリシー。辞書変更は必ず version を更新する。."""
+
+    version: str = "v1"
+    confidential_terms: tuple[str, ...] = ()
+    allowed_terms: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PolicyFinding:
+    """公開前に人手判断を必要とする、時刻つき音声監査の検知結果。."""
+
+    finding_id: str
+    chunk_id: str
+    category: PolicyFindingCategory
+    source: PolicyFindingSource
+    start_ms: int
+    end_ms: int
+    text: str
+    entity_type: str | None = None
+    policy_version: str = "v1"
+    review_required: bool = True
+    action: str = "silence"
+    status: str = "pending"
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        chunk: UtteranceChunk,
+        category: PolicyFindingCategory,
+        source: PolicyFindingSource,
+        policy_version: str,
+        entity_type: str | None = None,
+    ) -> PolicyFinding:
+        """Create a pending finding for the exact audited utterance."""
+        return cls(
+            finding_id=str(uuid.uuid4()),
+            chunk_id=chunk.chunk_id,
+            category=category,
+            source=source,
+            start_ms=chunk.start_ms,
+            end_ms=chunk.end_ms,
+            text=chunk.text,
+            entity_type=entity_type,
+            policy_version=policy_version,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the finding for Firestore."""
+        return {
+            "finding_id": self.finding_id,
+            "chunk_id": self.chunk_id,
+            "category": self.category,
+            "source": self.source,
+            "start_ms": self.start_ms,
+            "end_ms": self.end_ms,
+            "text": self.text,
+            "entity_type": self.entity_type,
+            "policy_version": self.policy_version,
+            "review_required": self.review_required,
+            "action": self.action,
+            "status": self.status,
+            "created_at": self.created_at,
+        }
+
+
 # 客観的事実主張と判定する最小のNoul閾値(感想・挨拶・相槌の除外)
 MIN_FACT_NOUL_THRESHOLD: float = 0.6
 
@@ -228,6 +301,14 @@ class FactCheckAuditMetric:
             return True
 
         return self.score == MINOR_ERROR_SCORE and self.choice in critical_categories and self.noul >= high_noul
+
+
+@dataclass(frozen=True)
+class AuditBundle:
+    """ファクトチェックと音声校正ポリシーを完全な一組として返す監査結果。."""
+
+    fact_check_results: list[tuple[UtteranceChunk, FactCheckAuditMetric]]
+    policy_findings: list[PolicyFinding]
 
 
 @dataclass(frozen=True)

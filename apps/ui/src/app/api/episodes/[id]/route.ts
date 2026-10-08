@@ -5,6 +5,8 @@ import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import {
   deleteEpisodeRecord,
   findEpisode,
+  listDirectorInterventions,
+  listPolicyFindings,
   setEpisodePublished,
   updateEpisodeGeneratedContent,
   updateEpisodeMetadata,
@@ -101,6 +103,23 @@ export async function PATCH(
     }
 
     if (input.isPublished !== undefined) {
+      if (input.isPublished) {
+        const episode = await findEpisode(auth.podcastId, episodeId);
+        const [interventions, policyFindings] = await Promise.all([
+          listDirectorInterventions(auth.podcastId, episodeId),
+          listPolicyFindings(auth.podcastId, episodeId),
+        ]);
+        if (
+          episode?.status !== "completed"
+          || interventions.some((intervention) => intervention.status === "pending")
+          || policyFindings.some((finding) => finding.status === "pending")
+        ) {
+          return NextResponse.json(
+            { error: "すべての監査項目を判断し、音声処理の完了後に公開してください" },
+            { status: 409 },
+          );
+        }
+      }
       await setEpisodePublished(auth.podcastId, episodeId, input.isPublished);
       await runAutomatorJob({
         action: "sync_rss",

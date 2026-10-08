@@ -4,6 +4,7 @@ export type EpisodeStatus =
   | "processing"
   | "auditing"
   | "awaiting_approval"
+  | "awaiting_publish_confirmation"
   | "editing"
   | "completed"
   | "failed";
@@ -82,4 +83,19 @@ export type DirectorIntervention = {
   category: string;
   correctionScript: string;
   status: DirectorInterventionStatus;
+};
+
+export type PolicyFindingStatus = "pending" | "approved" | "rejected";
+
+export type PolicyFinding = {
+  id: string;
+  chunkId: string;
+  category: "pii" | "confidential_information" | "third_party_risk";
+  source: "presidio" | "jev";
+  start: number;
+  end: number;
+  text: string;
+  entityType: string | null;
+  action: "silence";
+  status: PolicyFindingStatus;
 };

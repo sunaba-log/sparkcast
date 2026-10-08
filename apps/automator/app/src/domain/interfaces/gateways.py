@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
     from domain.models import (
         AgendaResult,
+        AudioAuditPolicy,
+        AuditBundle,
         DirectorIntervention,
         DiscordMessage,
         FactCheckAuditMetric,
@@ -166,6 +168,9 @@ class EpisodeRepository(Protocol):
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """Return the cast (登場人物) registered in the podcast settings."""
 
+    def get_audio_audit_policy(self, *, podcast_id: str) -> AudioAuditPolicy:
+        """Return the current program-level audio audit policy."""
+
     def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
         """Return the speakers when the episode was recorded in the browser recording room."""
 
@@ -180,6 +185,15 @@ class FactCheckAuditorGateway(Protocol):
         concurrency_limit: int = 10,
     ) -> list[tuple[UtteranceChunk, FactCheckAuditMetric]]:
         """発話チャンク配列を非同期バッチで高速監査し、各チャンクの評価メトリクスを返す."""
+
+    def audit_bundle(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        policy: AudioAuditPolicy,
+        concurrency_limit: int = 10,
+    ) -> AuditBundle:
+        """Return the complete fact-check and audio-policy audit results."""
 
 
 class DirectorScriptGeneratorGateway(Protocol):

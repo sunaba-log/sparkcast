@@ -10,18 +10,24 @@ export function SettingsForm({
   description: initialDescription,
   rssFeedPath: initialRssFeedPath,
   castMembers: initialCastMembers,
+  confidentialTerms: initialConfidentialTerms = [],
+  allowedTerms: initialAllowedTerms = [],
 }: {
   podcastId: number;
   title: string;
   description: string;
   rssFeedPath: string;
   castMembers: string;
+  confidentialTerms?: string[];
+  allowedTerms?: string[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [rssFeedPath, setRssFeedPath] = useState(initialRssFeedPath);
   const [castMembers, setCastMembers] = useState(initialCastMembers);
+  const [confidentialTerms, setConfidentialTerms] = useState(initialConfidentialTerms.join("\n"));
+  const [allowedTerms, setAllowedTerms] = useState(initialAllowedTerms.join("\n"));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -127,6 +133,8 @@ export function SettingsForm({
           description: description.trim() || undefined,
           rssFeedPath: rssFeedPath.trim(),
           castMembers: castMembers.trim(),
+          confidentialTerms: confidentialTerms.split("\n").map((term) => term.trim()).filter(Boolean),
+          allowedTerms: allowedTerms.split("\n").map((term) => term.trim()).filter(Boolean),
         }),
       });
       const result = (await response.json()) as { error?: string };
@@ -239,6 +247,44 @@ export function SettingsForm({
             <p className="text-xs text-gray-500 mt-1">
               読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
             </p>
+          </div>
+
+          <div>
+            <label htmlFor="confidential-terms" className="block text-xs font-semibold text-gray-700 mb-1.5">
+              音声監査: 機密語句
+            </label>
+            <textarea
+              id="confidential-terms"
+              rows={4}
+              value={confidentialTerms}
+              onChange={(event) => {
+                setConfidentialTerms(event.target.value);
+                setSaved(false);
+              }}
+              maxLength={40_000}
+              placeholder={"1行に1語句\n例: 未公開プロジェクト名"}
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">一致した語句は機密情報として承認待ちになります。</p>
+          </div>
+
+          <div>
+            <label htmlFor="allowed-terms" className="block text-xs font-semibold text-gray-700 mb-1.5">
+              音声監査: 許可語句
+            </label>
+            <textarea
+              id="allowed-terms"
+              rows={4}
+              value={allowedTerms}
+              onChange={(event) => {
+                setAllowedTerms(event.target.value);
+                setSaved(false);
+              }}
+              maxLength={40_000}
+              placeholder={"1行に1語句\n例: 公開済みの代表メールアドレス"}
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">許可語句はローカル PII・カスタム語句検知から除外されます。</p>
           </div>
 
           <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">

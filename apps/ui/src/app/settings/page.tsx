@@ -19,6 +19,8 @@ export default async function SettingsPage() {
       description={podcast.description ?? ""}
       rssFeedPath={podcast.rssFeedPath ?? ""}
       castMembers={podcast.castMembers ?? ""}
+      confidentialTerms={podcast.audioAuditPolicy.confidentialTerms}
+      allowedTerms={podcast.audioAuditPolicy.allowedTerms}
     />
   );
 }

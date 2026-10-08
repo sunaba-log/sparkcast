@@ -74,6 +74,7 @@ class PodcastEnvConfig:
     jev_enabled: bool = True
     director_enabled: bool = True
     resume_from_audit: bool = False
+    publish_original: bool = False
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -118,6 +119,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     jev_enabled = environ.get("JEV_ENABLED", "true").lower() != "false"
     director_enabled = environ.get("DIRECTOR_ENABLED", "true").lower() != "false"
     resume_from_audit = environ.get("RESUME_FROM_AUDIT", "false").lower() in ("true", "1")
+    publish_original = environ.get("PUBLISH_ORIGINAL", "false").lower() in ("true", "1")
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -152,6 +154,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         jev_enabled=jev_enabled,
         director_enabled=director_enabled,
         resume_from_audit=resume_from_audit,
+        publish_original=publish_original,
     )
 
 
@@ -182,6 +185,7 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
     logger.info("JEV_ENABLED: %s (api_key configured: %s)", config.jev_enabled, bool(config.typesafe_api_key))
     logger.info("DIRECTOR_ENABLED: %s", config.director_enabled)
+    logger.info("PUBLISH_ORIGINAL: %s", config.publish_original)
     logger.info("###########################\n")
 
 
@@ -312,6 +316,7 @@ def process_podcast_workflow() -> None:
             r2_custom_domain=config.r2_custom_domain,
             sns_promotion_count=config.sns_promotion_count,
             resume_from_audit=config.resume_from_audit,
+            publish_original=config.publish_original,
         )
     )
 
