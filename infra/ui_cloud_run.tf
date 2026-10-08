@@ -154,7 +154,10 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
       # （#72 Stage 8 の SA 改名では実際にそうした）。
       # （#166 で収録用の env を足したときも、dev への反映の間だけ外して戻した）。
       # （#174 で prod に収録用の env を足したときも、prod への反映の間だけ外して戻した）。
-      template[0].revision,
+      #
+      # ⚠️ #211: AUTOMATOR_JOB_NAME の環境変数を反映するため、いま一時的に外している。
+      # dev / prod への apply が済んだら、次のリリースで元に戻す。
+      # template[0].revision,
       template[0].labels,
       template[0].annotations,
       # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。
