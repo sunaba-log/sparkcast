@@ -4,6 +4,7 @@ import { getSessionUser } from "@/server/auth";
 import {
   findEpisode,
   listDirectorInterventions,
+  listPolicyFindings,
   markEpisodeEditing,
   updateDirectorInterventions,
 } from "@/server/episodes/data-repository";
@@ -14,7 +15,7 @@ const applySchema = z.object({
     id: z.string().min(1).max(200),
     correctionScript: z.string().min(1).max(10_000),
     status: z.enum(["pending", "approved", "rejected"]),
-  })).min(1),
+  })).default([]),
 });
 
 export async function POST(
@@ -36,11 +37,21 @@ export async function POST(
     }
 
     const input = applySchema.parse(await request.json());
-    if (!input.interventions.some((intervention) => intervention.status === "approved")) {
-      return NextResponse.json({ error: "承認した訂正案を1件以上選択してください" }, { status: 400 });
+    const [existingInterventions, policyFindings] = await Promise.all([
+      listDirectorInterventions(podcastId, episodeId),
+      listPolicyFindings(podcastId, episodeId),
+    ]);
+    if (policyFindings.some((finding) => finding.status === "pending")) {
+      return NextResponse.json({ error: "すべての音声校正項目を判断してください" }, { status: 409 });
+    }
+    if (
+      !input.interventions.some((intervention) => intervention.status === "approved")
+      && !policyFindings.some((finding) => finding.status === "approved")
+    ) {
+      return NextResponse.json({ error: "承認した校正項目を1件以上選択してください" }, { status: 400 });
     }
     const existingIds = new Set(
-      (await listDirectorInterventions(podcastId, episodeId)).map(
+      existingInterventions.map(
         (intervention) => intervention.id,
       ),
     );
@@ -53,12 +64,14 @@ export async function POST(
       return NextResponse.json({ error: "音声編集ジョブが設定されていません" }, { status: 503 });
     }
 
-    await updateDirectorInterventions({
-      podcastId,
-      episodeId,
-      interventions: input.interventions,
-      updatedBy: user.uid,
-    });
+    if (input.interventions.length > 0) {
+      await updateDirectorInterventions({
+        podcastId,
+        episodeId,
+        interventions: input.interventions,
+        updatedBy: user.uid,
+      });
+    }
     const response = await fetch(editorUrl, {
       method: "POST",
       headers: {
@@ -71,6 +84,7 @@ export async function POST(
         podcastId,
         episodeId,
         interventions: input.interventions.filter((intervention) => intervention.status === "approved"),
+        policyFindings: policyFindings.filter((finding) => finding.status === "approved"),
       }),
     });
     if (!response.ok) {

@@ -10,13 +10,18 @@ export type Podcast = {
   rssFeedPath: string | null;
   // 登場人物（読点・カンマ・改行区切り）。文字起こしの話者推定と議事録で使う（#166）
   castMembers?: string | null;
+  audioAuditPolicy: {
+    version: string;
+    confidentialTerms: string[];
+    allowedTerms: string[];
+  };
 };
 
 const DEFAULT_COVER_IMAGE_URL = "/images/default-podcast-cover.png";
 
 export async function getPodcast(podcastId: number): Promise<Podcast | null> {
   const result = await (await getDbPool()).query(
-    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path, cast_members
+    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path, cast_members, audio_audit_policy
      FROM podcasts
      WHERE podcast_id = $1`,
     [podcastId]
@@ -30,6 +35,15 @@ export async function getPodcast(podcastId: number): Promise<Podcast | null> {
     coverImageUrl: row.cover_image_url,
     rssFeedPath: row.rss_feed_path,
     castMembers: row.cast_members ?? null,
+    audioAuditPolicy: {
+      version: typeof row.audio_audit_policy?.version === "string" ? row.audio_audit_policy.version : "v1",
+      confidentialTerms: Array.isArray(row.audio_audit_policy?.confidential_terms)
+        ? row.audio_audit_policy.confidential_terms.map(String)
+        : [],
+      allowedTerms: Array.isArray(row.audio_audit_policy?.allowed_terms)
+        ? row.audio_audit_policy.allowed_terms.map(String)
+        : [],
+    },
   };
 }
 
@@ -89,6 +103,11 @@ export async function createPodcast(input: {
       description: row.description,
       coverImageUrl: row.cover_image_url,
       rssFeedPath: row.rss_feed_path,
+      audioAuditPolicy: {
+        version: "v1",
+        confidentialTerms: [],
+        allowedTerms: [],
+      },
     };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -178,11 +197,28 @@ export async function updatePodcast(input: {
   rssFeedPath?: string | null;
   // undefined のときは cast_members を変更しない
   castMembers?: string | null;
+  audioAuditPolicy?: { confidentialTerms: string[]; allowedTerms: string[] };
 }): Promise<void> {
   if (input.castMembers !== undefined) {
     await (await getDbPool()).query(
       `UPDATE podcasts SET cast_members = $2 WHERE podcast_id = $1`,
       [input.podcastId, input.castMembers],
+    );
+  }
+  if (input.audioAuditPolicy !== undefined) {
+    await (await getDbPool()).query(
+      `UPDATE podcasts
+       SET audio_audit_policy = jsonb_build_object(
+         'version', to_char(now(), 'YYYYMMDDHH24MISS'),
+         'confidential_terms', $2::jsonb,
+         'allowed_terms', $3::jsonb
+       )
+       WHERE podcast_id = $1`,
+      [
+        input.podcastId,
+        JSON.stringify(input.audioAuditPolicy.confidentialTerms),
+        JSON.stringify(input.audioAuditPolicy.allowedTerms),
+      ],
     );
   }
   if (input.rssFeedPath === undefined) {

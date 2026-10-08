@@ -27,6 +27,7 @@ import {
   DirectorInterventionMarkers,
   DirectorInterventionsPanel,
 } from "@/components/DirectorInterventionsPanel";
+import { PolicyFindingsPanel } from "@/components/PolicyFindingsPanel";
 
 type TabType = "overview" | "minutes" | "transcript" | "promotions" | "director";
 
@@ -51,6 +52,7 @@ const EPISODE_STATUS_LABELS: Record<string, string> = {
   processing: "処理中",
   auditing: "監査中",
   awaiting_approval: "承認待ち",
+  awaiting_publish_confirmation: "公開確認待ち",
   editing: "編集・合成中",
   completed: "完了",
   failed: "失敗",
@@ -842,22 +844,40 @@ export function EpisodeMasterDetail({
               )}
 
               {activeTab === "director" && (
-                <DirectorInterventionsPanel
-                  key={selectedEpisode.id}
-                  episodeId={selectedEpisode.id}
-                  episodeStatus={selectedEpisode.status}
-                  canSeek={Boolean(selectedEpisode.audioUrl)}
-                  onSeek={seekTo}
-                  onEditingStarted={() => {
-                    setEpisodes((previous) =>
-                      previous.map((episode) =>
-                        episode.id === selectedEpisode.id
-                          ? { ...episode, status: "editing" }
-                          : episode,
-                      ),
-                    );
-                  }}
-                />
+                <>
+                  <DirectorInterventionsPanel
+                    key={selectedEpisode.id}
+                    episodeId={selectedEpisode.id}
+                    episodeStatus={selectedEpisode.status}
+                    canSeek={Boolean(selectedEpisode.audioUrl)}
+                    onSeek={seekTo}
+                    onEditingStarted={() => {
+                      setEpisodes((previous) =>
+                        previous.map((episode) =>
+                          episode.id === selectedEpisode.id
+                            ? { ...episode, status: "editing" }
+                            : episode,
+                        ),
+                      );
+                    }}
+                  />
+                  <PolicyFindingsPanel
+                    key={`${selectedEpisode.id}-policy`}
+                    episodeId={selectedEpisode.id}
+                    episodeStatus={selectedEpisode.status}
+                    canSeek={Boolean(selectedEpisode.audioUrl)}
+                    onSeek={seekTo}
+                    onStatusChanged={(nextStatus) => {
+                      setEpisodes((previous) =>
+                        previous.map((episode) =>
+                          episode.id === selectedEpisode.id
+                            ? { ...episode, status: nextStatus }
+                            : episode,
+                        ),
+                      );
+                    }}
+                  />
+                </>
               )}
             </div>
 

@@ -9,6 +9,8 @@ import type {
   DirectorInterventionStatus,
   EpisodePromotion,
   EpisodeStatus,
+  PolicyFinding,
+  PolicyFindingStatus,
   TranscriptSegment,
 } from "@/types/episode";
 
@@ -55,6 +57,18 @@ type FirestoreDirectorIntervention = {
     score?: number;
     choice?: string;
   };
+  status?: string;
+};
+
+type FirestorePolicyFinding = {
+  chunk_id?: string;
+  category?: string;
+  source?: string;
+  start_ms?: number;
+  end_ms?: number;
+  text?: string;
+  entity_type?: string | null;
+  action?: string;
   status?: string;
 };
 
@@ -229,6 +243,63 @@ export async function updateDirectorInterventions(input: {
   await batch.commit();
 }
 
+function toPolicyFinding(id: string, data: FirestorePolicyFinding): PolicyFinding {
+  const category =
+    data.category === "pii" || data.category === "confidential_information" || data.category === "third_party_risk"
+      ? data.category
+      : "pii";
+  const source = data.source === "jev" ? "jev" : "presidio";
+  const status: PolicyFindingStatus =
+    data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  return {
+    id,
+    chunkId: String(data.chunk_id ?? ""),
+    category,
+    source,
+    start: Number(data.start_ms ?? 0) / 1_000,
+    end: Number(data.end_ms ?? 0) / 1_000,
+    text: String(data.text ?? ""),
+    entityType: data.entity_type ? String(data.entity_type) : null,
+    action: "silence",
+    status,
+  };
+}
+
+export async function listPolicyFindings(
+  podcastId: number,
+  episodeId: number,
+): Promise<PolicyFinding[]> {
+  const snapshot = await episodeContentRef(podcastId, episodeId)
+    .collection("policy_findings")
+    .get();
+  return snapshot.docs
+    .map((document) => toPolicyFinding(document.id, document.data() as FirestorePolicyFinding))
+    .sort((left, right) => left.start - right.start || left.id.localeCompare(right.id));
+}
+
+export async function updatePolicyFindings(input: {
+  podcastId: number;
+  episodeId: number;
+  findings: Array<Pick<PolicyFinding, "id" | "status">>;
+  updatedBy: string;
+}): Promise<void> {
+  const batch = getAdminFirestore().batch();
+  const collection = episodeContentRef(input.podcastId, input.episodeId)
+    .collection("policy_findings");
+  for (const finding of input.findings) {
+    batch.set(
+      collection.doc(finding.id),
+      {
+        status: finding.status,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: input.updatedBy,
+      },
+      { merge: true },
+    );
+  }
+  await batch.commit();
+}
+
 export async function markEpisodeEditing(
   podcastId: number,
   episodeId: number,
@@ -237,6 +308,32 @@ export async function markEpisodeEditing(
     `UPDATE episodes
      SET status = 'editing', processing_error = NULL, updated_at = now()
      WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_approval'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function markEpisodeAwaitingPublishConfirmation(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'awaiting_publish_confirmation', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_approval'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function markEpisodePublishingOriginal(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'processing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_publish_confirmation'`,
     [podcastId, episodeId],
   );
   return result.rowCount === 1;
@@ -494,5 +591,3 @@ export async function updateEpisodeMetadata(
   );
   return result.rowCount === 1;
 }
-
-

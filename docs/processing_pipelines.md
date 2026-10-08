@@ -229,6 +229,8 @@ Jev には `confidential_information` と `third_party_risk` の型付き `Noul`
 
 番組管理者は `podcasts.audio_audit_policy` の `confidential_terms` と `allowed_terms` を番組ごとに管理し、変更時に `version` を更新します。各 finding にそのバージョンを保存することで、判断時点のポリシーを追跡できます。
 
+`policy_findings` は UI で全件を `approved` または `rejected` に判断するまで、編集・公開を開始できません。承認済み finding は既存の音声編集ジョブへ `policyFindings` として渡され、原音声を変更せず新しいレンディションを生成します。全件を却下した場合は `awaiting_publish_confirmation` へ遷移し、管理者が原音声の公開を明示確認した場合だけ、監査を再実行せずに R2 と RSS の公開を再開します。
+
 ### 4.4 Jev 監査用 UtteranceChunk の文再構成仕様
 
 #### 現状の課題

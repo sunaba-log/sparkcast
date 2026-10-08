@@ -6,6 +6,7 @@ const statusConfig: Record<EpisodeStatus, { label: string; className: string }> 
   processing: { label: "処理中", className: "bg-yellow-100 text-yellow-800" },
   auditing: { label: "監査中", className: "bg-purple-100 text-purple-800" },
   awaiting_approval: { label: "承認待ち", className: "bg-amber-100 text-amber-800" },
+  awaiting_publish_confirmation: { label: "公開確認待ち", className: "bg-orange-100 text-orange-800" },
   editing: { label: "編集・合成中", className: "bg-indigo-100 text-indigo-800" },
   completed: { label: "完了", className: "bg-green-100 text-green-800" },
   failed: { label: "失敗", className: "bg-red-100 text-red-800" },

@@ -88,6 +88,7 @@ class ProcessPodcastWorkflowInput:
     r2_custom_domain: str
     sns_promotion_count: int = 3
     resume_from_audit: bool = False
+    publish_original: bool = False
 
 
 class ProcessPodcastWorkflow:
@@ -288,7 +289,7 @@ class ProcessPodcastWorkflow:
                         )
 
             # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170)
-            if self._fact_check_auditor is not None:
+            if self._fact_check_auditor is not None and not request.publish_original:
                 if not transcription.segments:
                     raise ReviewIncompleteError(
                         "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。"

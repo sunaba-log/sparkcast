@@ -8,6 +8,7 @@ export type AutomatorJobTriggerInput = {
   podcastId?: number;
   gcsTriggerObjectName?: string;
   resumeFromAudit?: boolean;
+  publishOriginal?: boolean;
 };
 
 export function buildAutomatorJobOverrides(input: AutomatorJobTriggerInput) {
@@ -24,6 +25,9 @@ export function buildAutomatorJobOverrides(input: AutomatorJobTriggerInput) {
   }
   if (input.resumeFromAudit) {
     env.push({ name: "RESUME_FROM_AUDIT", value: "true" });
+  }
+  if (input.publishOriginal) {
+    env.push({ name: "PUBLISH_ORIGINAL", value: "true" });
   }
 
   return {
