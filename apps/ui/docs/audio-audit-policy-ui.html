@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>音声校正ポリシー監査 | 画面設計書</title>
+  <style>
+    :root {
+      --ink: #1d2939; --muted: #667085; --line: #d0d5dd; --canvas: #f8fafc;
+      --brand: #155eef; --brand-dark: #004eeb; --success: #067647; --warning: #b54708;
+      --danger: #b42318; --card: #fff; --amber-bg: #fffaeb; --orange-bg: #fff6ed;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.55; }
+    button, input, textarea { font: inherit; }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 32px 24px 72px; }
+    .document-header { display: flex; justify-content: space-between; gap: 24px; align-items: start; margin-bottom: 24px; }
+    h1 { font-size: 25px; margin: 0 0 6px; } h2 { font-size: 17px; margin: 0; } h3 { font-size: 15px; margin: 0; }
+    p { margin: 0; } .muted { color: var(--muted); font-size: 14px; }
+    .tag, .badge { display: inline-flex; align-items: center; border-radius: 999px; font-size: 12px; font-weight: 700; padding: 3px 9px; }
+    .tag { background: #e0eaff; color: #004eeb; } .badge.warning { background: #fef0c7; color: #93370d; } .badge.pii { background: #fef3f2; color: #b42318; }
+    .badge.secret { background: #fdf2fa; color: #c11574; } .badge.risk { background: #fff6ed; color: #b54708; } .badge.done { background: #ecfdf3; color: #067647; }
+    .tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+    .tab { border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); cursor: pointer; padding: 12px 16px 10px; font-weight: 700; white-space: nowrap; }
+    .tab[aria-selected="true"] { color: var(--brand); border-color: var(--brand); }
+    .screen { display: none; } .screen.active { display: block; }
+    .layout { display: grid; grid-template-columns: 255px minmax(0, 1fr); gap: 20px; }
+    .sidebar, .panel, .callout { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+    .sidebar { padding: 14px; } .episode { border-radius: 8px; padding: 12px; background: #eff4ff; border: 1px solid #b2ccff; }
+    .episode strong { display: block; font-size: 14px; margin-bottom: 4px; } .episode small { color: var(--muted); }
+    .panel { padding: 24px; } .panel-header { display: flex; gap: 16px; justify-content: space-between; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 18px; }
+    .section-intro { font-size: 14px; color: var(--muted); margin-top: 5px; max-width: 700px; }
+    .findings { display: grid; gap: 12px; }
+    .finding { border: 1px solid #fecdca; border-radius: 10px; padding: 16px; background: #fff; }
+    .finding-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .timestamp { border: 0; background: transparent; padding: 0; color: var(--brand); cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+    .quote { background: #f9fafb; border-radius: 7px; margin: 12px 0; padding: 11px 12px; font-size: 14px; }
+    .decision { display: flex; gap: 8px; flex-wrap: wrap; }
+    .button { border: 1px solid transparent; border-radius: 7px; cursor: pointer; padding: 9px 13px; font-size: 13px; font-weight: 700; }
+    .button.primary { color: #fff; background: var(--brand); } .button.primary:hover { background: var(--brand-dark); }
+    .button.approve { background: #fff; border-color: #12b76a; color: var(--success); } .button.approve.selected { background: var(--success); color: #fff; }
+    .button.reject { background: #fff; border-color: #98a2b3; color: #475467; } .button.reject.selected { background: #475467; color: #fff; }
+    .button.orange { color: #fff; background: var(--warning); } .button:disabled { cursor: not-allowed; opacity: .45; }
+    .footer-action { display: flex; gap: 12px; align-items: center; margin-top: 18px; }
+    .status-message { color: var(--success); font-size: 14px; font-weight: 600; }
+    .callout { margin-top: 20px; padding: 16px; background: #f9fafb; }
+    .callout ul { margin: 8px 0 0; padding-left: 20px; color: #475467; font-size: 14px; }
+    .confirmation { max-width: 680px; border: 1px solid #fedf89; border-radius: 12px; padding: 24px; background: var(--orange-bg); }
+    .confirmation h2 { color: #7a2e0e; margin-bottom: 10px; }.confirmation p { color: #7a2e0e; }
+    .warning-list { margin: 16px 0; padding-left: 20px; color: #7a2e0e; font-size: 14px; }
+    .field { margin-top: 18px; } .field label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    textarea { width: 100%; min-height: 108px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; color: var(--ink); }
+    .helper { color: var(--muted); font-size: 12px; margin-top: 5px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; margin-top: 18px; }
+    .flow-step { padding: 8px 10px; border-radius: 7px; background: #f2f4f7; font-weight: 700; } .flow-step.active { color: #fff; background: var(--brand); } .arrow { color: #98a2b3; }
+    .annotation { margin-top: 12px; border-left: 3px solid var(--brand); padding: 7px 10px; background: #eff4ff; color: #344054; font-size: 13px; }
+    @media (max-width: 780px) { .shell { padding: 20px 14px 48px; } .document-header, .panel-header { display: block; } .document-header .tag { margin-top: 10px; } .layout, .settings-grid { grid-template-columns: 1fr; } .sidebar { display: none; } .panel { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="document-header">
+      <div>
+        <h1>音声校正ポリシー監査 — 画面設計書</h1>
+        <p class="muted">Issue #211 / Episode Master Detail と設定画面に追加する承認・最終公開確認フロー</p>
+      </div>
+      <span class="tag">静的モックアップ · 2026-10-09</span>
+    </header>
+
+    <nav class="tabs" aria-label="画面設計">
+      <button class="tab" aria-selected="true" data-screen="review">1. finding の承認・却下</button>
+      <button class="tab" aria-selected="false" data-screen="confirm">2. 原音声の最終公開確認</button>
+      <button class="tab" aria-selected="false" data-screen="settings">3. 番組ポリシー設定</button>
+    </nav>
+
+    <section class="screen active" id="review">
+      <div class="layout">
+        <aside class="sidebar" aria-label="エピソード一覧の要約">
+          <p class="muted" style="font-weight:700;margin:4px 4px 12px">エピソード</p>
+          <div class="episode">
+            <strong>#42 AI は何を覚えている？</strong>
+            <small>2026/10/08 · 42:18</small>
+            <div style="margin-top:9px"><span class="badge warning">承認待ち</span></div>
+          </div>
+        </aside>
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>音声校正ポリシー監査 <span class="badge warning">3件の要確認</span></h2>
+              <p class="section-intro">検知項目をすべて承認または却下してください。承認された項目は、原音声を変更せず、新しい音声レンディションで <code>silence</code> として処理されます。</p>
+            </div>
+            <span class="badge warning">awaiting_approval</span>
+          </div>
+          <div class="findings" id="findings">
+            <article class="finding" data-id="phone">
+              <div class="finding-top"><button class="timestamp" type="button">12:04.300 – 12:08.800</button><span class="badge pii">PII</span><span class="badge">JP_PHONE_NUMBER</span></div>
+              <p class="quote">「詳しくは 090-1234-5678 に連絡してください。」</p>
+              <div class="decision"><button class="button approve" data-decision="approved">承認して無音化</button><button class="button reject" data-decision="rejected">却下</button></div>
+            </article>
+            <article class="finding" data-id="secret">
+              <div class="finding-top"><button class="timestamp" type="button">18:36.100 – 18:43.900</button><span class="badge secret">機密情報</span><span class="badge">CUSTOM_TERM</span></div>
+              <p class="quote">「例の未公開プロジェクト名は、来月から社内で…」</p>
+              <div class="decision"><button class="button approve" data-decision="approved">承認して無音化</button><button class="button reject" data-decision="rejected">却下</button></div>
+            </article>
+            <article class="finding" data-id="risk">
+              <div class="finding-top"><button class="timestamp" type="button">31:10.000 – 31:18.600</button><span class="badge risk">第三者リスク</span><span class="badge">Jev</span></div>
+              <p class="quote">「あの会社は顧客情報をちゃんと扱っていないらしい。」</p>
+              <div class="decision"><button class="button approve" data-decision="approved">承認して無音化</button><button class="button reject" data-decision="rejected">却下</button></div>
+            </article>
+          </div>
+          <div class="footer-action">
+            <button class="button primary" id="save-review" disabled>すべての判断を確定</button>
+            <span id="review-message" class="muted">全 3 件を判断すると確定できます。</span>
+          </div>
+          <div class="callout">
+            <h3>設計ルール</h3>
+            <ul><li>サーバーは全 finding ID の提出を必須にする。未判断・改ざん ID は 400 で拒否。</li><li>1件でも承認なら編集開始ボタンを表示し、編集ジョブには承認済み finding のみを渡す。</li><li>全件却下なら最終公開確認状態へ遷移する。</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="confirm">
+      <div class="layout">
+        <aside class="sidebar"><p class="muted" style="font-weight:700;margin:4px 4px 12px">エピソード</p><div class="episode"><strong>#42 AI は何を覚えている？</strong><small>すべての finding を却下済み</small><div style="margin-top:9px"><span class="badge risk">公開確認待ち</span></div></div></aside>
+        <div class="panel">
+          <div class="panel-header"><div><h2>原音声の最終公開確認</h2><p class="section-intro">全件を却下したため、原音声をそのまま公開するには明示的な確認が必要です。</p></div><span class="badge risk">awaiting_publish_confirmation</span></div>
+          <div class="confirmation">
+            <h2>このまま原音声を公開しますか？</h2>
+            <p>公開すると、R2 への音声配置と RSS 更新ジョブを開始します。</p>
+            <ul class="warning-list"><li>原音声の該当発話は無音化されません。</li><li>公開前監査は再実行せず、今回保存した却下判断を使用します。</li><li>この操作後、エピソードは「処理中」になります。</li></ul>
+            <button class="button orange" id="confirm-publish">原音声を公開する</button>
+            <p id="confirm-message" class="helper" style="margin-top:12px">確認操作は `POST /confirm-original-publish` を実行します。</p>
+          </div>
+          <div class="flow"><span class="flow-step">awaiting_approval</span><span class="arrow">→</span><span class="flow-step active">awaiting_publish_confirmation</span><span class="arrow">→</span><span class="flow-step">processing</span><span class="arrow">→</span><span class="flow-step">completed</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="settings">
+      <div class="panel">
+        <div class="panel-header"><div><h2>番組設定 / 音声監査ポリシー</h2><p class="section-intro">番組管理者が辞書と許可語を番組単位で管理します。保存時にはポリシーバージョンを自動更新します。</p></div><span class="badge done">version: 20261009061542</span></div>
+        <div class="settings-grid">
+          <div class="field"><label for="confidential">音声監査: 機密語句</label><textarea id="confidential">未公開プロジェクト名
+社内コードネーム</textarea><p class="helper">1行に1語句。一致した発話を機密情報として承認待ちにします。</p></div>
+          <div class="field"><label for="allowed">音声監査: 許可語句</label><textarea id="allowed">public@example.com
+Sparkcast 株式会社</textarea><p class="helper">1行に1語句。ローカル PII・カスタム語句検知から除外します。</p></div>
+        </div>
+        <div class="annotation">保存される構造: <code>{ version, confidential_terms, allowed_terms }</code>。finding には検知時のバージョンを保存し、判断時点のポリシーを追跡します。</div>
+        <div class="footer-action"><button class="button primary" id="save-settings">設定を保存</button><span id="settings-message" class="muted">未保存の変更はありません。</span></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const screens = document.querySelectorAll(".screen");
+    tabs.forEach((tab) => tab.addEventListener("click", () => {
+      tabs.forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+      screens.forEach((screen) => screen.classList.toggle("active", screen.id === tab.dataset.screen));
+    }));
+    const saveReview = document.querySelector("#save-review");
+    const reviewMessage = document.querySelector("#review-message");
+    document.querySelectorAll("[data-decision]").forEach((button) => button.addEventListener("click", () => {
+      const finding = button.closest(".finding");
+      finding.querySelectorAll("[data-decision]").forEach((choice) => choice.classList.remove("selected"));
+      button.classList.add("selected");
+      const decided = [...document.querySelectorAll(".finding")].every((item) => item.querySelector(".selected"));
+      saveReview.disabled = !decided;
+      reviewMessage.textContent = decided ? "すべての判断を保存できます。" : "全 3 件を判断すると確定できます。";
+    }));
+    saveReview.addEventListener("click", () => {
+      const approved = document.querySelectorAll('[data-decision="approved"].selected').length;
+      reviewMessage.className = "status-message";
+      reviewMessage.textContent = approved ? "判断を保存しました。承認済み項目の音声編集を開始できます。" : "すべて却下しました。原音声の最終公開確認が必要です。";
+    });
+    document.querySelector("#confirm-publish").addEventListener("click", () => {
+      document.querySelector("#confirm-message").textContent = "公開ジョブを開始しました。エピソードの状態は「処理中」です。";
+    });
+    document.querySelector("#save-settings").addEventListener("click", () => {
+      document.querySelector("#settings-message").textContent = "設定を保存しました。ポリシーバージョンを更新しました。";
+      document.querySelector("#settings-message").className = "status-message";
+    });
+  </script>
+</body>
+</html>
