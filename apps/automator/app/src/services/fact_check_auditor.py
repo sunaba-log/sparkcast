@@ -267,9 +267,7 @@ class FactCheckAuditor:
             )
             allowed = {term.casefold() for term in policy.allowed_terms}
             if any(
-                term
-                and term.casefold() not in allowed
-                and term.casefold() in chunk.text.casefold()
+                term and term.casefold() not in allowed and term.casefold() in chunk.text.casefold()
                 for term in policy.confidential_terms
             ):
                 policy_findings.append(

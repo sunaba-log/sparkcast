@@ -94,6 +94,7 @@ class PolicyFinding:
             "created_at": self.created_at,
         }
 
+
 # 客観的事実主張と判定する最小のNoul閾値(感想・挨拶・相槌の除外)
 MIN_FACT_NOUL_THRESHOLD: float = 0.6
 

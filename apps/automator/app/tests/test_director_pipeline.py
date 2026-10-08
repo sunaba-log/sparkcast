@@ -238,7 +238,10 @@ def test_fact_check_auditor_bundle_creates_timestamped_policy_findings():
         ("pii", "presidio"),
         ("confidential_information", "jev"),
     }
-    assert all((finding.start_ms, finding.end_ms, finding.policy_version) == (1200, 3400, "v7") for finding in bundle.policy_findings)
+    assert all(
+        (finding.start_ms, finding.end_ms, finding.policy_version) == (1200, 3400, "v7")
+        for finding in bundle.policy_findings
+    )
 
 
 def test_fact_check_auditor_sync_batch_multiple_chunks():
