@@ -309,12 +309,11 @@ class ProcessPodcastWorkflow:
                     or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
                 ):
                     raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
-                severe_items = [(c, m) for c, m in audit_results if m.score >= INTERVENTION_THRESHOLD_SCORE]
+                severe_items = [(c, m) for c, m in audit_results if m.should_intervene()]
                 self._logger.info(
-                    "Jev audit finished: %d chunks, %d severe errors (Score >= %d)",
+                    "Jev audit finished: %d chunks, %d interventions needed (composite criteria)",
                     len(chunks),
                     len(severe_items),
-                    INTERVENTION_THRESHOLD_SCORE,
                 )
 
                 interventions = []
