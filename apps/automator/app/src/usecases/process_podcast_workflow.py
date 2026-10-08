@@ -298,9 +298,7 @@ class ProcessPodcastWorkflow:
                     podcast_id=episode_ref.podcast_id,
                     episode_id=episode_ref.episode_id,
                 )
-                chunks = [
-                    UtteranceChunk.from_segment(seg, idx) for idx, seg in enumerate(transcription.segments, start=1)
-                ]
+                chunks = UtteranceChunk.from_segments(transcription.segments)
                 audit_results = self._fact_check_auditor.audit_chunks(chunks)
                 expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
                 if (

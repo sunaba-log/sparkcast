@@ -27,6 +27,80 @@ from usecases.process_podcast_workflow import (
     ProcessPodcastWorkflowInput,
 )
 
+# --- Utterance Chunk Assembly Tests ---
+
+
+def test_utterance_chunks_join_same_speaker_until_a_sentence_ends():
+    """同一話者で分断された文を、Jev 監査前に1チャンクへ再構成すること."""
+    chunks = UtteranceChunk.from_segments(
+        [
+            TranscriptSegment(start=0.0, end=1.0, text="Python 3.12 は", speaker="小野", speaker_id="ono"),
+            TranscriptSegment(start=1.1, end=2.5, text="GIL を削除しました。", speaker="小野", speaker_id="ono"),
+        ]
+    )
+
+    assert len(chunks) == 1
+    assert chunks[0].text == "Python 3.12 は GIL を削除しました。"
+    assert chunks[0].segment_ids == ("seg_00001", "seg_00002")
+    assert (chunks[0].start_ms, chunks[0].end_ms) == (0, 2500)
+    assert chunks[0].is_complete_sentence is True
+    assert chunks[0].completion_reason == "sentence_terminator"
+
+
+def test_utterance_chunks_split_multiple_sentences_from_one_segment():
+    """1 セグメントに複数文が含まれても、それぞれを完結文として監査すること."""
+    chunks = UtteranceChunk.from_segments(
+        [TranscriptSegment(start=0.0, end=3.0, text="最初の文です。次の文です。", speaker="数森")]
+    )
+
+    assert [chunk.text for chunk in chunks] == ["最初の文です。", "次の文です。"]
+    assert all(chunk.segment_ids == ("seg_00001",) for chunk in chunks)
+    assert all(chunk.is_complete_sentence for chunk in chunks)
+
+
+def test_utterance_chunks_do_not_cross_speaker_boundary():
+    """話者交替で終端した未完の発話を、次話者へ結合しないこと."""
+    chunks = UtteranceChunk.from_segments(
+        [
+            TranscriptSegment(start=0.0, end=1.0, text="それは", speaker="小野", speaker_id="ono"),
+            TranscriptSegment(start=1.1, end=2.0, text="違います。", speaker="高島", speaker_id="takashima"),
+        ]
+    )
+
+    assert [chunk.text for chunk in chunks] == ["それは", "違います。"]
+    assert chunks[0].is_complete_sentence is False
+    assert chunks[0].completion_reason == "speaker_change"
+    assert chunks[1].is_complete_sentence is True
+
+
+def test_utterance_chunks_bound_unpunctuated_long_speech():
+    """句読点のない長い発話は文字数上限で確定すること."""
+    chunks = UtteranceChunk.from_segments(
+        [
+            TranscriptSegment(start=0.0, end=1.0, text="a" * 500, speaker="小野"),
+            TranscriptSegment(start=1.1, end=2.0, text="b", speaker="小野"),
+        ]
+    )
+
+    assert [chunk.text for chunk in chunks] == ["a" * 500, "b"]
+    assert chunks[0].completion_reason == "maximum_characters"
+    assert chunks[1].completion_reason == "transcript_end"
+
+
+def test_utterance_chunks_bound_unpunctuated_long_duration():
+    """句読点のない長い発話は時間上限で確定すること."""
+    chunks = UtteranceChunk.from_segments(
+        [
+            TranscriptSegment(start=0.0, end=20.0, text="前半の発話", speaker="小野"),
+            TranscriptSegment(start=20.1, end=31.0, text="後半の発話", speaker="小野"),
+        ]
+    )
+
+    assert [chunk.text for chunk in chunks] == ["前半の発話", "後半の発話"]
+    assert chunks[0].completion_reason == "maximum_duration"
+    assert chunks[1].completion_reason == "transcript_end"
+
+
 # --- Jev Auditor Tests ---
 
 
@@ -81,6 +155,33 @@ async def test_fact_check_auditor_mock_success():
     assert "noul" in call_kwargs["questions"]
     assert "score" in call_kwargs["questions"]
     assert "choice" in call_kwargs["questions"]
+
+
+@pytest.mark.anyio
+async def test_fact_check_auditor_marks_incomplete_chunk_in_state():
+    """不完全文を Jev へ渡す場合、文脈が欠ける可能性を明示すること."""
+    mock_client = AsyncMock()
+    mock_client.system_one.return_value = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.5),
+            "score": MagicMock(score=0.0, confidence=0.9),
+            "choice": MagicMock(choice="other"),
+        }
+    )
+    chunk = UtteranceChunk(
+        "utt_00001_00001_00001",
+        "小野",
+        0,
+        1000,
+        "この機能は無料で",
+        is_complete_sentence=False,
+        completion_reason="transcript_end",
+    )
+
+    await FactCheckAuditor(client=mock_client).audit_single_chunk_async(mock_client, chunk)
+
+    state = mock_client.system_one.call_args.kwargs["state"]
+    assert "切れている可能性があります" in state
 
 
 def test_fact_check_auditor_sync_batch_multiple_chunks():

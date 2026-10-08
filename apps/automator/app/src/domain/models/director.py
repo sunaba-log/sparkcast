@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from domain.models.transcript import TranscriptSegment
 
 # エラー分類
@@ -39,10 +42,24 @@ BENIGN_SCORE_THRESHOLD: int = 1
 MINOR_ERROR_SCORE: int = 2
 SEVERE_ERROR_MIN_SCORE: int = 3
 
+MAX_UTTERANCE_CHUNK_DURATION_MS = 30_000
+MAX_UTTERANCE_CHUNK_CHARACTERS = 500
+_SENTENCE_END = re.compile(r"[。！？!?][」』”’）〕〉》】]*")  # noqa: RUF001
+_WHITESPACE = re.compile(r"\s+")
+
+
+ChunkCompletionReason = Literal[
+    "sentence_terminator",
+    "speaker_change",
+    "transcript_end",
+    "maximum_duration",
+    "maximum_characters",
+]
+
 
 @dataclass(frozen=True)
 class UtteranceChunk:
-    """話者とミリ秒単位タイムスタンプを持つ発話チャンク."""
+    """話者・時刻・構成元を持つ Jev 監査用の発話チャンク."""
 
     chunk_id: str
     speaker: str
@@ -50,18 +67,129 @@ class UtteranceChunk:
     end_ms: int
     text: str
     speaker_id: str | None = None
+    segment_ids: tuple[str, ...] = field(default=(), compare=False)
+    is_complete_sentence: bool = field(default=True, compare=False)
+    completion_reason: ChunkCompletionReason = field(default="sentence_terminator", compare=False)
 
     @classmethod
     def from_segment(cls, segment: TranscriptSegment, index: int) -> UtteranceChunk:
-        """TranscriptSegment からミリ秒タイムスタンプ付きチャンクを生成する."""
+        """後方互換のため、単一の TranscriptSegment を監査チャンクへ変換する."""
+        text = _WHITESPACE.sub(" ", segment.text).strip()
+        sentence_end = _SENTENCE_END.search(text)
+        is_complete_sentence = sentence_end is not None and sentence_end.end() == len(text)
         return cls(
             chunk_id=f"seg_{index:05d}",
             speaker=segment.speaker,
             speaker_id=segment.speaker_id,
             start_ms=round(segment.start * 1000),
             end_ms=round(segment.end * 1000),
-            text=segment.text,
+            text=text,
+            segment_ids=(f"seg_{index:05d}",),
+            is_complete_sentence=is_complete_sentence,
+            completion_reason="sentence_terminator" if is_complete_sentence else "transcript_end",
         )
+
+    @classmethod
+    def from_segments(cls, segments: Sequence[TranscriptSegment]) -> list[UtteranceChunk]:
+        """同一話者の連続セグメントを完結文優先の監査チャンクに再構成する."""
+        chunks: list[UtteranceChunk] = []
+        buffer: list[tuple[int, TranscriptSegment, str]] = []
+
+        def normalize(text: str) -> str:
+            return _WHITESPACE.sub(" ", text).strip()
+
+        def buffer_text() -> str:
+            return " ".join(text for _, _, text in buffer)
+
+        def append_chunk(
+            source: list[tuple[int, TranscriptSegment, str]],
+            text: str,
+            reason: ChunkCompletionReason,
+            *,
+            complete: bool,
+        ) -> None:
+            if not source:
+                return
+            first_index, first_segment, _ = source[0]
+            last_index, last_segment, _ = source[-1]
+            chunk_id = (
+                f"seg_{first_index:05d}" if first_index == last_index else f"seg_{first_index:05d}_{last_index:05d}"
+            )
+            if any(chunk.chunk_id == chunk_id for chunk in chunks):
+                chunk_id = f"{chunk_id}_{len(chunks) + 1:05d}"
+            chunks.append(
+                cls(
+                    chunk_id=chunk_id,
+                    speaker=first_segment.speaker,
+                    speaker_id=first_segment.speaker_id,
+                    start_ms=round(first_segment.start * 1000),
+                    end_ms=round(last_segment.end * 1000),
+                    text=text,
+                    segment_ids=tuple(f"seg_{index:05d}" for index, _, _ in source),
+                    is_complete_sentence=complete,
+                    completion_reason=reason,
+                )
+            )
+
+        def flush(reason: ChunkCompletionReason, *, complete: bool) -> None:
+            if not buffer:
+                return
+            append_chunk(buffer, buffer_text(), reason, complete=complete)
+            buffer.clear()
+
+        def flush_complete_sentences() -> None:
+            while buffer:
+                text = buffer_text()
+                match = _SENTENCE_END.search(text)
+                if match is None:
+                    return
+
+                consumed: list[tuple[int, TranscriptSegment, str]] = []
+                remaining: list[tuple[int, TranscriptSegment, str]] = []
+                prefix_end = match.end()
+                cursor = 0
+                for index, segment, segment_text in buffer:
+                    segment_start = cursor
+                    segment_end = segment_start + len(segment_text)
+                    if segment_start < prefix_end:
+                        consumed_length = min(len(segment_text), prefix_end - segment_start)
+                        consumed_text = segment_text[:consumed_length].rstrip()
+                        if consumed_text:
+                            consumed.append((index, segment, consumed_text))
+                        remaining_text = segment_text[consumed_length:].lstrip()
+                        if remaining_text:
+                            remaining.append((index, segment, remaining_text))
+                    else:
+                        remaining.append((index, segment, segment_text))
+                    cursor = segment_end + 1
+
+                append_chunk(consumed, text[:prefix_end].strip(), "sentence_terminator", complete=True)
+                buffer[:] = remaining
+
+        for index, segment in enumerate(segments, start=1):
+            text = normalize(segment.text)
+            if not text:
+                continue
+
+            if buffer:
+                _, current_speaker, _ = buffer[0]
+                same_speaker = (
+                    current_speaker.speaker_id == segment.speaker_id
+                    if current_speaker.speaker_id is not None and segment.speaker_id is not None
+                    else current_speaker.speaker == segment.speaker
+                )
+                if not same_speaker:
+                    flush("speaker_change", complete=False)
+                elif round(segment.end * 1000) - round(buffer[0][1].start * 1000) > MAX_UTTERANCE_CHUNK_DURATION_MS:
+                    flush("maximum_duration", complete=False)
+                elif len(buffer_text()) + 1 + len(text) > MAX_UTTERANCE_CHUNK_CHARACTERS:
+                    flush("maximum_characters", complete=False)
+
+            buffer.append((index, segment, text))
+            flush_complete_sentences()
+
+        flush("transcript_end", complete=False)
+        return chunks
 
 
 @dataclass(frozen=True)

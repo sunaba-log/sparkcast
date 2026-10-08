@@ -107,7 +107,12 @@ class FactCheckAuditor:
         chunk: UtteranceChunk,
     ) -> tuple[UtteranceChunk, FactCheckAuditMetric]:
         """1つの発話チャンクに対して Noul, Score, Choice を同時に並行評価する."""
-        state = f"話者: {chunk.speaker}\n発話: {chunk.text}"
+        completion_note = (
+            "この発話は文末まで確認できた完結文です。"
+            if chunk.is_complete_sentence
+            else "この発話は話者交替・文字起こし末尾・上限で切れている可能性があります。"
+        )
+        state = f"話者: {chunk.speaker}\n発話: {chunk.text}\n注記: {completion_note}"
         questions = {
             "noul": Noul(instructions=NOUL_INSTRUCTIONS),
             "score": Score(instructions=SCORE_INSTRUCTIONS, criteria=SCORE_CRITERIA),
