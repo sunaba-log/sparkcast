@@ -258,11 +258,7 @@ export function SNSPostMasterDetail({
   return (
     <div className="flex flex-col h-full space-y-4">
       {!detailOnly && (
-        <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">SNS投稿</span>
-        </div>
+        <h1 className="shrink-0 text-sm font-bold text-gray-900">SNS投稿</h1>
       )}
 
       {/* Master-Detail Container */}

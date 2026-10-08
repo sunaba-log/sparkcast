@@ -102,13 +102,8 @@ export function TopicProposalEditor({
 
   return (
     <div className="space-y-5">
-      {/* Header Bar with Breadcrumbs and Date Pagination */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-start text-xs text-gray-500 gap-2">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">次回議題</span>
-        </div>
+        <h1 className="text-sm font-bold text-gray-900">次回議題</h1>
 
         {/* Date Switcher Bar */}
         <div className="flex items-center flex-wrap gap-2 text-xs justify-center">

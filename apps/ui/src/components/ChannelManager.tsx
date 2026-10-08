@@ -164,12 +164,6 @@ export function ChannelManager({
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center text-xs text-gray-500 gap-2">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">チャンネル管理</span>
-      </div>
-
       {error && (
         <p className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}

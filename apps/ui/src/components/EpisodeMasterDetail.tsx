@@ -399,12 +399,7 @@ export function EpisodeMasterDetail({
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      {/* Breadcrumb / Header */}
-      <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">エピソード</span>
-      </div>
+      <h1 className="shrink-0 text-sm font-bold text-gray-900">エピソード</h1>
 
       {/* Master-Detail Container */}
       <div className="flex-1 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-12">
