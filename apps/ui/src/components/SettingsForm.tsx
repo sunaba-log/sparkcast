@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Save, Radio, Rss, Key, RefreshCw, Eye, EyeOff, Users } from "lucide-react";
 
+type ChannelSecretsResponse = {
+  x_api_key?: string;
+  x_api_secret?: string;
+  x_access_token?: string;
+  x_access_token_secret?: string;
+  discord_bot_token?: string;
+  error?: string;
+};
+
 export function SettingsForm({
   podcastId,
   title: initialTitle,
@@ -57,23 +66,27 @@ export function SettingsForm({
     async function fetchSecrets() {
       try {
         setLoadingSecrets(true);
+        setSecretsError("");
         const response = await fetch(`/api/podcasts/${podcastId}/secrets`);
-        if (response.ok) {
-          const data = await response.json();
-          setXApiKey(data.x_api_key || "");
-          setXApiSecret(data.x_api_secret || "");
-          setXAccessToken(data.x_access_token || "");
-          setXAccessTokenSecret(data.x_access_token_secret || "");
-          setDiscordBotToken(data.discord_bot_token || "");
-        } else {
-          console.error("Failed to load secrets");
+        const result = (await response.json()) as ChannelSecretsResponse;
+        if (!response.ok) {
+          setSecretsError(result.error ?? "シークレットの取得に失敗しました");
+          return;
         }
+        setXApiKey(result.x_api_key || "");
+        setXApiSecret(result.x_api_secret || "");
+        setXAccessToken(result.x_access_token || "");
+        setXAccessTokenSecret(result.x_access_token_secret || "");
+        setDiscordBotToken(result.discord_bot_token || "");
       } catch (err) {
-        console.error("Error loading secrets:", err);
+        setSecretsError(
+          err instanceof Error ? err.message : "シークレットの取得に失敗しました",
+        );
       } finally {
         setLoadingSecrets(false);
       }
     }
+
     fetchSecrets();
   }, [podcastId]);
 
@@ -152,12 +165,6 @@ export function SettingsForm({
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center text-xs text-gray-500 gap-2">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">番組設定</span>
-      </div>
-
       {error && (
         <p className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}
@@ -294,7 +301,7 @@ export function SettingsForm({
             <button
               type="submit"
               disabled={saving || title.trim().length === 0}
-              className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> {saving ? "保存中..." : "設定を保存"}
             </button>
@@ -508,7 +515,7 @@ export function SettingsForm({
               <button
                 type="submit"
                 disabled={savingSecrets}
-                className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />{" "}
                 {savingSecrets ? "保存中..." : "シークレットを保存"}

@@ -2,6 +2,8 @@ import { TopicProposalEditor } from "@/components/TopicProposalEditor";
 import { requireRegisteredUser } from "@/server/auth";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
 import { listTopicProposals } from "@/server/topic-proposals/repository";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { UI_DEMO_TOPIC_PROPOSALS } from "@/server/ui-demo";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,9 @@ export default async function AgendaPage({
   const user = await requireRegisteredUser();
   const podcastId = await requireSelectedPodcast(user);
   const [proposals, { proposal, topic }] = await Promise.all([
-    listTopicProposals(podcastId),
+    isLocalUiDemoEnabled()
+      ? Promise.resolve(UI_DEMO_TOPIC_PROPOSALS)
+      : listTopicProposals(podcastId),
     searchParams,
   ]);
   const topicIndex =

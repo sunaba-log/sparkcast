@@ -164,12 +164,6 @@ export function ChannelManager({
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center text-xs text-gray-500 gap-2">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">チャンネル管理</span>
-      </div>
-
       {error && (
         <p className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}
@@ -190,7 +184,7 @@ export function ChannelManager({
           <button
             type="button"
             onClick={() => setShowCreateForm((show) => !show)}
-            className="shrink-0 min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover transition-colors flex items-center justify-center gap-1.5"
+            className="shrink-0 min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> 新規チャンネル
           </button>
@@ -238,14 +232,14 @@ export function ChannelManager({
               <button
                 type="submit"
                 disabled={creating || title.trim().length === 0}
-                className="min-h-[44px] px-5 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
               >
                 {creating ? "作成中..." : "作成する"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="min-h-[44px] px-5 py-2.5 border border-gray-400 text-gray-700 rounded-xs text-sm hover:bg-gray-100 flex items-center justify-center"
+                className="min-h-[44px] px-4 py-2 rounded-none border border-gray-400 text-gray-700 text-xs font-medium transition-colors hover:bg-gray-100 flex items-center justify-center"
               >
                 キャンセル
               </button>
@@ -290,7 +284,7 @@ export function ChannelManager({
                         type="button"
                         onClick={() => saveEdit(podcast.id)}
                         disabled={savingEdit || editTitle.trim().length === 0}
-                        className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
                       >
                         {savingEdit ? "保存中..." : "保存"}
                       </button>
@@ -298,7 +292,7 @@ export function ChannelManager({
                         type="button"
                         onClick={() => setEditingId(null)}
                         disabled={savingEdit}
-                        className="min-h-[44px] px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>
@@ -358,7 +352,7 @@ export function ChannelManager({
                           type="button"
                           onClick={() => selectChannel(podcast.id)}
                           disabled={pendingId !== null}
-                          className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
+                          className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
                         >
                           {pendingId === podcast.id ? "切り替え中..." : "切り替え"}
                         </button>
@@ -367,7 +361,7 @@ export function ChannelManager({
                         <button
                           type="button"
                           onClick={() => router.push("/episodes")}
-                          className="min-h-[44px] px-4 py-2 text-xs font-medium bg-brand text-white rounded-xs hover:bg-brand-hover flex items-center justify-center"
+                          className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center"
                         >
                           エピソード管理
                         </button>
@@ -408,14 +402,14 @@ export function ChannelManager({
                         type="button"
                         onClick={() => deleteChannel(podcast.id)}
                         disabled={pendingId !== null}
-                        className="min-h-[44px] px-4 py-2 text-xs font-medium bg-red-600 text-white rounded-xs hover:bg-red-700 disabled:opacity-50 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
                       >
                         {pendingId === podcast.id ? "削除中..." : "削除する"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmingDeleteId(null)}
-                        className="min-h-[44px] px-4 py-2 text-xs border border-gray-400 text-gray-700 rounded-xs hover:bg-gray-100 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>

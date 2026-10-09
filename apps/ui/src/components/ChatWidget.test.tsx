@@ -17,11 +17,11 @@ describe("ChatWidget mobile UX & accessibility", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders closed by default and toggle button has 44px min height", () => {
+  it("renders closed by default and toggle button has full header height", () => {
     render(<ChatWidget />);
     const toggleButton = screen.getByRole("button", { name: "チャットを開く" });
     expect(toggleButton).toBeDefined();
-    expect(toggleButton.className).toContain("min-h-[44px]");
+    expect(toggleButton.className).toContain("h-full");
   });
 
   it("applies full-screen modal classes on mobile and floating width on desktop when opened", () => {
@@ -31,10 +31,10 @@ describe("ChatWidget mobile UX & accessibility", () => {
 
     const closeButtons = screen.getAllByRole("button", { name: "チャットを閉じる" });
     expect(closeButtons.length).toBe(2);
-    // Both header close button and toggle button have min-h-[44px]
+    // Modal header close button has min-w/min-h 44px, header toggle button fits header height
     expect(closeButtons[0].className).toContain("min-w-[44px]");
     expect(closeButtons[0].className).toContain("min-h-[44px]");
-    expect(closeButtons[1].className).toContain("min-h-[44px]");
+    expect(closeButtons[1].className).toContain("h-full");
 
     // The modal container
     const modalContainer = closeButtons[0].closest(".fixed");

@@ -8,6 +8,7 @@ import {
   updatePolicyFindings,
 } from "@/server/episodes/data-repository";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
 
 const reviewSchema = z.object({
   findings: z.array(z.object({
@@ -21,6 +22,19 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (isLocalUiDemoEnabled()) {
+      const { id } = await context.params;
+      if (id !== "3") {
+        return NextResponse.json({ error: "エピソードが見つかりません" }, { status: 404 });
+      }
+      const input = reviewSchema.parse(await request.json());
+      return NextResponse.json({
+        ok: true,
+        status: input.findings.some((finding) => finding.status === "approved")
+          ? "awaiting_approval"
+          : "awaiting_publish_confirmation",
+      });
+    }
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     const podcastId = await requireSelectedPodcastForApi(user);

@@ -169,7 +169,7 @@ export function RecordingRoomApp(props: Props) {
       </header>
 
       {stage === "closed" && (
-        <div className="border border-brand/20 rounded-xs bg-white/60 p-6 text-center space-y-2">
+        <div className="border border-brand/20 rounded-xs bg-app-bg p-6 text-center space-y-2">
           {props.newGuestsClosed === "locked" ? (
             <>
               <p className="text-gray-800">このルームは入室を締め切っています。</p>

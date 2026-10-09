@@ -12,8 +12,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("./AccountMenu", () => ({
-  AccountMenu: ({ displayName }: { displayName: string | null }) => (
-    <div data-testid="account-menu">AccountMenu:{displayName}</div>
+  AccountMenu: ({
+    displayName,
+    channelTitle,
+  }: {
+    displayName: string | null;
+    channelTitle: string | null;
+  }) => (
+    <div data-testid="account-menu">
+      AccountMenu:{displayName}:{channelTitle}
+    </div>
   ),
 }));
 
@@ -92,7 +100,7 @@ describe("Sidebar and Mobile Navigation", () => {
     expect(html).toContain("番組設定");
 
     // Account menu included
-    expect(html).toContain("AccountMenu:Taro");
+    expect(html).toContain("AccountMenu:Taro:Tech Podcast");
 
     // Channel switcher included
     expect(html).toContain("Tech Podcast");

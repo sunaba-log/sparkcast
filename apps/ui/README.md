@@ -59,6 +59,17 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
 3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）でFirebase認証なしで即座にログインできます。未登録の場合は通常のログインと同様に`/register`からユーザ登録します。
 
+### ローカル UI デモ
+
+DB や Firebase を準備せず、各画面をダミーデータで確認するには `.env.local` に
+`NEXT_PUBLIC_ENABLE_LOCAL_UI_DEMO="true"` を設定して `npm run dev` を実行します。
+ローカル開発時だけデモ管理者としてログインし、チャンネル、エピソード、議題、SNS 投稿、
+設定、管理画面をサンプルデータで表示します。デモモードの編集・送信操作は保存先を持たないため、
+表示確認専用として利用してください。
+
+AI ディレクター監査は `/episodes?episode=3` を開き、`AIディレクター監査` タブを選ぶと確認できます。
+訂正提案と音声校正ポリシー検知を表示し、承認・却下・音声編集開始の各状態遷移を画面上で確認できます。
+
 ## デプロイ（Cloud Run + GitHub Actions）
 
 Cloud Run（asia-northeast1）でホスティングします。環境はプロジェクト単位で分離

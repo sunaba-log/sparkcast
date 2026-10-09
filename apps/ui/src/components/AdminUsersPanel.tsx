@@ -24,11 +24,7 @@ export function AdminUsersPanel({
   if (!isAdmin) {
     return (
       <div className="space-y-5 max-w-4xl">
-        <div className="flex items-center text-xs text-gray-500 gap-2">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">ユーザー管理</span>
-        </div>
+        <h1 className="text-sm font-bold text-gray-900">ユーザー管理</h1>
 
         <div className="rounded-xs border border-yellow-200 bg-yellow-50 p-4">
           <p className="text-sm text-yellow-800">
@@ -85,12 +81,6 @@ export function AdminUsersPanel({
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center text-xs text-gray-500 gap-2">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">ユーザー管理</span>
-      </div>
-
       {error && (
         <p className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}

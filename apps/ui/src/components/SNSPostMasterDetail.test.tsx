@@ -141,6 +141,19 @@ describe("SNSPostMasterDetail layout & responsive styling", () => {
     expect(titleSpan).not.toBeNull();
   });
 
+  it("keeps the inspector actions at the bottom while its content fills the remaining height", () => {
+    render(<SNSPostMasterDetail initialPosts={samplePosts} />);
+
+    const content = screen.getByTestId("sns-inspector-content");
+    expect(content.className).toContain("min-h-0");
+    expect(content.className).toContain("flex-1");
+    expect(content.className).toContain("overflow-y-auto");
+
+    const actions = screen.getByTestId("sns-inspector-actions");
+    expect(actions.className).toContain("mt-auto");
+    expect(actions.className).toContain("shrink-0");
+  });
+
   it("initially selects the newest post by default in descending order", () => {
     render(<SNSPostMasterDetail initialPosts={samplePosts} />);
 

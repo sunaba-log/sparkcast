@@ -36,7 +36,7 @@ export function RoomChat({
   }
 
   return (
-    <section className="border border-brand/20 rounded-xs bg-white/60" aria-label="チャット">
+    <section className="border border-brand/20 rounded-xs bg-app-bg" aria-label="チャット">
       <div className="px-4 pt-3">
         <h2 className="flex items-center gap-1.5 text-sm font-medium text-gray-700 whitespace-nowrap">
           <MessageSquare className="w-4 h-4 text-brand" /> チャット

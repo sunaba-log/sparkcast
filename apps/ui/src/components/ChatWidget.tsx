@@ -533,7 +533,7 @@ export function ChatWidget() {
                         {message.content}
                       </div>
                     ) : (
-                      <div className="max-w-[85%] rounded-lg bg-white/80 border border-brand/30 px-3 py-2 text-sm text-gray-800">
+                      <div className="max-w-[85%] rounded-lg bg-app-bg border border-brand/30 px-3 py-2 text-sm text-gray-800">
                         {message.content ? (
                           <div className="text-sm leading-relaxed break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                             <ReactMarkdown
@@ -599,7 +599,7 @@ export function ChatWidget() {
                   <button
                     type="button"
                     onClick={stop}
-                    className="min-h-[44px] px-4 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+                    className="min-h-[44px] px-4 py-2 rounded-none border border-gray-300 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                   >
                     停止
                   </button>
@@ -608,7 +608,7 @@ export function ChatWidget() {
                     type="button"
                     onClick={() => void send()}
                     disabled={!input.trim()}
-                    className="min-h-[44px] px-4 py-2 rounded-md bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+                    className="min-h-[44px] px-4 py-2 rounded-none bg-blue-600 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
                   >
                     送信
                   </button>
@@ -623,7 +623,7 @@ export function ChatWidget() {
         type="button"
         onClick={toggleOpen}
         aria-label={isOpen ? "チャットを閉じる" : "チャットを開く"}
-        className={`min-h-[44px] px-4 py-2 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
+        className={`h-full px-4 text-xs font-normal rounded-xs flex items-center gap-1.5 transition-colors border ${isOpen
           ? "bg-brand text-white border-brand hover:bg-brand-hover"
           : "text-gray-600 hover:text-gray-900 border-gray-400 hover:bg-gray-200"
           }`}

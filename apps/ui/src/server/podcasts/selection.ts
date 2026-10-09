@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasPodcastAccess, type SessionUser } from "@/server/auth";
+import { isLocalUiDemoEnabled } from "@/server/env";
 import { getUserDefaultPodcastId } from "@/server/podcasts/data-repository";
 
 export const SELECTED_PODCAST_COOKIE_NAME = "selected_podcast_id";
@@ -33,6 +34,7 @@ export async function getSelectedPodcastId(): Promise<number | null> {
 export async function resolveEffectivePodcastId(
   user: SessionUser,
 ): Promise<number | null> {
+  if (isLocalUiDemoEnabled()) return 1;
   const selected = await getSelectedPodcastId();
   if (selected && (await hasPodcastAccess(user.uid, selected))) {
     return selected;

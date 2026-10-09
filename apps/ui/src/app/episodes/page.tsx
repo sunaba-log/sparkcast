@@ -3,6 +3,8 @@ import { EpisodeMasterDetail } from "@/components/EpisodeMasterDetail";
 import { requireRegisteredUser } from "@/server/auth";
 import { getPodcast } from "@/server/podcasts/data-repository";
 import { requireSelectedPodcast } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { UI_DEMO_PODCAST } from "@/server/ui-demo";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ export default async function EpisodeListPage({
   const podcastId = await requireSelectedPodcast(user);
   const [episodes, podcast, { episode }] = await Promise.all([
     getEpisodes(podcastId),
-    getPodcast(podcastId),
+    isLocalUiDemoEnabled() ? Promise.resolve(UI_DEMO_PODCAST) : getPodcast(podcastId),
     searchParams,
   ]);
 
@@ -27,4 +29,3 @@ export default async function EpisodeListPage({
     />
   );
 }
-

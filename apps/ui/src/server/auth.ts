@@ -8,6 +8,7 @@ import {
   isAdminUser,
   isGuestModeEnabled,
   isLocalMockAuthEnabled,
+  isLocalUiDemoEnabled,
 } from "@/server/env";
 import { getAdminAuth } from "@/server/firebase-admin";
 
@@ -53,6 +54,18 @@ function resolveApprovalStatus(
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
+  if (isLocalUiDemoEnabled()) {
+    return {
+      uid: "ui_demo_admin",
+      email: "demo-admin@example.com",
+      displayName: "デモ管理者",
+      registered: true,
+      approvalStatus: "active",
+      isAdmin: true,
+      canRecord: true,
+    };
+  }
+
   const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!sessionCookie) return null;
 
@@ -151,6 +164,7 @@ export async function hasPodcastAccess(
   userId: string,
   podcastId: number,
 ): Promise<boolean> {
+  if (isLocalUiDemoEnabled()) return podcastId === 1 || podcastId === 2;
   const result = await (await getDbPool()).query(
     `SELECT 1
      FROM podcast_ownerships
