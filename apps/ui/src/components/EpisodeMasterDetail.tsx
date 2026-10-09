@@ -519,18 +519,21 @@ export function EpisodeMasterDetail({
                 </button>
                 <button
                   onClick={() => setActiveTab("director")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "director"
-                    ? "border-brand text-brand"
-                    : selectedEpisode.status === "awaiting_approval"
-                      ? "border-amber-400 text-amber-800 hover:text-amber-900"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
-                    }`}
+                  className={`py-1 text-sm font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === "director"
+                      ? "rounded-xs bg-brand text-white px-2.5 shadow-xs"
+                      : selectedEpisode.status === "awaiting_approval"
+                        ? "border-b-2 border-amber-400 text-amber-800 hover:text-amber-900"
+                        : "border-b-2 border-transparent text-gray-500 hover:text-gray-800"
+                  }`}
                 >
-                  AIディレクター監査
-                  {selectedEpisode.status === "awaiting_approval" && (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
-                      要確認
-                    </span>
+                  <span>AI監査</span>
+                  {(selectedEpisode.status === "awaiting_approval" || activeTab === "director") && (
+                    <AlertTriangle
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        activeTab === "director" ? "text-amber-300" : "text-amber-600"
+                      }`}
+                    />
                   )}
                 </button>
               </div>
