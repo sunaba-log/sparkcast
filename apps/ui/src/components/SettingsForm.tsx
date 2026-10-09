@@ -301,7 +301,7 @@ export function SettingsForm({
             <button
               type="submit"
               disabled={saving || title.trim().length === 0}
-              className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> {saving ? "保存中..." : "設定を保存"}
             </button>
@@ -515,7 +515,7 @@ export function SettingsForm({
               <button
                 type="submit"
                 disabled={savingSecrets}
-                className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />{" "}
                 {savingSecrets ? "保存中..." : "シークレットを保存"}

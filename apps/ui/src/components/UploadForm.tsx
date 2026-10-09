@@ -233,7 +233,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
         <button
           onClick={handleUpload}
           disabled={!selectedFile || status === "success" || isBusy}
-          className="px-4 py-2 rounded-none bg-blue-600 text-white text-xs font-medium transition-colors hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+          className="min-h-[44px] px-4 py-2 rounded-none bg-blue-600 text-white text-xs font-medium transition-colors hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
         >
           {isBusy ? "処理中..." : "アップロード開始"}
         </button>
@@ -241,7 +241,7 @@ export function UploadForm({ podcastId }: { podcastId: number }) {
           <button
             onClick={handleReset}
             disabled={isBusy}
-            className="px-4 py-2 rounded-none text-xs font-medium text-gray-600 border border-gray-300 transition-colors hover:bg-gray-50 flex items-center justify-center"
+            className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium text-gray-600 border border-gray-300 transition-colors hover:bg-gray-50 flex items-center justify-center"
           >
             リセット
           </button>

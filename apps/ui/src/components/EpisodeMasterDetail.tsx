@@ -904,7 +904,7 @@ export function EpisodeMasterDetail({
                     setPosts(selectedEpisode.xPosts);
                     setMinutesTab("preview");
                   }}
-                  className="px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -912,7 +912,7 @@ export function EpisodeMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={status === "saving"}
-                  className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {status === "saving" ? "保存中..." : "変更"}
                 </button>

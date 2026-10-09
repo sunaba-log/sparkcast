@@ -184,7 +184,7 @@ export function ChannelManager({
           <button
             type="button"
             onClick={() => setShowCreateForm((show) => !show)}
-            className="shrink-0 px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center gap-1.5"
+            className="shrink-0 min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> 新規チャンネル
           </button>
@@ -232,14 +232,14 @@ export function ChannelManager({
               <button
                 type="submit"
                 disabled={creating || title.trim().length === 0}
-                className="px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
               >
                 {creating ? "作成中..." : "作成する"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="px-4 py-2 rounded-none border border-gray-400 text-gray-700 text-xs font-medium transition-colors hover:bg-gray-100 flex items-center justify-center"
+                className="min-h-[44px] px-4 py-2 rounded-none border border-gray-400 text-gray-700 text-xs font-medium transition-colors hover:bg-gray-100 flex items-center justify-center"
               >
                 キャンセル
               </button>
@@ -284,7 +284,7 @@ export function ChannelManager({
                         type="button"
                         onClick={() => saveEdit(podcast.id)}
                         disabled={savingEdit || editTitle.trim().length === 0}
-                        className="px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
                       >
                         {savingEdit ? "保存中..." : "保存"}
                       </button>
@@ -292,7 +292,7 @@ export function ChannelManager({
                         type="button"
                         onClick={() => setEditingId(null)}
                         disabled={savingEdit}
-                        className="px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>
@@ -352,7 +352,7 @@ export function ChannelManager({
                           type="button"
                           onClick={() => selectChannel(podcast.id)}
                           disabled={pendingId !== null}
-                          className="px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
+                          className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-50 flex items-center justify-center"
                         >
                           {pendingId === podcast.id ? "切り替え中..." : "切り替え"}
                         </button>
@@ -361,7 +361,7 @@ export function ChannelManager({
                         <button
                           type="button"
                           onClick={() => router.push("/episodes")}
-                          className="px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center"
+                          className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-brand text-white hover:bg-brand-hover transition-colors flex items-center justify-center"
                         >
                           エピソード管理
                         </button>
@@ -402,14 +402,14 @@ export function ChannelManager({
                         type="button"
                         onClick={() => deleteChannel(podcast.id)}
                         disabled={pendingId !== null}
-                        className="px-4 py-2 rounded-none text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
                       >
                         {pendingId === podcast.id ? "削除中..." : "削除する"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmingDeleteId(null)}
-                        className="px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
+                        className="min-h-[44px] px-4 py-2 rounded-none text-xs font-medium border border-gray-400 text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                       >
                         キャンセル
                       </button>

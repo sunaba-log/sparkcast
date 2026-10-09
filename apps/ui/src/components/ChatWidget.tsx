@@ -599,7 +599,7 @@ export function ChatWidget() {
                   <button
                     type="button"
                     onClick={stop}
-                    className="px-4 py-2 rounded-none border border-gray-300 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
+                    className="min-h-[44px] px-4 py-2 rounded-none border border-gray-300 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 flex items-center justify-center"
                   >
                     停止
                   </button>
@@ -608,7 +608,7 @@ export function ChatWidget() {
                     type="button"
                     onClick={() => void send()}
                     disabled={!input.trim()}
-                    className="px-4 py-2 rounded-none bg-blue-600 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+                    className="min-h-[44px] px-4 py-2 rounded-none bg-blue-600 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
                   >
                     送信
                   </button>
