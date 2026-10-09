@@ -10,6 +10,10 @@ import { resolveEffectivePodcastId } from "@/server/podcasts/selection";
 import { isLocalUiDemoEnabled } from "@/server/env";
 import { UI_DEMO_PODCAST, UI_DEMO_PODCASTS } from "@/server/ui-demo";
 import type { PodcastSummary } from "@/types/podcast";
+import {
+  InspectorPanelHost,
+  InspectorPanelSlotProvider,
+} from "@/components/InspectorPanelSlot";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -83,22 +87,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {user && <HeaderActions />}
             </div>
           </header>
-          <div className="flex-1 flex overflow-hidden min-h-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-            {user && (
-              <Sidebar
-                channelTitle={channelTitle}
-                podcasts={podcasts}
-                selectedPodcastId={selectedPodcastId}
-                userDisplayName={user.displayName}
-                userRegistered={user.registered}
-                userIsAdmin={user.isAdmin}
-                recordingEnabled={isRecordingEnabled() && user.canRecord}
-              />
-            )}
-            <main className="notebook-grid flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-[calc(env(safe-area-inset-bottom)+1rem)] md:pb-6">
-              {children}
-            </main>
-          </div>
+          <InspectorPanelSlotProvider>
+            <div className="flex-1 flex overflow-hidden min-h-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+              {user && (
+                <Sidebar
+                  channelTitle={channelTitle}
+                  podcasts={podcasts}
+                  selectedPodcastId={selectedPodcastId}
+                  userDisplayName={user.displayName}
+                  userRegistered={user.registered}
+                  userIsAdmin={user.isAdmin}
+                  recordingEnabled={isRecordingEnabled() && user.canRecord}
+                />
+              )}
+              <main className="notebook-grid flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-[calc(env(safe-area-inset-bottom)+1rem)] md:pb-6">
+                {children}
+              </main>
+              <InspectorPanelHost />
+            </div>
+          </InspectorPanelSlotProvider>
         </MobileNavProvider>
       </body>
     </html>

@@ -95,7 +95,7 @@ export function DirectorInterventionsPanel({
   const editable = episodeStatus === "awaiting_approval";
   const approvedCount = state.interventions.filter((intervention) => intervention.status === "approved").length;
   return (
-    <section className="space-y-4" aria-label="AIディレクター監査">
+    <section className="space-y-4" aria-label="AI監査">
       <p className="text-sm text-gray-600">
         訂正台詞を確認・編集し、音声へ挿入する提案を承認してください。
       </p>

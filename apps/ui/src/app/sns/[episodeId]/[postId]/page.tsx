@@ -35,17 +35,19 @@ export default async function SNSPostDetailPage({
   }
 
   return (
-    <div className="h-full">
-      <div className="mb-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 shrink-0">
         <Link href="/sns" className="text-sm text-blue-600 hover:underline">
           ← SNS投稿一覧に戻る
         </Link>
       </div>
-      <SNSPostMasterDetail
-        initialPosts={[mapToSNSPostItem(episode, post)]}
-        initialSelectedId={postId}
-        detailOnly
-      />
+      <div className="min-h-0 flex-1">
+        <SNSPostMasterDetail
+          initialPosts={[mapToSNSPostItem(episode, post)]}
+          initialSelectedId={postId}
+          detailOnly
+        />
+      </div>
     </div>
   );
 }

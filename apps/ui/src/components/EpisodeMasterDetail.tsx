@@ -28,6 +28,8 @@ import {
   DirectorInterventionsPanel,
 } from "@/components/DirectorInterventionsPanel";
 import { PolicyFindingsPanel } from "@/components/PolicyFindingsPanel";
+import { InspectorPanelSlot } from "@/components/InspectorPanelSlot";
+import { ResizableInspectorPanel } from "@/components/ResizableInspectorPanel";
 
 type TabType = "overview" | "minutes" | "transcript" | "promotions" | "director";
 
@@ -402,9 +404,9 @@ export function EpisodeMasterDetail({
       <h1 className="shrink-0 text-sm font-bold text-gray-900">エピソード</h1>
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-12">
+      <div className="flex-1 flex min-h-0 flex-col gap-5 lg:flex-row lg:gap-0">
         {/* Left Column: Master List (5 cols) */}
-        <div className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-3 overflow-y-auto pr-1 lg:col-span-5`}>
+        <div className={`${initialSelectedId ? "hidden lg:flex" : "flex"} min-h-0 flex-col space-y-3 overflow-y-auto pr-1 lg:flex-1 lg:pr-5`}>
           {episodes.map((ep) => {
             const isSelected = ep.id === selectedEpisode?.id;
             return (
@@ -462,75 +464,79 @@ export function EpisodeMasterDetail({
 
         {/* Right Column: Inspector Panel (7 cols) */}
         {selectedEpisode && (
-          <div className={`${initialSelectedId ? "flex" : "hidden"} rounded-xs border-t border-brand/30 overflow-hidden flex-col lg:col-span-7 lg:flex lg:border-t-0 lg:border-l`}>
-            <div className="lg:hidden border-b border-brand/30 px-4 py-2">
+          <InspectorPanelSlot>
+            <ResizableInspectorPanel
+              className={`${initialSelectedId ? "flex h-full min-h-0 flex-1" : "hidden"} lg:flex`}
+            >
+            <div className="lg:hidden border-b border-brand/30 pr-2 py-2">
               <button
                 type="button"
                 onClick={() => router.push("/episodes")}
-                className="min-h-11 px-2 text-sm font-medium text-brand hover:text-brand-hover"
+                className="min-h-4 px-2 text-xs font-medium text-brand hover:text-brand-hover"
               >
                 ← エピソード一覧に戻る
               </button>
             </div>
-            {/* Top Bar Tabs & Actions */}
-            {/* 幅が狭いとき、タブの文字を縦に折らずにタブごと折り返す */}
-            <div className="px-5 py-1 border-b border-brand flex flex-col items-stretch gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 gap-x-6 overflow-x-auto no-scrollbar">
+            {/* Action buttons are kept above the tab bar so narrow inspector widths cannot overlap them. */}
+            <div className="px-5 py-2 border-b border-brand flex flex-col items-stretch gap-1">
+              {/* 幅が狭いとき、タブの文字を縦に折らずに横スクロールする */}
+              <div className="flex min-w-0 gap-1 overflow-x-auto rounded-xs border border-brand/30 bg-white/50 p-1 no-scrollbar">
                 <button
                   onClick={() => setActiveTab("overview")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "overview"
-                    ? "border-brand text-brand"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
+                  className={`rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "overview"
+                    ? "border-brand bg-brand text-white"
+                    : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
                     }`}
                 >
                   概要
                 </button>
                 <button
                   onClick={() => setActiveTab("minutes")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "minutes"
-                    ? "border-brand text-brand"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
+                  className={`rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "minutes"
+                    ? "border-brand bg-brand text-white"
+                    : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
                     }`}
                 >
                   議事録
                 </button>
                 <button
                   onClick={() => setActiveTab("transcript")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "transcript"
-                    ? "border-brand text-brand"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
+                  className={`rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "transcript"
+                    ? "border-brand bg-brand text-white"
+                    : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
                     }`}
                 >
                   文字起こし
                 </button>
                 <button
                   onClick={() => setActiveTab("promotions")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "promotions"
-                    ? "border-brand text-brand"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
+                  className={`rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "promotions"
+                    ? "border-brand bg-brand text-white"
+                    : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
                     }`}
                 >
                   SNS投稿文
                 </button>
                 <button
                   onClick={() => setActiveTab("director")}
-                  className={`py-1 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === "director"
-                    ? "border-brand text-brand"
+                  className={`inline-flex items-center gap-1 rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "director"
+                    ? "border-brand bg-brand text-white"
                     : selectedEpisode.status === "awaiting_approval"
-                      ? "border-amber-400 text-amber-800 hover:text-amber-900"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
+                      ? "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                      : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
                     }`}
                 >
-                  AIディレクター監査
+                  AI監査
                   {selectedEpisode.status === "awaiting_approval" && (
-                    <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
-                      要確認
-                    </span>
+                    <AlertTriangle
+                      className="h-4 w-4 shrink-0 text-amber-600"
+                      aria-label="要確認"
+                    />
                   )}
                 </button>
               </div>
 
-              <div className="flex items-center space-x-2 shrink-0">
+              <div className="order-first flex shrink-0 flex-wrap items-center justify-end gap-2">
                 {selectedEpisode.status === "failed" && (
                   <button
                     type="button"
@@ -595,13 +601,13 @@ export function EpisodeMasterDetail({
             )}
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto space-y-5 p-6">
               <div className="text-xs text-gray-500">
                 更新日時 : {formatDate(selectedEpisode.createdAt)}
               </div>
 
               {/* Audio Player Preview */}
-              <div className="rounded-xs p-4 border border-brand flex flex-col gap-4 backdrop-blur-xs sm:flex-row sm:items-center">
+              <div className="flex shrink-0 flex-col gap-4 rounded-xs border border-brand p-4 backdrop-blur-xs sm:flex-row sm:items-center">
                 {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
                   <Image
                     src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
@@ -713,7 +719,7 @@ export function EpisodeMasterDetail({
 
               {/* Tab Form Views */}
               {activeTab === "overview" && (
-                <div className="space-y-4">
+                <div className="flex min-h-0 flex-1 flex-col gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       タイトル
@@ -725,7 +731,7 @@ export function EpisodeMasterDetail({
                       className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
                     />
                   </div>
-                  <div>
+                  <div className="flex min-h-0 flex-1 flex-col">
                     <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                       概要文
                     </label>
@@ -733,7 +739,7 @@ export function EpisodeMasterDetail({
                       rows={6}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
+                      className="min-h-0 flex-1 w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:border-brand"
                     />
                   </div>
                 </div>
@@ -879,7 +885,7 @@ export function EpisodeMasterDetail({
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 border-t border-brand/30 flex items-center justify-between shrink-0">
+            <div className="mt-auto flex shrink-0 items-center justify-between border-t border-brand/30 p-4">
               <div className="flex items-center gap-2">
                 {status === "saved" && (
                   <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
@@ -912,7 +918,8 @@ export function EpisodeMasterDetail({
                 </button>
               </div>
             </div>
-          </div>
+            </ResizableInspectorPanel>
+          </InspectorPanelSlot>
         )}
       </div>
 
