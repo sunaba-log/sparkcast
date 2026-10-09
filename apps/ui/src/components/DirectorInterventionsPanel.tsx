@@ -102,7 +102,7 @@ export function DirectorInterventionsPanel({
           訂正台詞を確認・編集し、音声へ挿入する提案を承認してください。
         </p>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-1">
         {state.interventions.map((intervention, index) => (
           <DirectorInterventionCard
             key={intervention.id}

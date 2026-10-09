@@ -539,54 +539,60 @@ export function EpisodeMasterDetail({
                 </button>
               </div>
 
-              <div className="order-first flex shrink-0 flex-wrap items-center justify-end gap-2">
-                {selectedEpisode.status === "failed" && (
+              <div className="order-first flex shrink-0 flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-gray-500">
+                  更新日時 : {formatDate(selectedEpisode.createdAt)}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {selectedEpisode.status === "failed" && (
+                    <button
+                      type="button"
+                      onClick={handleRetryAudit}
+                      disabled={isRetryingAudit}
+                      className="px-3 py-1 whitespace-nowrap bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isRetryingAudit ? "animate-spin" : ""}`} />
+                      {isRetryingAudit ? "再開中..." : "監査を再開"}
+                    </button>
+                  )}
+
+                  {selectedEpisode.status === "completed" && (
+                    <button
+                      type="button"
+                      onClick={handleTogglePublish}
+                      disabled={isTogglingPublish}
+                      className={`px-3 py-1 whitespace-nowrap rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
+                        selectedEpisode.isPublished
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      }`}
+                      title={selectedEpisode.isPublished ? "クリックして非公開にする" : "クリックしてRSSに公開する"}
+                    >
+                      {selectedEpisode.isPublished ? (
+                        <>
+                          <Globe className="w-3.5 h-3.5" />
+                          公開中 (RSS配信)
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5" />
+                          非公開 (下書き)
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={handleRetryAudit}
-                    disabled={isRetryingAudit}
-                    className="px-3 py-1 whitespace-nowrap bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    onClick={handleDeleteEpisode}
+                    disabled={isDeleting}
+                    className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isRetryingAudit ? "animate-spin" : ""}`} />
-                    {isRetryingAudit ? "再開中..." : "監査を再開"}
+                    <Trash2 className="w-3.5 h-3.5 text-gray-500" />
+                    {isDeleting ? "削除中..." : "削除"}
                   </button>
-                )}
-
-                {selectedEpisode.status === "completed" && (
-                  <button
-                    type="button"
-                    onClick={handleTogglePublish}
-                    disabled={isTogglingPublish}
-                    className={`px-3 py-1 whitespace-nowrap rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
-                      selectedEpisode.isPublished
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                    }`}
-                    title={selectedEpisode.isPublished ? "クリックして非公開にする" : "クリックしてRSSに公開する"}
-                  >
-                    {selectedEpisode.isPublished ? (
-                      <>
-                        <Globe className="w-3.5 h-3.5" />
-                        公開中 (RSS配信)
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-3.5 h-3.5" />
-                        非公開 (下書き)
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleDeleteEpisode}
-                  disabled={isDeleting}
-                  className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-gray-500" />
-                  {isDeleting ? "削除中..." : "削除"}
-                </button>
+                </div>
               </div>
             </div>
 
@@ -605,9 +611,6 @@ export function EpisodeMasterDetail({
 
             {/* Content Body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto space-y-5 p-6">
-              <div className="text-xs text-gray-500">
-                更新日時 : {formatDate(selectedEpisode.createdAt)}
-              </div>
 
               {/* Audio Player Preview */}
               <div className="flex shrink-0 flex-col gap-4 rounded-xs border border-brand p-4 backdrop-blur-xs sm:flex-row sm:items-center">

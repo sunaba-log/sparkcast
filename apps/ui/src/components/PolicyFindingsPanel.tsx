@@ -82,7 +82,7 @@ export function PolicyFindingCard({
       </div>
 
       {isExpanded && (
-        <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100">
+        <div className="px-4 pb-4 pt-1 space-y-1 border-t border-gray-100">
           <div>
             <p className="text-xs font-bold text-gray-900 mb-1">検知された発話</p>
             <p className="text-sm text-gray-800 leading-relaxed">{finding.text}</p>
@@ -254,7 +254,7 @@ export function PolicyFindingsPanel({
           検知項目ごとに判断してください。承認した項目は `silence` 編集用の新規レンディションへ反映されます。
         </p>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-1">
         {state.findings.map((finding) => (
           <PolicyFindingCard
             key={finding.id}
