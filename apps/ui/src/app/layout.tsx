@@ -7,7 +7,13 @@ import { getSessionUser } from "@/server/auth";
 import { isRecordingEnabled } from "@/server/env";
 import { getPodcast, listPodcastsForUser } from "@/server/podcasts/data-repository";
 import { resolveEffectivePodcastId } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { UI_DEMO_PODCAST, UI_DEMO_PODCASTS } from "@/server/ui-demo";
 import type { PodcastSummary } from "@/types/podcast";
+import {
+  InspectorPanelHost,
+  InspectorPanelSlotProvider,
+} from "@/components/InspectorPanelSlot";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -35,12 +41,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let podcasts: PodcastSummary[] = [];
   let selectedPodcastId: number | null = null;
   if (user?.registered) {
-    podcasts = await listPodcastsForUser(user.uid);
-    // Cookie 未設定時もデフォルトチャンネルを「選択中」として表示する
-    const podcastId = await resolveEffectivePodcastId(user);
-    if (podcastId) {
-      selectedPodcastId = podcastId;
-      channelTitle = (await getPodcast(podcastId))?.title ?? null;
+    if (isLocalUiDemoEnabled()) {
+      podcasts = UI_DEMO_PODCASTS;
+      selectedPodcastId = UI_DEMO_PODCAST.id;
+      channelTitle = UI_DEMO_PODCAST.title;
+    } else {
+      podcasts = await listPodcastsForUser(user.uid);
+      // Cookie 未設定時もデフォルトチャンネルを「選択中」として表示する
+      const podcastId = await resolveEffectivePodcastId(user);
+      if (podcastId) {
+        selectedPodcastId = podcastId;
+        channelTitle = (await getPodcast(podcastId))?.title ?? null;
+      }
     }
   }
   return (
@@ -48,7 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-app-bg text-gray-900 antialiased min-h-dvh h-dvh flex flex-col font-sans overflow-hidden">
         <MobileNavProvider>
           <header className="border-b border-brand/30 shrink-0 z-20 bg-app-bg pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-            <div className="w-full px-3 sm:px-5 h-14 flex items-center justify-between gap-2">
+            <div className="w-full pl-3 sm:pl-5 h-8 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 {user && <MobileMenuButton />}
                 <Link href="/" className="flex items-center hover:opacity-90 transition-opacity shrink-0">
@@ -59,7 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     height={32}
                     priority
                     unoptimized
-                    className="hidden sm:block h-6 w-auto"
+                    className="hidden sm:block h-5 w-auto"
                   />
                   <Image
                     src="/sparkcast_logo_small.svg"
@@ -68,29 +80,32 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     height={32}
                     priority
                     unoptimized
-                    className="block sm:hidden h-6 w-auto"
+                    className="block sm:hidden h-5 w-auto"
                   />
                 </Link>
               </div>
               {user && <HeaderActions />}
             </div>
           </header>
-          <div className="flex-1 flex overflow-hidden min-h-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-            {user && (
-              <Sidebar
-                channelTitle={channelTitle}
-                podcasts={podcasts}
-                selectedPodcastId={selectedPodcastId}
-                userDisplayName={user.displayName}
-                userRegistered={user.registered}
-                userIsAdmin={user.isAdmin}
-                recordingEnabled={isRecordingEnabled() && user.canRecord}
-              />
-            )}
-            <main className="flex-1 overflow-y-auto bg-app-bg p-3 sm:p-4 md:p-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-[calc(env(safe-area-inset-bottom)+1rem)] md:pb-6">
-              {children}
-            </main>
-          </div>
+          <InspectorPanelSlotProvider>
+            <div className="flex-1 flex overflow-hidden min-h-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+              {user && (
+                <Sidebar
+                  channelTitle={channelTitle}
+                  podcasts={podcasts}
+                  selectedPodcastId={selectedPodcastId}
+                  userDisplayName={user.displayName}
+                  userRegistered={user.registered}
+                  userIsAdmin={user.isAdmin}
+                  recordingEnabled={isRecordingEnabled() && user.canRecord}
+                />
+              )}
+              <main className="notebook-grid flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-[calc(env(safe-area-inset-bottom)+1rem)] md:pb-6">
+                {children}
+              </main>
+              <InspectorPanelHost />
+            </div>
+          </InspectorPanelSlotProvider>
         </MobileNavProvider>
       </body>
     </html>

@@ -23,7 +23,7 @@ describe("HeaderActions", () => {
     const html = renderToStaticMarkup(<HeaderActions />);
 
     expect(html).toContain('href="/upload"');
-    expect(html).toContain("p-2 sm:px-4 sm:py-2");
+    expect(html).toContain("h-full px-2 sm:px-4");
     expect(html).toContain('<span class="hidden sm:inline">新規エピソード追加</span>');
     expect(html).toContain('title="新規エピソード追加"');
     expect(html).toContain('aria-label="新規エピソード追加"');

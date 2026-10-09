@@ -92,7 +92,7 @@ export function EpisodeEditor({ episode }: { episode: Episode }) {
           type="button"
           onClick={save}
           disabled={status === "saving"}
-          className="min-h-[44px] px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+          className="min-h-[44px] px-4 py-2 rounded-none bg-blue-600 text-white text-xs font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
         >
           {status === "saving" ? "保存中..." : "変更を保存"}
         </button>

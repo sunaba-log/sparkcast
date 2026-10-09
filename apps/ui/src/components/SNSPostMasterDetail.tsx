@@ -8,6 +8,8 @@ import {
   type SNSPostItem,
   sortPostsDesc,
 } from "@/lib/sns";
+import { InspectorPanelSlot } from "@/components/InspectorPanelSlot";
+import { ResizableInspectorPanel } from "@/components/ResizableInspectorPanel";
 
 export type { SNSPostItem } from "@/lib/sns";
 export { getPostSortTimestamp, sortPostsDesc } from "@/lib/sns";
@@ -256,21 +258,17 @@ export function SNSPostMasterDetail({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex h-full min-h-0 flex-col space-y-4">
       {!detailOnly && (
-        <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
-          <span>ホーム</span>
-          <span>&gt;</span>
-          <span className="font-medium text-gray-800">SNS投稿</span>
-        </div>
+        <h1 className="shrink-0 text-sm font-bold text-gray-900">SNS投稿</h1>
       )}
 
       {/* Master-Detail Container */}
-      <div className={detailOnly ? "flex-1 min-h-0" : "flex-1 grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-12"}>
+      <div className={detailOnly ? "h-full min-h-0 flex-1" : "flex-1 flex min-h-0 flex-col gap-5 lg:flex-row lg:gap-0"}>
         {/* Left Column: Timeline Master List (6 cols) */}
         {!detailOnly && <div
           ref={containerRef}
-          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} col-span-1 min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:col-span-6 @container`}
+          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:flex-1 lg:pr-5 @container`}
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -304,7 +302,7 @@ export function SNSPostMasterDetail({
                   {/* Post Preview Card */}
                   <div
                     onClick={() => handleSelect(post)}
-                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
+                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-app-bg ${isSelected
                       ? "border-2 border-brand shadow-sm"
                       : "border-gray-200 hover:border-brand/50 shadow-sm"
                       }`}
@@ -367,13 +365,17 @@ export function SNSPostMasterDetail({
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost ? (
-          <div className={`${detailOnly || initialSelectedId ? "flex" : "hidden"} ${detailOnly ? "h-full" : "lg:col-span-6 lg:flex"} rounded-sm border-t border-brand/30 flex-col overflow-hidden lg:border-t-0 lg:border-l`}>
+          <InspectorPanelSlot enabled={!detailOnly}>
+            <ResizableInspectorPanel
+              className={`${detailOnly || initialSelectedId ? "flex h-full min-h-0 flex-1" : "hidden"} lg:flex`}
+              resizable={!detailOnly}
+            >
             {!detailOnly && (
-              <div className="border-b border-brand/30 px-4 py-2 lg:hidden">
+              <div className="border-b border-brand/30 pr-2 py-2 lg:hidden">
                 <button
                   type="button"
                   onClick={() => router.push("/sns")}
-                  className="min-h-11 px-2 text-sm font-medium text-brand hover:text-brand-hover"
+                  className="min-h-4 px-2 text-xs font-medium text-brand hover:text-brand-hover"
                 >
                   ← SNS投稿一覧に戻る
                 </button>
@@ -398,7 +400,10 @@ export function SNSPostMasterDetail({
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div
+              data-testid="sns-inspector-content"
+              className="min-h-0 flex-1 overflow-y-auto space-y-5 p-6"
+            >
               <div className="text-xs text-gray-500">更新日時 : {selectedPost.updatedAt}</div>
 
               {/* Form: Scheduled Datetime */}
@@ -516,7 +521,10 @@ export function SNSPostMasterDetail({
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 border-t border-brand/30 flex items-center justify-between shrink-0">
+            <div
+              data-testid="sns-inspector-actions"
+              className="mt-auto flex shrink-0 items-center justify-between border-t border-brand/30 p-4"
+            >
               <div>
                 {saveStatus === "saved" && (
                   <span className="text-xs text-emerald-600 font-semibold">変更を保存しました</span>
@@ -531,7 +539,7 @@ export function SNSPostMasterDetail({
                     setPlatformUrls(selectedPost.platformUrls);
                     setHashtags(selectedPost.hashtags);
                   }}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors flex items-center justify-center"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -539,13 +547,14 @@ export function SNSPostMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="min-h-[44px] px-6 py-2.5 bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {isSaving ? "保存中..." : "変更"}
                 </button>
               </div>
             </div>
-          </div>
+            </ResizableInspectorPanel>
+          </InspectorPanelSlot>
         ) : (
           <div className={`${detailOnly ? "h-full flex" : "hidden lg:col-span-6 lg:flex"} rounded-sm border-t border-brand/30 items-center justify-center text-sm text-gray-400 lg:border-t-0 lg:border-l`}>
             投稿文を選択してください

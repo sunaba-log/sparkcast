@@ -9,6 +9,7 @@ import {
   updateDirectorInterventions,
 } from "@/server/episodes/data-repository";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
+import { isLocalUiDemoEnabled } from "@/server/env";
 
 const applySchema = z.object({
   interventions: z.array(z.object({
@@ -23,6 +24,13 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (isLocalUiDemoEnabled()) {
+      const { id } = await context.params;
+      if (id !== "3") {
+        return NextResponse.json({ error: "エピソードが見つかりません" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, status: "editing" });
+    }
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     const podcastId = await requireSelectedPodcastForApi(user);

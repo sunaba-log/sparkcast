@@ -6,6 +6,8 @@ import {
   listEpisodesAndPromotionsPaginated,
 } from "@/server/episodes/data-repository";
 import { mapToSNSPostItem, sortPostsDesc } from "@/lib/sns";
+import { isLocalUiDemoEnabled } from "@/server/env";
+import { mockEpisodes } from "@/lib/mockEpisodes";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,9 @@ export default async function SNSPostPage({
   const { episode, post } = await searchParams;
 
   // Load the initial 5 episodes and their promotions
-  const { episodes, hasMore } = await listEpisodesAndPromotionsPaginated(podcastId, 5, 0);
+  const { episodes, hasMore } = isLocalUiDemoEnabled()
+    ? { episodes: mockEpisodes.filter((item) => item.podcastId === podcastId), hasMore: false }
+    : await listEpisodesAndPromotionsPaginated(podcastId, 5, 0);
 
   // Map to SNSPostItem structure
   let initialPosts = episodes.flatMap((ep) =>
@@ -30,7 +34,9 @@ export default async function SNSPostPage({
   // 該当エピソードの投稿を読み込んでマージする。
   const episodeId = Number(episode);
   if (post && Number.isFinite(episodeId) && !initialPosts.some((p) => p.id === post)) {
-    const target = await findEpisode(podcastId, episodeId);
+    const target = isLocalUiDemoEnabled()
+      ? mockEpisodes.find((item) => item.podcastId === podcastId && item.id === episode)
+      : await findEpisode(podcastId, episodeId);
     if (target) {
       const existing = new Set(initialPosts.map((p) => p.id));
       const targetPosts = target.xPosts
