@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  useCallback,
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -34,6 +36,7 @@ export function ResizableInspectorPanel({
   resizable?: boolean;
 }) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [isDragging, setIsDragging] = useState(false);
   const resizeStartRef = useRef<{ clientX: number; width: number } | null>(null);
 
   const resizeBy = (amount: number) => {
@@ -44,21 +47,44 @@ export function ResizableInspectorPanel({
     if (event.button !== 0) return;
     event.preventDefault();
     resizeStartRef.current = { clientX: event.clientX, width };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDragging(true);
   };
 
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const resizeStart = resizeStartRef.current;
-    if (!resizeStart) return;
-    setWidth(clampWidth(resizeStart.width + resizeStart.clientX - event.clientX));
-  };
-
-  const stopResizing = (event: PointerEvent<HTMLDivElement>) => {
+  const stopResizing = useCallback(() => {
     resizeStartRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (event: globalThis.PointerEvent) => {
+      const resizeStart = resizeStartRef.current;
+      if (!resizeStart) return;
+      setWidth(clampWidth(resizeStart.width + resizeStart.clientX - event.clientX));
+    };
+
+    const handlePointerUp = () => {
+      stopResizing();
+    };
+
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+
+    return () => {
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+  }, [isDragging, stopResizing]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowLeft") {
@@ -82,8 +108,8 @@ export function ResizableInspectorPanel({
 
   return (
     <aside
-      className={`relative flex w-full min-h-0 flex-col overflow-hidden rounded-xs border-t border-brand/30 bg-app-bg ${
-        resizable ? "lg:w-[var(--inspector-width)] lg:shrink-0 lg:self-stretch lg:border-t-0 lg:border-l" : ""
+      className={`relative flex w-full min-h-0 flex-col rounded-xs border-t border-brand/30 bg-app-bg ${
+        resizable ? "lg:w-[var(--inspector-width)] lg:flex-none lg:shrink-0 lg:self-stretch lg:border-t-0 lg:border-l" : ""
       } ${className}`}
       style={style}
     >
@@ -96,17 +122,22 @@ export function ResizableInspectorPanel({
           aria-valuemax={getMaximumWidth()}
           aria-valuenow={width}
           tabIndex={0}
-          className="group absolute top-0 -left-1 z-30 hidden h-full w-2 cursor-col-resize items-center justify-center select-none lg:flex"
+          className="group absolute top-0 -left-2 z-40 hidden h-full w-4 cursor-col-resize items-center justify-center select-none touch-none lg:flex"
           onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={stopResizing}
-          onPointerCancel={stopResizing}
           onKeyDown={handleKeyDown}
         >
-          <div className="h-10 w-1 rounded-full bg-brand/30 transition-colors group-hover:bg-brand group-focus:bg-brand" />
+          <div
+            className={`h-10 w-1 rounded-full transition-colors ${
+              isDragging
+                ? "bg-brand ring-2 ring-brand/40"
+                : "bg-brand/30 group-hover:bg-brand group-focus:bg-brand"
+            }`}
+          />
         </div>
       )}
-      {children}
+      <div className="flex h-full w-full min-h-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
     </aside>
   );
 }
