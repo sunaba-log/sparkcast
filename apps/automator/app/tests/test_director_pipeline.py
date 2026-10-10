@@ -1057,3 +1057,92 @@ def test_pipeline_skips_intervention_when_verification_agent_finds_actually_true
     # 介入なしのため awaiting_approval ではなく completed に進んだ
     assert repo.awaiting_approval_called is False
     assert repo.completed_called is True
+
+
+@pytest.mark.anyio
+async def test_fact_check_auditor_populates_raw_response_and_traces():
+    """FactCheckAuditor が raw_response を FactCheckAuditMetric に保持し、トレースを収集すること (#220)."""
+    mock_client = AsyncMock()
+    mock_response = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.12),
+            "score": MagicMock(score=0.05, confidence=0.95),
+            "choice": MagicMock(choice="other"),
+        },
+        model="typesafe-model-v1",
+    )
+    mock_client.system_one.return_value = mock_response
+
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk(
+        chunk_id="seg_00001",
+        speaker="話者1",
+        start_ms=0,
+        end_ms=4500,
+        text="これはテスト発話です。",
+    )
+
+    _, metric = await auditor.audit_single_chunk_async(mock_client, chunk)
+
+    # 1. FactCheckAuditMetric.raw_response の検証
+    assert metric.raw_response is not None
+    assert metric.raw_response["noul"] == 0.12
+    assert metric.raw_response["score"] == 0.05
+    assert metric.raw_response["choice"] == "other"
+    assert metric.raw_response["confidence"] == 0.95
+
+    # 2. FactCheckAuditor.last_traces の検証
+    traces = auditor.last_traces
+    assert len(traces) == 1
+    trace = traces[0]
+    assert trace.chunk_id == "seg_00001"
+    assert trace.raw_answers == metric.raw_response
+    assert trace.parsed_metric["score"] == 1
+    assert trace.parsed_metric["should_intervene"] is False
+    assert trace.metadata["model"] == "typesafe-model-v1"
+    assert trace.metadata["latency_ms"] >= 0
+    assert "話者: 話者1" in trace.input_state
+
+
+def test_fact_check_auditor_bundle_includes_traces_with_policy_findings():
+    """audit_bundle の戻り値 AuditBundle に traces が含まれ、ポリシー検知結果が紐付けられること (#220)."""
+    mock_client = AsyncMock()
+    mock_client.system_one.side_effect = [
+        MagicMock(
+            answers={
+                "noul": MagicMock(noul=0.8),
+                "score": MagicMock(score=0.0, confidence=0.9),
+                "choice": MagicMock(choice="other"),
+            }
+        ),
+        MagicMock(
+            answers={
+                "confidential_information": MagicMock(noul=0.1),
+                "third_party_risk": MagicMock(noul=0.1),
+            }
+        ),
+    ]
+    detector = MagicMock()
+    detector.detect.return_value = []
+
+    auditor = FactCheckAuditor(client=mock_client, pii_detector=detector)
+    chunk1 = UtteranceChunk(
+        chunk_id="seg_00001",
+        speaker="小野",
+        start_ms=0,
+        end_ms=3000,
+        text="社外秘のプロジェクトAの予算は1000万です",
+    )
+    policy = AudioAuditPolicy(
+        confidential_terms=("プロジェクトA",),
+        version="v1",
+    )
+
+    bundle = auditor.audit_bundle([chunk1], policy=policy)
+
+    assert len(bundle.traces) == 1
+    trace = bundle.traces[0]
+    assert trace.chunk_id == "seg_00001"
+    assert len(trace.policy_findings) == 1
+    assert trace.policy_findings[0]["category"] == "confidential_information"
+    assert trace.metadata["policy_version"] == "v1"

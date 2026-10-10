@@ -45,3 +45,8 @@ rate_limit_hourly                = "100"
 # ブラウザ収録ルーム（#166）。Worker のホスト名は apps/realtime/wrangler.jsonc の env.dev.routes と揃える。
 enable_recording  = true
 realtime_hostname = "sparkcast-realtime-dev.sunabalog.com"
+
+# Jev 入出力トレースログ保存（#220）
+audit_trace_enabled        = true
+audit_trace_retention_days = 90
+

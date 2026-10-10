@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -305,11 +305,124 @@ class FactCheckAuditMetric:
 
 
 @dataclass(frozen=True)
+class AuditChunkTrace:
+    """監査トレース記録 (チャンク単位) (#220)."""
+
+    chunk_id: str
+    speaker: str
+    start_ms: int
+    end_ms: int
+    text: str
+    is_complete_sentence: bool
+    completion_reason: str
+    input_state: str
+    questions: dict[str, str]
+    raw_answers: dict[str, Any]
+    parsed_metric: dict[str, Any]
+    policy_findings: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    podcast_id: str = ""
+    episode_id: str = ""
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        chunk: UtteranceChunk,
+        metric: FactCheckAuditMetric,
+        input_state: str,
+        questions: dict[str, str],
+        latency_ms: int = 0,
+        model: str = "jev-default",
+        policy_version: str = "v1",
+        policy_findings: Sequence[PolicyFinding] = (),
+        podcast_id: str = "",
+        episode_id: str = "",
+        timestamp: str | None = None,
+    ) -> AuditChunkTrace:
+        """Create an audit trace record from evaluated chunk and metric."""
+        ts = timestamp or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return cls(
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+            chunk_id=chunk.chunk_id,
+            speaker=chunk.speaker,
+            start_ms=chunk.start_ms,
+            end_ms=chunk.end_ms,
+            text=chunk.text,
+            is_complete_sentence=chunk.is_complete_sentence,
+            completion_reason=chunk.completion_reason,
+            input_state=input_state,
+            questions=dict(questions),
+            raw_answers=dict(metric.raw_response or {}),
+            parsed_metric={
+                "noul": metric.noul,
+                "score": metric.score,
+                "choice": metric.choice,
+                "should_intervene": metric.should_intervene(),
+            },
+            policy_findings=[f.to_dict() for f in policy_findings],
+            metadata={
+                "model": model,
+                "latency_ms": latency_ms,
+                "policy_version": policy_version,
+            },
+            timestamp=ts,
+        )
+
+    def with_policy_findings(
+        self,
+        findings: Sequence[PolicyFinding],
+        policy_version: str | None = None,
+    ) -> AuditChunkTrace:
+        """Return a new trace record with updated policy findings and policy version."""
+        new_metadata = dict(self.metadata)
+        if policy_version:
+            new_metadata["policy_version"] = policy_version
+        return replace(
+            self,
+            policy_findings=[f.to_dict() for f in findings],
+            metadata=new_metadata,
+        )
+
+    def with_episode(self, podcast_id: str, episode_id: str) -> AuditChunkTrace:
+        """Return a new trace record associated with the given podcast and episode IDs."""
+        return replace(
+            self,
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
+    def to_dict(self, podcast_id: str | None = None, episode_id: str | None = None) -> dict[str, Any]:
+        """Serialize the trace to a dictionary conforming to the JSONL specification."""
+        return {
+            "timestamp": self.timestamp,
+            "podcast_id": podcast_id or self.podcast_id,
+            "episode_id": episode_id or self.episode_id,
+            "chunk_id": self.chunk_id,
+            "speaker": self.speaker,
+            "start_ms": self.start_ms,
+            "end_ms": self.end_ms,
+            "text": self.text,
+            "is_complete_sentence": self.is_complete_sentence,
+            "completion_reason": self.completion_reason,
+            "input_state": self.input_state,
+            "questions": self.questions,
+            "raw_answers": self.raw_answers,
+            "parsed_metric": self.parsed_metric,
+            "policy_findings": self.policy_findings,
+            "metadata": self.metadata,
+        }
+
+
+@dataclass(frozen=True)
 class AuditBundle:
     """ファクトチェックと音声校正ポリシーを完全な一組として返す監査結果。."""
 
     fact_check_results: list[tuple[UtteranceChunk, FactCheckAuditMetric]]
     policy_findings: list[PolicyFinding]
+    traces: list[AuditChunkTrace] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
