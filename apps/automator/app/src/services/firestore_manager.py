@@ -40,11 +40,15 @@ class FirestoreManager:
         audio_metadata: dict[str, Any],
         minutes: str | None = None,
         transcript_meta: dict[str, Any] | None = None,
+        rss_guid: str | None = None,
+        published_at: Any = None,
+        is_published: bool | None = None,
     ) -> str:
         """Upsert episode content document.
 
         minutes は AI が作った議事録(#166 以降。それ以前は transcripts に議事録を分割して入れていた)。
         transcript_meta は文字起こしの作り方(engine / speaker_source / segment_count など)。
+        rss_guid, published_at, is_published は RSS 完全再生成用のメタデータ(#221)。
         """
         doc_ref = self._episode_contents_collection(podcast_id).document(episode_id)
         data: dict[str, Any] = {
@@ -60,8 +64,39 @@ class FirestoreManager:
             data["minutes"] = minutes
         if transcript_meta is not None:
             data["transcript_meta"] = transcript_meta
+        if rss_guid is not None:
+            data["rss_guid"] = rss_guid
+        if published_at is not None:
+            data["published_at"] = published_at
+        if is_published is not None:
+            data["is_published"] = is_published
         doc_ref.set(data, merge=True)
         return doc_ref.id
+
+    def list_all_episode_contents(
+        self,
+        *,
+        podcast_id: str,
+    ) -> list[dict[str, Any]]:
+        """Fetch all episode contents under a podcast."""
+        docs = self._episode_contents_collection(podcast_id).stream()
+        results: list[dict[str, Any]] = []
+        for doc in docs:
+            d = doc.to_dict() or {}
+            d["id"] = doc.id
+            results.append(d)
+        return results
+
+    def update_episode_fields(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        fields: dict[str, Any],
+    ) -> None:
+        """Partially update episode content document."""
+        doc_ref = self._episode_contents_collection(podcast_id).document(episode_id)
+        doc_ref.set(fields, merge=True)
 
     def get_episode_content(
         self,

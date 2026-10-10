@@ -17,6 +17,13 @@ class PostgresEpisodeRepository:
         """Initialize the repository."""
         self._database_url = database_url
 
+    def get_episode_count(self, *, podcast_id: str) -> int:
+        """Return the number of episodes for a given podcast."""
+        with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM episodes WHERE podcast_id = %s", (podcast_id,))
+            row = cursor.fetchone()
+        return row[0] if row else 0
+
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         """Mark an uploaded episode as processing."""
         self._execute_update(

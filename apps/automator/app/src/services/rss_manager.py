@@ -140,7 +140,7 @@ class PodcastRssManager:
         for key, value in kwargs.items():
             self.podcast_basic_info[key] = value
 
-    def _register_episode(self, episode: EpisodeData) -> None:
+    def _register_episode(self, episode: EpisodeData, order: str = "append") -> None:
         """エピソード(episode)をFeedGeneratorに登録."""
         # 必須フィールドのチェック
         required_fields = ["title", "description", "audio_url"]
@@ -150,7 +150,7 @@ class PodcastRssManager:
                 raise ValueError(msg)
 
         # 新しいエントリを作成
-        fe = self.fg.add_entry()
+        fe = self.fg.add_entry(order=order)
 
         # テキストフィールドにエスケープ処理を適用
         fe.id(episode.get("guid", str(uuid.uuid4())))
@@ -556,7 +556,7 @@ class PodcastRssManager:
         rss_str = self._wrap_elements_with_cdata(rss_str, ["itunes:category"])
         self.rss_xml = rss_str
 
-    def add_episode(self, episode_data: EpisodeData) -> None:
+    def add_episode(self, episode_data: EpisodeData, order: str = "append") -> None:
         """新しいエピソードをRSSフィードに追加.
 
         Args:
@@ -577,10 +577,14 @@ class PodcastRssManager:
                 - itunes_season: iTunesシーズン番号
                 - itunes_episode_number: iTunesエピソード番号
                 - itunes_episode_type: iTunesエピソードタイプ(例: "full", "trailer", "bonus")
+            order: 追加順序 ('append' または 'prepend', デフォルト: 'append').
 
         """
-        self._register_episode(episode_data)
-        self.episodes.append(episode_data)
+        self._register_episode(episode_data, order=order)
+        if order == "append":
+            self.episodes.append(episode_data)
+        else:
+            self.episodes.insert(0, episode_data)
         self.total_episodes += 1
 
         self.set_rss_xml()

@@ -8,10 +8,35 @@ import {
   listDirectorInterventions,
   listPolicyFindings,
   setEpisodePublished,
+  updateEpisodeAudio,
   updateEpisodeGeneratedContent,
   updateEpisodeMetadata,
 } from "@/server/episodes/data-repository";
 import { runAutomatorJob } from "@/server/episodes/automator-jobs";
+
+const lastRssSyncByPodcast = new Map<number, number>();
+const RSS_SYNC_THROTTLE_MS = 5000;
+
+export function _resetRssSyncThrottle(): void {
+  lastRssSyncByPodcast.clear();
+}
+
+async function triggerRssSync(podcastId: number, throttle = false): Promise<void> {
+  const now = Date.now();
+  if (throttle) {
+    const last = lastRssSyncByPodcast.get(podcastId) ?? 0;
+    if (now - last < RSS_SYNC_THROTTLE_MS) {
+      return;
+    }
+  }
+  lastRssSyncByPodcast.set(podcastId, now);
+  await runAutomatorJob({
+    action: "sync_rss",
+    podcastId,
+  }).catch((err) => {
+    console.warn("Failed to trigger sync_rss:", err);
+  });
+}
 
 const updateSchema = z.object({
   title: z.string().min(1).max(255).optional(),
@@ -26,6 +51,10 @@ const updateSchema = z.object({
     )
     .optional(),
   isPublished: z.boolean().optional(),
+  audioUrl: z.string().url().max(2000).optional(),
+  durationSeconds: z.number().int().nonnegative().optional(),
+  fileSizeBytes: z.number().int().nonnegative().optional(),
+  mimeType: z.string().max(100).optional(),
 });
 
 async function authorize() {
@@ -78,7 +107,8 @@ export async function PATCH(
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
       return NextResponse.json({ error: "episode IDが不正です" }, { status: 400 });
     }
-    if (!(await findEpisode(auth.podcastId, episodeId))) {
+    const existingEpisode = await findEpisode(auth.podcastId, episodeId);
+    if (!existingEpisode) {
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
     const input = updateSchema.parse(await request.json());
@@ -90,6 +120,30 @@ export async function PATCH(
         input.title,
         input.description,
       );
+    }
+
+    if (input.audioUrl !== undefined) {
+      let bustedAudioUrl = input.audioUrl;
+      try {
+        const parsed = new URL(bustedAudioUrl);
+        if (!parsed.searchParams.has("v")) {
+          parsed.searchParams.set("v", String(Date.now()));
+          bustedAudioUrl = parsed.toString();
+        }
+      } catch {
+        if (!bustedAudioUrl.includes("?v=") && !bustedAudioUrl.includes("&v=")) {
+          const sep = bustedAudioUrl.includes("?") ? "&" : "?";
+          bustedAudioUrl = `${bustedAudioUrl}${sep}v=${Date.now()}`;
+        }
+      }
+      await updateEpisodeAudio({
+        podcastId: auth.podcastId,
+        episodeId,
+        audioUrl: bustedAudioUrl,
+        durationSeconds: input.durationSeconds,
+        fileSizeBytes: input.fileSizeBytes,
+        mimeType: input.mimeType,
+      });
     }
 
     if (input.minutes !== undefined || input.promotions !== undefined) {
@@ -104,13 +158,12 @@ export async function PATCH(
 
     if (input.isPublished !== undefined) {
       if (input.isPublished) {
-        const episode = await findEpisode(auth.podcastId, episodeId);
         const [interventions, policyFindings] = await Promise.all([
           listDirectorInterventions(auth.podcastId, episodeId),
           listPolicyFindings(auth.podcastId, episodeId),
         ]);
         if (
-          episode?.status !== "completed"
+          existingEpisode.status !== "completed"
           || interventions.some((intervention) => intervention.status === "pending")
           || policyFindings.some((finding) => finding.status === "pending")
         ) {
@@ -121,12 +174,12 @@ export async function PATCH(
         }
       }
       await setEpisodePublished(auth.podcastId, episodeId, input.isPublished);
-      await runAutomatorJob({
-        action: "sync_rss",
-        podcastId: auth.podcastId,
-      }).catch((err) => {
-        console.warn("Failed to trigger sync_rss after publish update:", err);
-      });
+      await triggerRssSync(auth.podcastId, false);
+    } else if (
+      existingEpisode.isPublished &&
+      (input.title !== undefined || input.description !== undefined || input.audioUrl !== undefined)
+    ) {
+      await triggerRssSync(auth.podcastId, true);
     }
 
     return NextResponse.json({ ok: true });
@@ -165,12 +218,7 @@ export async function DELETE(
     if (!deleted) {
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
-    await runAutomatorJob({
-      action: "sync_rss",
-      podcastId: auth.podcastId,
-    }).catch((err) => {
-      console.warn("Failed to trigger sync_rss after delete:", err);
-    });
+    await triggerRssSync(auth.podcastId, false);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof Error && error.message === "NO_PODCAST_SELECTED") {

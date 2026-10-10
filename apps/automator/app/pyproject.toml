@@ -96,16 +96,22 @@ unfixable = [
 "**/tests/*" = [
   "S",  # ignore security related warnings in tests
   "C",  # ignore various C categories in tests
-  "D1",  # ignore undocumented code in tests
+  "D",  # ignore docstring checks in tests
   "ANN",  # ignore some type annotation checks in tests
   "PLR2004",  # ignore magic number compare
   "SLF001",  # allow private member access for cache reset
   "S101",    # assert allowed in tests
-  "PLR2004", # Magic values allowed in tests
-  "ANN",     # Type annotations optional in tests
-  "D",       # Docstrings optional in tests
-  "ARG004", # Unused static method argument
-  "RUF100", # Unused `noqa` directive 
+  "ARG",     # Unused arguments in test mocks
+  "PTH",     # Path operations in tests
+  "RUF100",  # Unused `noqa` directive 
+]
+"scripts/*" = [
+  "INP001",  # Scripts are standalone entrypoints
+  "T201",    # Print allowed in CLI scripts
+  "PTH",     # Path operations in scripts
+  "BLE001",  # Blind exception allowed in scripts
+  "PLR2004", # Magic values allowed in scripts
+  "S",       # Security checks relaxed in scripts
 ]
 
 [tool.ruff.lint.mccabe]

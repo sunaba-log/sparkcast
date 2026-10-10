@@ -33,6 +33,7 @@ export type Episode = {
   processingError: string | null;
   publishedAt?: string | null;
   isPublished?: boolean;
+  rssGuid?: string;
   minutesGenerated: boolean;
   // 話者・時刻つきの文字起こしがあるか（#166 以降に処理したエピソード）
   transcriptAvailable: boolean;

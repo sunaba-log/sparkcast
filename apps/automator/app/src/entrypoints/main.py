@@ -12,8 +12,6 @@ import urllib.request
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import psycopg
-
 from infrastructure.ai_analyzer import AudioAnalyzer
 from infrastructure.episode_repository import PostgresEpisodeRepository
 from infrastructure.knowledge_reindexer import HttpKnowledgeReindexer
@@ -28,6 +26,7 @@ from services.fact_check_auditor import FactCheckAuditor
 from services.fact_verification_agent import FactVerificationAgent
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
+from services.rss_rebuilder import PodcastRssRebuilder
 from services.speech_audio import GcsSpeechAudioPreparer
 from services.track_energy import load_track_energy
 from services.voiced_audio import GcsVoicedTrackPreparer
@@ -263,12 +262,20 @@ def process_podcast_workflow() -> None:
     )
     gcs_client = GCSClient(project_id=config.project_id)
 
+    rss_rebuilder = PodcastRssRebuilder(
+        database_url=config.database_url,
+        object_storage=r2_client,
+        firestore_manager=firestore_manager,
+        logger_instance=logger,
+    )
+
     usecase = ProcessPodcastWorkflow(
         transcript_provider=audio_analyzer,
         object_storage=r2_client,
         blob_source=gcs_client,
         notifier=notifier_client,
         rss_manager_factory=PodcastRssManager,
+        rss_rebuilder=rss_rebuilder,
         audio_converter=AudioConverter.convert_to_mp3,
         audio_info_reader=get_audio_info,
         firestore_manager=firestore_manager,
@@ -329,7 +336,7 @@ def process_podcast_workflow() -> None:
 
 
 def sync_podcast_rss(environ: Mapping[str, str]) -> None:
-    """Sync the podcast RSS feed in R2 with published episodes in PostgreSQL."""
+    """Sync the podcast RSS feed in R2 with published episodes in DB and Firestore."""
     podcast_id = environ.get("PODCAST_ID")
     if not podcast_id:
         logger.error("PODCAST_ID environment variable is required for sync_rss")
@@ -338,11 +345,12 @@ def sync_podcast_rss(environ: Mapping[str, str]) -> None:
     database_url = _required_env(environ, "DATABASE_URL")
     project_id = _required_env(environ, "PROJECT_ID")
     r2_bucket = _required_env(environ, "R2_BUCKET")
-    r2_key_prefix = environ.get("R2_KEY_PREFIX", "test")
+    r2_key_prefix = environ.get("R2_KEY_PREFIX", "sunabalog")
     r2_account_id = environ.get("CLOUDFLARE_ACCOUNT_ID", "8ed20f6872cea7c9219d68bfcf5f98ae")
     r2_endpoint_url = environ.get("R2_ENDPOINT_URL", f"https://{r2_account_id}.r2.cloudflarestorage.com")
     r2_access_key = environ.get("CLOUDFLARE_ACCESS_KEY_ID")
     r2_secret_key = environ.get("CLOUDFLARE_SECRET_ACCESS_KEY")
+    r2_custom_domain = environ.get("R2_CUSTOM_DOMAIN", "podcast.sunabalog.com")
     secret_name = environ.get("SECRET_NAME")
 
     if secret_name and (not r2_access_key or not r2_secret_key):
@@ -359,75 +367,19 @@ def sync_podcast_rss(environ: Mapping[str, str]) -> None:
         access_key=r2_access_key,
         secret_key=r2_secret_key,
     )
+    firestore_manager = FirestoreManager(project_id=project_id)
 
-    with psycopg.connect(database_url) as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT title, description, cover_image_url
-            FROM podcasts
-            WHERE podcast_id = %s
-            """,
-            (podcast_id,),
-        )
-        podcast_row = cur.fetchone()
-        if not podcast_row:
-            logger.error("Podcast %s not found", podcast_id)
-            return
-        p_title, p_desc, p_cover = podcast_row
-
-        cur.execute(
-            """
-            SELECT episode_id, title, description, audio_file_path, duration_seconds, published_at
-            FROM episodes
-            WHERE podcast_id = %s AND status = 'completed' AND published_at IS NOT NULL
-            ORDER BY published_at ASC
-            """,
-            (podcast_id,),
-        )
-        episodes = cur.fetchall()
-
-    rss_manager = PodcastRssManager()
-    rss_manager.generate_podcast_rss(
-        title=p_title,
-        description=p_desc or "30 Days to Build (or Not)",
-        language="ja",
-        category="Technology",
-        cover_url=p_cover or "https://podcast.sunabalog.com/cover.jpg",
-        owner_name="sunabalog",
-        owner_email="admin@sunabalog.com",
+    rebuilder = PodcastRssRebuilder(
+        database_url=database_url,
+        object_storage=r2_client,
+        firestore_manager=firestore_manager,
+        logger_instance=logger,
     )
-
-    for i, (ep_id, title, desc, audio_url, dur_sec, pub_date) in enumerate(episodes):
-        if not audio_url:
-            continue
-        dur_str = (
-            f"{dur_sec // 3600:02d}:{(dur_sec % 3600) // 60:02d}:{dur_sec % 60:02d}"
-            if dur_sec is not None
-            else "00:00:00"
-        )
-        rss_manager.add_episode(
-            {
-                "guid": f"sparkcast-ep-{ep_id}",
-                "title": title,
-                "description": desc or "",
-                "audio_url": audio_url,
-                "file_size": 10000000,
-                "mime_type": "audio/mpeg",
-                "itunes_duration": dur_str,
-                "pub_date": pub_date,
-                "itunes_episode_number": i + 1,
-                "itunes_episode_type": "full",
-            }
-        )
-
-    rss_xml = rss_manager.get_rss_xml()
-    r2_client.upload_file(
-        file_content=rss_xml.encode("utf-8"),
-        remote_key=f"{r2_key_prefix}/feed.xml",
-        content_type="application/rss+xml; charset=utf-8",
-        public=True,
+    rebuilder.rebuild(
+        podcast_id=podcast_id,
+        r2_key_prefix=r2_key_prefix,
+        r2_custom_domain=r2_custom_domain,
     )
-    logger.info("Successfully synced RSS feed for podcast %s with %d episodes", podcast_id, len(episodes))
 
 
 def main() -> None:
