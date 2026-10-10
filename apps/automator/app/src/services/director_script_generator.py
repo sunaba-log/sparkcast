@@ -192,9 +192,7 @@ class DirectorScriptGenerator:
         # 参照リンクの決定:
         # Verification Agent の一次ソースURLがあれば最優先、なければ LLM のパース結果を採用
         resolved_ref_url = (
-            verification.sources[0].url
-            if verification and verification.sources
-            else parsed.reference_url
+            verification.sources[0].url if verification and verification.sources else parsed.reference_url
         )
 
         resolved_ref_links = (
