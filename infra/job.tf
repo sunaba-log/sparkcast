@@ -48,6 +48,10 @@ module "cloud_run_job" {
     SPEECH_TIMEOUT_SECONDS = "18000"
     # エピソードが完成したらチャット用の索引をすぐ作り直してもらう（#166。認証は定期実行と同じ CRON_SECRET）
     APP_BASE_URL = local.app_base_url
+    # Jev 入出力トレースログ保存（#220）
+    AUDIT_TRACE_ENABLED    = tostring(var.audit_trace_enabled)
+    AUDIT_TRACE_GCS_BUCKET = google_storage_bucket.audit_traces.name
+    AUDIT_TRACE_PREFIX     = var.audit_trace_prefix
   }
 
   secret_environment_variables = {
@@ -59,6 +63,7 @@ module "cloud_run_job" {
 
   depends_on = [
     google_project_service.required,
+    google_storage_bucket_iam_member.job_audit_traces_access,
   ]
 }
 

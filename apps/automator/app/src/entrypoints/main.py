@@ -81,6 +81,7 @@ class PodcastEnvConfig:
     audit_trace_enabled: bool = False
     audit_trace_gcs_bucket: str | None = None
     audit_trace_local_dir: str | None = None
+    audit_trace_prefix: str = "audit_traces"
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -129,6 +130,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     audit_trace_enabled = environ.get("AUDIT_TRACE_ENABLED", "false").lower() in ("true", "1")
     audit_trace_gcs_bucket = environ.get("AUDIT_TRACE_GCS_BUCKET") or None
     audit_trace_local_dir = environ.get("AUDIT_TRACE_LOCAL_DIR") or None
+    audit_trace_prefix = environ.get("AUDIT_TRACE_PREFIX", "audit_traces")
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -167,6 +169,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         audit_trace_enabled=audit_trace_enabled,
         audit_trace_gcs_bucket=audit_trace_gcs_bucket,
         audit_trace_local_dir=audit_trace_local_dir,
+        audit_trace_prefix=audit_trace_prefix,
     )
 
 
@@ -199,10 +202,11 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("DIRECTOR_ENABLED: %s", config.director_enabled)
     logger.info("PUBLISH_ORIGINAL: %s", config.publish_original)
     logger.info(
-        "AUDIT_TRACE_ENABLED: %s (gcs_bucket=%s, local_dir=%s)",
+        "AUDIT_TRACE_ENABLED: %s (gcs_bucket=%s, local_dir=%s, prefix=%s)",
         config.audit_trace_enabled,
         config.audit_trace_gcs_bucket,
         config.audit_trace_local_dir,
+        config.audit_trace_prefix,
     )
     logger.info("###########################\n")
 

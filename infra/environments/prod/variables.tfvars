@@ -43,3 +43,8 @@ custom_domain                    = "sparkcast.sunabalog.com"
 # Worker のホスト名は apps/realtime/wrangler.jsonc の env.prod.routes と揃える。
 enable_recording  = true
 realtime_hostname = "sparkcast-realtime.sunabalog.com"
+
+# Jev 入出力トレースログ保存（#220）
+audit_trace_enabled        = true
+audit_trace_retention_days = 90
+
