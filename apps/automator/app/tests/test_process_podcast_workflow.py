@@ -2,13 +2,13 @@ from __future__ import annotations
 
 # ruff: noqa: ARG002, ARG005
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
 from domain.errors import ReviewIncompleteError
 from domain.models import SnsPromotionContent, SnsPromotionsResponse, Summary
-from domain.models.director import FactCheckAuditMetric
+from domain.models.director import AudioAuditPolicy, FactCheckAuditMetric
 from domain.models.transcript import TranscriptSegment
 from services.episode_transcription import EpisodeTranscription, TranscriptionResult
 from usecases.process_podcast_workflow import (
@@ -104,6 +104,9 @@ class _EpisodeRepository:
     completed: dict[str, object] | None = None
     failed: tuple[str, str, str] | None = None
     interim_metadata: dict[str, object] | None = None
+    auditing: tuple[str, str] | None = None
+    awaiting_approval: tuple[str, str] | None = None
+    audio_audit_policy: AudioAuditPolicy = field(default_factory=AudioAuditPolicy)
 
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         self.processing = (podcast_id, episode_id, source_audio_path)
@@ -125,6 +128,9 @@ class _EpisodeRepository:
 
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         return ["小野", "数森"]
+
+    def get_audio_audit_policy(self, *, podcast_id: str) -> AudioAuditPolicy:
+        return self.audio_audit_policy
 
     def find_recording_speakers(self, *, episode_id: str):
         return None
@@ -473,3 +479,56 @@ def test_workflow_resumes_from_audit_skipping_speech_and_transcription() -> None
     # 3. 正常に completed に遷移
     assert repository.completed is not None
     assert repository.completed["title"] == "#4 既存のタイトル"
+
+
+def test_workflow_skips_audit_when_policy_disabled() -> None:
+    """audio_audit_policy.enabled = False の場合、監査がスキップされ completed になること (#217)."""
+
+    class _CountingAuditor:
+        def __init__(self):
+            self.call_count = 0
+
+        def audit_chunks(self, chunks):
+            self.call_count += 1
+            raise AssertionError("Auditor should NOT be called when audio_audit_policy is disabled!")
+
+        def audit_bundle(self, chunks, policy):
+            self.call_count += 1
+            raise AssertionError("Auditor should NOT be called when audio_audit_policy is disabled!")
+
+    class _MockTranscription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="発話テキスト", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    repository = _EpisodeRepository(audio_audit_policy=AudioAuditPolicy(enabled=False))
+    firestore = _FirestoreManager()
+    mock_auditor = _CountingAuditor()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=firestore,
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_MockTranscription(),
+        fact_check_auditor=mock_auditor,
+    )
+
+    workflow.run(_request())
+
+    # 1. 監査メソッドは呼ばれていない
+    assert mock_auditor.call_count == 0
+    # 2. mark_auditing は呼ばれていない
+    assert repository.auditing is None
+    # 3. エピソードは正常に completed に遷移
+    assert repository.completed is not None
+    assert repository.failed is None

@@ -227,7 +227,7 @@ sequenceDiagram
 
 Jev には `confidential_information` と `third_party_risk` の型付き `Noul` 質問も送ります。PII 検出器の初期化・実行失敗、欠落した質問、NaN、範囲外値、未知の応答形式はすべてフェイルクローズとし、R2 への音声アップロードおよび RSS 更新を行いません。検知時の既定アクションは `require_approval` / `silence` であり、自動カットや訂正音声の挿入は行いません。
 
-番組管理者は `podcasts.audio_audit_policy` の `confidential_terms` と `allowed_terms` を番組ごとに管理し、変更時に `version` を更新します。各 finding にそのバージョンを保存することで、判断時点のポリシーを追跡できます。
+番組管理者は `podcasts.audio_audit_policy` の `enabled`（AI監査の有効・無効フラグ、既定: `true`）、`confidential_terms`、`allowed_terms` を番組ごとに管理し、変更時に `version` を更新します。監査を無効化した番組では Step 2.5 の全処理（Jev 監査・事実検証・訂正生成）が自動でスキップされ、AI 利用料を最適化できます。各 finding にそのバージョンを保存することで、判断時点のポリシーを追跡できます。
 
 `policy_findings` は UI で全件を `approved` または `rejected` に判断するまで、編集・公開を開始できません。承認済み finding は既存の音声編集ジョブへ `policyFindings` として渡され、原音声を変更せず新しいレンディションを生成します。全件を却下した場合は `awaiting_publish_confirmation` へ遷移し、管理者が原音声の公開を明示確認した場合だけ、監査を再実行せずに R2 と RSS の公開を再開します。
 

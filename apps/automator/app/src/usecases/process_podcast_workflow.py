@@ -291,117 +291,127 @@ class ProcessPodcastWorkflow:
                             transcript=transcript,
                         )
 
-            # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170)
+            # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170, #217)
             if self._fact_check_auditor is not None and not request.publish_original:
-                if not transcription.segments:
-                    raise ReviewIncompleteError(
-                        "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。"
-                    )
-                self._logger.info("\n## Step2.5: Running Jev Fast Audit and Gemini Director Pipeline... ##")
-                self._episode_repository.mark_auditing(
-                    podcast_id=episode_ref.podcast_id,
-                    episode_id=episode_ref.episode_id,
+                policy_method = getattr(type(self._episode_repository), "get_audio_audit_policy", None)
+                policy = (
+                    self._episode_repository.get_audio_audit_policy(podcast_id=episode_ref.podcast_id)
+                    if callable(policy_method)
+                    else AudioAuditPolicy()
                 )
-                chunks = UtteranceChunk.from_segments(transcription.segments)
-                audit_bundle_method = getattr(type(self._fact_check_auditor), "audit_bundle", None)
-                if callable(audit_bundle_method):
-                    policy_method = getattr(type(self._episode_repository), "get_audio_audit_policy", None)
-                    policy = (
-                        self._episode_repository.get_audio_audit_policy(podcast_id=episode_ref.podcast_id)
-                        if callable(policy_method)
-                        else AudioAuditPolicy()
+                if not policy.enabled:
+                    self._logger.info(
+                        "Audio audit is disabled for podcast %s. Skipping Step 2.5.",
+                        episode_ref.podcast_id,
                     )
-                    audit_bundle = self._fact_check_auditor.audit_bundle(chunks, policy=policy)
-                    audit_results = audit_bundle.fact_check_results
-                    policy_findings = audit_bundle.policy_findings
                 else:
-                    audit_results = self._fact_check_auditor.audit_chunks(chunks)
-                    policy_findings = []
-                expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
-                if (
-                    len(audit_results) != len(chunks)
-                    or len({chunk.chunk_id for chunk, _ in audit_results}) != len(chunks)
-                    or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
-                ):
-                    raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
-                if policy_findings:
-                    if self._firestore_manager is None:
-                        raise ReviewIncompleteError("音声校正の検知結果の保存先がないため公開を停止しました。")
-                    self._firestore_manager.save_policy_findings(
-                        podcast_id=episode_ref.podcast_id,
-                        episode_id=episode_ref.episode_id,
-                        findings=policy_findings,
-                    )
-                    self._episode_repository.mark_awaiting_approval(
+                    if not transcription.segments:
+                        raise ReviewIncompleteError(
+                            "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。"
+                        )
+                    self._logger.info("\n## Step2.5: Running Jev Fast Audit and Gemini Director Pipeline... ##")
+                    self._episode_repository.mark_auditing(
                         podcast_id=episode_ref.podcast_id,
                         episode_id=episode_ref.episode_id,
                     )
-                    self._notifier.send_discord_message(
-                        message=f"#{latest_episode_number} 音声校正ポリシーの要確認項目が {len(policy_findings)} 件あります。"
+                    chunks = UtteranceChunk.from_segments(transcription.segments)
+                    audit_bundle_method = getattr(type(self._fact_check_auditor), "audit_bundle", None)
+                    if callable(audit_bundle_method):
+                        audit_bundle = self._fact_check_auditor.audit_bundle(chunks, policy=policy)
+                        audit_results = audit_bundle.fact_check_results
+                        policy_findings = audit_bundle.policy_findings
+                    else:
+                        audit_results = self._fact_check_auditor.audit_chunks(chunks)
+                        policy_findings = []
+                    expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
+                    if (
+                        len(audit_results) != len(chunks)
+                        or len({chunk.chunk_id for chunk, _ in audit_results}) != len(chunks)
+                        or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
+                    ):
+                        raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
+                    if policy_findings:
+                        if self._firestore_manager is None:
+                            raise ReviewIncompleteError("音声校正の検知結果の保存先がないため公開を停止しました。")
+                        self._firestore_manager.save_policy_findings(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            findings=policy_findings,
+                        )
+                        self._episode_repository.mark_awaiting_approval(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                        )
+                        self._notifier.send_discord_message(
+                            message=f"#{latest_episode_number} 音声校正ポリシーの要確認項目が {len(policy_findings)} 件あります。"
+                        )
+                        return
+                    severe_items = [(c, m) for c, m in audit_results if m.should_intervene()]
+                    self._logger.info(
+                        "Jev audit finished: %d chunks, %d interventions needed (composite criteria)",
+                        len(chunks),
+                        len(severe_items),
                     )
-                    return
-                severe_items = [(c, m) for c, m in audit_results if m.should_intervene()]
-                self._logger.info(
-                    "Jev audit finished: %d chunks, %d interventions needed (composite criteria)",
-                    len(chunks),
-                    len(severe_items),
-                )
 
-                interventions = []
-                if severe_items and self._director_script_generator is None:
-                    raise ReviewIncompleteError("要訂正の発話がありますが、訂正生成が無効のため公開を停止しました。")
-                if severe_items and self._director_script_generator is not None:
-                    cast_names = self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id)
-                    for c, m in severe_items:
-                        verification = None
-                        if self._fact_verification_agent is not None:
-                            verification = self._fact_verification_agent.verify_chunk(
+                    interventions = []
+                    if severe_items and self._director_script_generator is None:
+                        raise ReviewIncompleteError(
+                            "要訂正の発話がありますが、訂正生成が無効のため公開を停止しました。"
+                        )
+                    if severe_items and self._director_script_generator is not None:
+                        cast_names = self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id)
+                        for c, m in severe_items:
+                            verification = None
+                            if self._fact_verification_agent is not None:
+                                verification = self._fact_verification_agent.verify_chunk(
+                                    chunk=c,
+                                    metric=m,
+                                    all_chunks=chunks,
+                                    model_id=request.ai_model_id,
+                                )
+                                if verification is not None and not verification.is_false:
+                                    self._logger.info(
+                                        "Chunk %s verified as actually true by Verification Agent. Skipping intervention.",
+                                        c.chunk_id,
+                                    )
+                                    continue
+
+                            intervention = self._director_script_generator.generate_intervention(
                                 chunk=c,
                                 metric=m,
                                 all_chunks=chunks,
+                                cast_names=cast_names,
                                 model_id=request.ai_model_id,
+                                verification=verification,
                             )
-                            if verification is not None and not verification.is_false:
-                                self._logger.info(
-                                    "Chunk %s verified as actually true by Verification Agent. Skipping intervention.",
-                                    c.chunk_id,
-                                )
-                                continue
+                            if intervention is None or not intervention.correction_script.strip():
+                                raise ReviewIncompleteError("訂正案を生成できなかったため公開を停止しました。")
+                            interventions.append(intervention)
 
-                        intervention = self._director_script_generator.generate_intervention(
-                            chunk=c,
-                            metric=m,
-                            all_chunks=chunks,
-                            cast_names=cast_names,
-                            model_id=request.ai_model_id,
-                            verification=verification,
+                    if interventions:
+                        if self._firestore_manager is None:
+                            raise ReviewIncompleteError("訂正案の保存先がないため公開を停止しました。")
+                        self._firestore_manager.save_director_interventions(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            interventions=interventions,
                         )
-                        if intervention is None or not intervention.correction_script.strip():
-                            raise ReviewIncompleteError("訂正案を生成できなかったため公開を停止しました。")
-                        interventions.append(intervention)
-
-                if interventions:
-                    if self._firestore_manager is None:
-                        raise ReviewIncompleteError("訂正案の保存先がないため公開を停止しました。")
-                    self._firestore_manager.save_director_interventions(
-                        podcast_id=episode_ref.podcast_id,
-                        episode_id=episode_ref.episode_id,
-                        interventions=interventions,
-                    )
-                    self._episode_repository.mark_awaiting_approval(
-                        podcast_id=episode_ref.podcast_id,
-                        episode_id=episode_ref.episode_id,
-                    )
-                    ref_urls = [it.reference_url for it in interventions if it.reference_url]
-                    ref_text = ("\n判断根拠リンク:\n" + "\n".join(f"- {url}" for url in ref_urls)) if ref_urls else ""
-                    self._notifier.send_discord_message(
-                        message=(
-                            f"#{latest_episode_number} AIディレクターによる訂正提案が {len(interventions)} 件あります。\n"
-                            f"タイトル: {summary.title}\n"
-                            f"管理画面(UI)で承認を行ってください。{ref_text}"
+                        self._episode_repository.mark_awaiting_approval(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
                         )
-                    )
-                    return
+                        ref_urls = [it.reference_url for it in interventions if it.reference_url]
+                        ref_text = (
+                            ("\n判断根拠リンク:\n" + "\n".join(f"- {url}" for url in ref_urls)) if ref_urls else ""
+                        )
+                        self._notifier.send_discord_message(
+                            message=(
+                                f"#{latest_episode_number} AIディレクターによる訂正提案が {len(interventions)} 件あります。\n"
+                                f"タイトル: {summary.title}\n"
+                                f"管理画面(UI)で承認を行ってください。{ref_text}"
+                            )
+                        )
+                        return
 
             self._logger.info("\n## Step3: Uploading to Cloudflare R2... ##")
             if mp3_bytes is None:

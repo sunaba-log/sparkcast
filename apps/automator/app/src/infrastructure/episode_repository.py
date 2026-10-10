@@ -149,10 +149,12 @@ class PostgresEpisodeRepository:
         if not isinstance(raw, dict):
             return AudioAuditPolicy()
         version = raw.get("version", "v1")
+        enabled = raw.get("enabled", True)
         confidential_terms = raw.get("confidential_terms", [])
         allowed_terms = raw.get("allowed_terms", [])
         if (
             not isinstance(version, str)
+            or not isinstance(enabled, bool)
             or not isinstance(confidential_terms, list)
             or not isinstance(allowed_terms, list)
             or not all(isinstance(term, str) for term in confidential_terms + allowed_terms)
@@ -160,6 +162,7 @@ class PostgresEpisodeRepository:
             raise ValueError("Invalid audio audit policy configuration")
         return AudioAuditPolicy(
             version=version,
+            enabled=enabled,
             confidential_terms=tuple(cast("list[str]", confidential_terms)),
             allowed_terms=tuple(cast("list[str]", allowed_terms)),
         )

@@ -17,6 +17,7 @@ const updateSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   rssFeedPath: z.string().trim().max(2000).optional(),
   castMembers: z.string().trim().max(500).optional(),
+  audioAuditEnabled: z.boolean().optional(),
   confidentialTerms: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
   allowedTerms: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
 });
@@ -59,11 +60,14 @@ export async function PATCH(
       castMembers:
         input.castMembers === undefined ? undefined : input.castMembers || null,
       audioAuditPolicy:
-        input.confidentialTerms === undefined && input.allowedTerms === undefined
+        input.audioAuditEnabled === undefined &&
+        input.confidentialTerms === undefined &&
+        input.allowedTerms === undefined
           ? undefined
           : {
-              confidentialTerms: input.confidentialTerms ?? [],
-              allowedTerms: input.allowedTerms ?? [],
+              enabled: input.audioAuditEnabled,
+              confidentialTerms: input.confidentialTerms,
+              allowedTerms: input.allowedTerms,
             },
     });
     return NextResponse.json({ ok: true });
