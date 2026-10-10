@@ -15,7 +15,12 @@ from google import genai
 from google.genai.types import GenerateContentConfig
 from pydantic import BaseModel, Field
 
-from domain.models.director import DirectorIntervention, FactCheckAuditMetric, UtteranceChunk
+from domain.models.director import (
+    DirectorIntervention,
+    FactCheckAuditMetric,
+    FactVerificationResult,
+    UtteranceChunk,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +39,11 @@ class GeneratedInterventionSchema(BaseModel):
     insert_timestamp_ms: int = Field(
         description="カットイン音声を挿入するミリ秒タイムスタンプ(通常は発話終了の end_ms)"
     )
-    reason: str = Field(description="何が事実と異なっており正しくは何なのかの簡潔な理由")
+    reason: str = Field(description="何が事実と異なっており正しくは何なのかの簡潔な理由(判断根拠)")
+    reference_url: str | None = Field(
+        default=None,
+        description="判断根拠となる公式ドキュメント、リリースノート、技術記事などの信頼できる参照リンクURL(存在する場合)",
+    )
 
 
 DIRECTOR_PROMPT_TEMPLATE = """\
@@ -52,7 +61,8 @@ DIRECTOR_PROMPT_TEMPLATE = """\
    (例: 「ディレクターカットイン! その発表は去年じゃなくて先月ですね!」)
 3. 訂正対象の話者(target_speaker)に親しみやすく呼びかけてください。
 4. 挿入位置(insert_timestamp_ms)は、基本的に対象発話の終了直後({chunk_end_ms}ms)としてください。
-5. 出力は必ず指定された JSON スキーマに従ってください。
+5. 判断根拠となる理由(reason)を簡潔かつ論理的に説明し、根拠となる公式ドキュメントや信頼できる参照URL(reference_url)が判明していれば記載してください。
+6. 出力は必ず指定された JSON スキーマに従ってください。
 
 --- 前後の会話文脈 ---
 {context_text}
@@ -63,6 +73,7 @@ DIRECTOR_PROMPT_TEMPLATE = """\
 発言内容: {text}
 検出カテゴリ: {choice}
 深刻度スコア: {score}/5 (客観的事実確率: {noul})
+{verification_section}
 """
 
 
@@ -108,6 +119,7 @@ class DirectorScriptGenerator:
         all_chunks: list[UtteranceChunk],
         cast_names: list[str] | None = None,
         model_id: str | None = None,
+        verification: FactVerificationResult | None = None,
     ) -> DirectorIntervention:
         """Score >= 3 の発話チャンクに対し、前後の文脈を汲んだディレクター訂正介入を生成する."""
         client = self._get_client()
@@ -135,6 +147,18 @@ class DirectorScriptGenerator:
         casts = cast_names or DEFAULT_CAST_NAMES
         cast_display = "、".join(casts)
 
+        verification_section = ""
+        if verification is not None:
+            source_lines = [f"- {s.title}: {s.url}" for s in verification.sources]
+            sources_text = "\n".join(source_lines) if source_lines else "なし"
+            verification_section = (
+                "\n--- Google Search による裏取り検証結果 ---\n"
+                f"裏付けられた客観的事実: {verification.ground_truth}\n"
+                f"食い違いの理由: {verification.reason}\n"
+                f"参照一次ソース:\n{sources_text}\n"
+                "★指示: 上記の客観的事実を必ず反映し、愛嬌あるカットイン訂正台詞を起草してください。"
+            )
+
         prompt = DIRECTOR_PROMPT_TEMPLATE.format(
             cast_display=cast_display,
             chunk_end_ms=chunk.end_ms,
@@ -146,6 +170,7 @@ class DirectorScriptGenerator:
             choice=metric.choice,
             score=metric.score,
             noul=metric.noul,
+            verification_section=verification_section,
         )
 
         response = client.models.generate_content(
@@ -164,13 +189,28 @@ class DirectorScriptGenerator:
 
         parsed = GeneratedInterventionSchema.model_validate_json(response.text.strip())
 
+        # 参照リンクの決定:
+        # Verification Agent の一次ソースURLがあれば最優先、なければ LLM のパース結果を採用
+        resolved_ref_url = (
+            verification.sources[0].url if verification and verification.sources else parsed.reference_url
+        )
+
+        resolved_ref_links = (
+            tuple({"title": s.title, "url": s.url} for s in verification.sources)
+            if verification and verification.sources
+            else ()
+        )
+
         return DirectorIntervention.create(
             intervention_id=str(uuid.uuid4()),
             chunk_id=chunk.chunk_id,
             target_speaker=parsed.target_speaker or chunk.speaker,
             insert_timestamp_ms=parsed.insert_timestamp_ms or chunk.end_ms,
             correction_script=parsed.correction_script,
-            reason=parsed.reason,
+            reason=verification.reason if (verification and verification.reason) else parsed.reason,
             audit_metrics=metric,
+            reference_url=resolved_ref_url,
+            reference_links=resolved_ref_links,
+            verification=verification,
             status="pending",
         )

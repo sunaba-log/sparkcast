@@ -61,4 +61,33 @@ describe("DirectorInterventionCard", () => {
     expect(html).toContain("承認");
     expect(html).toContain("却下");
   });
+
+  it("renders reason and reference link when available", () => {
+    const html = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{
+          id: "intervention-2",
+          insertAt: 120.0,
+          sourceText: "Python 3.12 で GIL なくなったよね",
+          speaker: "小野",
+          severity: 4,
+          category: "technology",
+          correctionScript: "小野さん、GILフリーはPython 3.13からですよ〜!",
+          reason: "PEP 703 (free-threaded Python) は Python 3.13 で導入",
+          referenceUrl: "https://docs.python.org/3.13/whatsnew/3.13.html",
+          status: "pending",
+        }}
+        defaultExpanded={true}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("判断根拠:");
+    expect(html).toContain("PEP 703 (free-threaded Python) は Python 3.13 で導入");
+    expect(html).toContain("参照リンク:");
+    expect(html).toContain("https://docs.python.org/3.13/whatsnew/3.13.html");
+  });
 });
