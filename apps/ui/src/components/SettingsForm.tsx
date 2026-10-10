@@ -521,30 +521,6 @@ export function SettingsForm({
               </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="cast-members-secrets"
-                className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
-              >
-                <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
-              </label>
-              <input
-                id="cast-members-secrets"
-                type="text"
-                value={castMembers}
-                onChange={(e) => {
-                  setCastMembers(e.target.value);
-                  setSaved(false);
-                }}
-                maxLength={500}
-                placeholder="例: さとう、すずき、たかはし"
-                className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
-              </p>
-            </div>
-
             <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
               <span className="text-xs text-emerald-600 font-semibold">
                 {savedSecrets ? "シークレット設定を更新しました" : ""}
