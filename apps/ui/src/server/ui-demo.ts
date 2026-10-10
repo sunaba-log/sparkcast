@@ -16,6 +16,7 @@ export const UI_DEMO_PODCAST: Podcast = {
   castMembers: "山田 花子, 鈴木 太郎",
   audioAuditPolicy: {
     version: "demo",
+    enabled: true,
     confidentialTerms: ["社外秘", "未公開プロジェクト"],
     allowedTerms: ["SparkCast"],
   },

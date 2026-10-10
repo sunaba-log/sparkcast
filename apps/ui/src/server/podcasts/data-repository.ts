@@ -1,6 +1,8 @@
 import "server-only";
 import { getDbPool } from "@/server/db";
-import type { PodcastSummary } from "@/types/podcast";
+import type { AudioAuditPolicy, PodcastSummary } from "@/types/podcast";
+
+export type { AudioAuditPolicy };
 
 export type Podcast = {
   id: number;
@@ -10,11 +12,7 @@ export type Podcast = {
   rssFeedPath: string | null;
   // 登場人物（読点・カンマ・改行区切り）。文字起こしの話者推定と議事録で使う（#166）
   castMembers?: string | null;
-  audioAuditPolicy: {
-    version: string;
-    confidentialTerms: string[];
-    allowedTerms: string[];
-  };
+  audioAuditPolicy: AudioAuditPolicy;
 };
 
 const DEFAULT_COVER_IMAGE_URL = "/images/default-podcast-cover.png";
@@ -37,6 +35,7 @@ export async function getPodcast(podcastId: number): Promise<Podcast | null> {
     castMembers: row.cast_members ?? null,
     audioAuditPolicy: {
       version: typeof row.audio_audit_policy?.version === "string" ? row.audio_audit_policy.version : "v1",
+      enabled: typeof row.audio_audit_policy?.enabled === "boolean" ? row.audio_audit_policy.enabled : true,
       confidentialTerms: Array.isArray(row.audio_audit_policy?.confidential_terms)
         ? row.audio_audit_policy.confidential_terms.map(String)
         : [],
@@ -105,6 +104,7 @@ export async function createPodcast(input: {
       rssFeedPath: row.rss_feed_path,
       audioAuditPolicy: {
         version: "v1",
+        enabled: true,
         confidentialTerms: [],
         allowedTerms: [],
       },
@@ -197,7 +197,11 @@ export async function updatePodcast(input: {
   rssFeedPath?: string | null;
   // undefined のときは cast_members を変更しない
   castMembers?: string | null;
-  audioAuditPolicy?: { confidentialTerms: string[]; allowedTerms: string[] };
+  audioAuditPolicy?: {
+    enabled?: boolean;
+    confidentialTerms?: string[];
+    allowedTerms?: string[];
+  };
 }): Promise<void> {
   if (input.castMembers !== undefined) {
     await (await getDbPool()).query(
@@ -210,14 +214,22 @@ export async function updatePodcast(input: {
       `UPDATE podcasts
        SET audio_audit_policy = jsonb_build_object(
          'version', to_char(now(), 'YYYYMMDDHH24MISS'),
-         'confidential_terms', $2::jsonb,
-         'allowed_terms', $3::jsonb
+         'enabled', COALESCE($4::boolean, (audio_audit_policy->>'enabled')::boolean, true),
+         'confidential_terms', COALESCE($2::jsonb, audio_audit_policy->'confidential_terms', '[]'::jsonb),
+         'allowed_terms', COALESCE($3::jsonb, audio_audit_policy->'allowed_terms', '[]'::jsonb)
        )
        WHERE podcast_id = $1`,
       [
         input.podcastId,
-        JSON.stringify(input.audioAuditPolicy.confidentialTerms),
-        JSON.stringify(input.audioAuditPolicy.allowedTerms),
+        input.audioAuditPolicy.confidentialTerms !== undefined
+          ? JSON.stringify(input.audioAuditPolicy.confidentialTerms)
+          : null,
+        input.audioAuditPolicy.allowedTerms !== undefined
+          ? JSON.stringify(input.audioAuditPolicy.allowedTerms)
+          : null,
+        input.audioAuditPolicy.enabled !== undefined
+          ? input.audioAuditPolicy.enabled
+          : null,
       ],
     );
   }

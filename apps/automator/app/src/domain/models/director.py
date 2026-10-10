@@ -31,6 +31,7 @@ class AudioAuditPolicy:
     """番組ごとの音声監査ポリシー。辞書変更は必ず version を更新する。."""
 
     version: str = "v1"
+    enabled: bool = True
     confidential_terms: tuple[str, ...] = ()
     allowed_terms: tuple[str, ...] = ()
 
