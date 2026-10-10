@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { DirectorIntervention, Episode, EpisodePromotion } from "@/types/episode";
+import type { DirectorIntervention, Episode, EpisodePromotion, PolicyFinding } from "@/types/episode";
 import {
   AlertTriangle,
   Check,
@@ -24,7 +24,6 @@ import { TranscriptPanel } from "@/components/TranscriptPanel";
 import { formatJstDate, jstParts } from "@/lib/datetime";
 import { htmlToPlainText } from "@/lib/text";
 import {
-  DirectorInterventionMarkers,
   DirectorInterventionsPanel,
 } from "@/components/DirectorInterventionsPanel";
 import { PolicyFindingsPanel } from "@/components/PolicyFindingsPanel";
@@ -38,6 +37,120 @@ function formatDate(dateStr: string) {
   const parts = jstParts(dateStr);
   if (!parts) return dateStr;
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:00`;
+}
+
+function formatTime(seconds: number): string {
+  if (isNaN(seconds)) return "00:00";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (h > 0) {
+    parts.push(String(h).padStart(2, "0"));
+  }
+  parts.push(String(m).padStart(2, "0"));
+  parts.push(String(s).padStart(2, "0"));
+  return parts.join(":");
+}
+
+type AudioAuditMarkersProps = {
+  episodeId: string;
+  duration: number;
+  onSeek: (seconds: number) => void;
+};
+
+function AudioAuditMarkers({ episodeId, duration, onSeek }: AudioAuditMarkersProps) {
+  const [interventions, setInterventions] = useState<DirectorIntervention[]>([]);
+  const [policyFindings, setPolicyFindings] = useState<PolicyFinding[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch(`/api/episodes/${episodeId}/interventions`, { cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) return [];
+          const data = (await res.json()) as { interventions?: DirectorIntervention[] };
+          return data.interventions ?? [];
+        })
+        .catch(() => []),
+      fetch(`/api/episodes/${episodeId}/policy-findings`, { cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) return [];
+          const data = (await res.json()) as { findings?: PolicyFinding[] };
+          return data.findings ?? [];
+        })
+        .catch(() => []),
+    ]).then(([intervs, findings]) => {
+      if (!cancelled) {
+        setInterventions(intervs);
+        setPolicyFindings(findings);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [episodeId]);
+
+  // If real audio duration is available, use it. Otherwise, compute fallback duration from findings for preview.
+  const maxFindingTime = Math.max(
+    0,
+    ...interventions.map((i) => i.insertAt),
+    ...policyFindings.map((f) => f.end),
+  );
+  const effectiveDuration = duration > 0 ? duration : (maxFindingTime > 0 ? Math.max(140, Math.ceil(maxFindingTime + 10)) : 0);
+
+  if (!effectiveDuration) return null;
+
+  const activeInterventions = interventions.filter((i) => i.status !== "rejected");
+  const activeFindings = policyFindings.filter((f) => f.status !== "rejected");
+
+  if (activeInterventions.length === 0 && activeFindings.length === 0) return null;
+
+  return (
+    <>
+      {activeInterventions.map((intervention) => {
+        const leftPercent = Math.min(100, Math.max(0, (intervention.insertAt / effectiveDuration) * 100));
+        return (
+          <button
+            key={`intervention-${intervention.id}`}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSeek(intervention.insertAt);
+            }}
+            title={`[ファクトチェック] ${formatTime(intervention.insertAt)}: ${intervention.category || "訂正提案"}`}
+            className="absolute top-0 bottom-0 z-10 w-2 -translate-x-1/2 bg-red-600 hover:bg-red-700 ring-1 ring-white cursor-pointer transition-transform hover:scale-110"
+            style={{ left: `${leftPercent}%` }}
+            aria-label={`ファクトチェック ${formatTime(intervention.insertAt)}`}
+          />
+        );
+      })}
+
+      {activeFindings.map((finding) => {
+        const leftPercent = Math.min(100, Math.max(0, (finding.start / effectiveDuration) * 100));
+        const widthPercent = Math.max(
+          0.8,
+          ((Math.max(finding.end, finding.start + 1) - finding.start) / effectiveDuration) * 100,
+        );
+        return (
+          <button
+            key={`finding-${finding.id}`}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSeek(finding.start);
+            }}
+            title={`[ポリシー監査] ${formatTime(finding.start)} - ${formatTime(finding.end)}: ${finding.category || "規約・校正"}`}
+            className="absolute top-0 bottom-0 z-10 min-w-[6px] bg-[#ffb6b0] hover:bg-[#ffa099] ring-1 ring-white cursor-pointer transition-transform hover:scale-110"
+            style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+            aria-label={`ポリシー監査 ${formatTime(finding.start)}`}
+          />
+        );
+      })}
+    </>
+  );
 }
 
 type PodcastInfo = {
@@ -195,26 +308,12 @@ export function EpisodeMasterDetail({
   };
 
   const seekTo = (seconds: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = seconds;
-    setCurrentTime(seconds);
-    audioRef.current.play().then(() => setIsPlaying(true)).catch(() => undefined);
-  };
-
-  function formatTime(seconds: number): string {
-    if (isNaN(seconds)) return "00:00";
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-
-    const parts = [];
-    if (h > 0) {
-      parts.push(String(h).padStart(2, "0"));
+    if (audioRef.current) {
+      audioRef.current.currentTime = seconds;
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => undefined);
     }
-    parts.push(String(m).padStart(2, "0"));
-    parts.push(String(s).padStart(2, "0"));
-    return parts.join(":");
-  }
+    setCurrentTime(seconds);
+  };
 
   // When selected episode changes, sync form state
   const handleSelectEpisode = (ep: Episode) => {
@@ -519,71 +618,80 @@ export function EpisodeMasterDetail({
                 </button>
                 <button
                   onClick={() => setActiveTab("director")}
-                  className={`inline-flex items-center gap-1 rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === "director"
-                    ? "border-brand bg-brand text-white"
-                    : selectedEpisode.status === "awaiting_approval"
-                      ? "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
-                      : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
-                    }`}
+                  className={`inline-flex items-center gap-1.5 rounded-xs border px-2 py-1 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    activeTab === "director"
+                      ? "border-brand bg-brand text-white"
+                      : selectedEpisode.status === "awaiting_approval"
+                        ? "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900"
+                        : "border-transparent text-gray-500 hover:border-brand/30 hover:bg-brand-light hover:text-gray-800"
+                  }`}
                 >
-                  AI監査
-                  {selectedEpisode.status === "awaiting_approval" && (
+                  <span>AI監査</span>
+                  {(selectedEpisode.status === "awaiting_approval" || activeTab === "director") && (
                     <AlertTriangle
-                      className="h-4 w-4 shrink-0 text-amber-600"
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        activeTab === "director" ? "text-amber-300" : "text-amber-600"
+                      }`}
                       aria-label="要確認"
                     />
                   )}
                 </button>
               </div>
 
-              <div className="order-first flex shrink-0 flex-wrap items-center justify-end gap-2">
-                {selectedEpisode.status === "failed" && (
+              <div className="order-first flex shrink-0 flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-gray-500">
+                  更新日時 : {formatDate(selectedEpisode.createdAt)}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {selectedEpisode.status === "failed" && (
+                    <button
+                      type="button"
+                      onClick={handleRetryAudit}
+                      disabled={isRetryingAudit}
+                      className="px-3 py-1 whitespace-nowrap bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isRetryingAudit ? "animate-spin" : ""}`} />
+                      {isRetryingAudit ? "再開中..." : "監査を再開"}
+                    </button>
+                  )}
+
+                  {selectedEpisode.status === "completed" && (
+                    <button
+                      type="button"
+                      onClick={handleTogglePublish}
+                      disabled={isTogglingPublish}
+                      className={`px-3 py-1 whitespace-nowrap rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
+                        selectedEpisode.isPublished
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      }`}
+                      title={selectedEpisode.isPublished ? "クリックして非公開にする" : "クリックしてRSSに公開する"}
+                    >
+                      {selectedEpisode.isPublished ? (
+                        <>
+                          <Globe className="w-3.5 h-3.5" />
+                          公開中 (RSS配信)
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5" />
+                          非公開 (下書き)
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     type="button"
-                    onClick={handleRetryAudit}
-                    disabled={isRetryingAudit}
-                    className="px-3 py-1 whitespace-nowrap bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    onClick={handleDeleteEpisode}
+                    disabled={isDeleting}
+                    className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isRetryingAudit ? "animate-spin" : ""}`} />
-                    {isRetryingAudit ? "再開中..." : "監査を再開"}
+                    <Trash2 className="w-3.5 h-3.5 text-gray-500" />
+                    {isDeleting ? "削除中..." : "削除"}
                   </button>
-                )}
-
-                {selectedEpisode.status === "completed" && (
-                  <button
-                    type="button"
-                    onClick={handleTogglePublish}
-                    disabled={isTogglingPublish}
-                    className={`px-3 py-1 whitespace-nowrap rounded-xs text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 ${
-                      selectedEpisode.isPublished
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                    }`}
-                    title={selectedEpisode.isPublished ? "クリックして非公開にする" : "クリックしてRSSに公開する"}
-                  >
-                    {selectedEpisode.isPublished ? (
-                      <>
-                        <Globe className="w-3.5 h-3.5" />
-                        公開中 (RSS配信)
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-3.5 h-3.5" />
-                        非公開 (下書き)
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleDeleteEpisode}
-                  disabled={isDeleting}
-                  className="px-3 py-1 whitespace-nowrap border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xs text-xs font-medium text-brand transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-gray-500" />
-                  {isDeleting ? "削除中..." : "削除"}
-                </button>
+                </div>
               </div>
             </div>
 
@@ -602,30 +710,29 @@ export function EpisodeMasterDetail({
 
             {/* Content Body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto space-y-5 p-6">
-              <div className="text-xs text-gray-500">
-                更新日時 : {formatDate(selectedEpisode.createdAt)}
-              </div>
 
               {/* Audio Player Preview */}
               <div className="flex shrink-0 flex-col gap-4 rounded-xs border border-brand p-4 backdrop-blur-xs sm:flex-row sm:items-center">
-                {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
-                  <Image
-                    src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
-                    alt={selectedEpisode.title}
-                    width={96}
-                    height={96}
-                    sizes="(max-width: 640px) 56px, 96px"
-                    priority
-                    className="w-14 h-14 object-cover rounded-lg shrink-0 border border-brand/20 shadow-sm sm:w-24 sm:h-24"
-                  />
-                ) : (
-                  <div className="w-14 h-14 bg-gradient-to-br from-brand/60 to-brand/20 rounded-lg shrink-0 flex flex-col items-center justify-center text-white/90 border border-brand/20 shadow-sm sm:w-24 sm:h-24">
-                    <Radio className={`w-8 h-8 stroke-[1.5] mb-1 ${isPlaying ? "animate-pulse" : ""}`} />
-                    <span className="text-[9px] font-bold tracking-wider uppercase opacity-80">
-                      No Cover
-                    </span>
-                  </div>
-                )}
+                {/* Mobile: Cover image is hidden to save vertical space in the preview box */}
+                <div className="hidden sm:block shrink-0">
+                  {selectedEpisode.artworkUrl || podcast?.coverImageUrl ? (
+                    <Image
+                      src={selectedEpisode.artworkUrl || podcast?.coverImageUrl || ""}
+                      alt={selectedEpisode.title}
+                      width={96}
+                      height={96}
+                      priority
+                      className="w-24 h-24 object-cover rounded-lg border border-brand/20 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 bg-gradient-to-br from-brand/60 to-brand/20 rounded-lg flex flex-col items-center justify-center text-white/90 border border-brand/20 shadow-sm">
+                      <Radio className={`w-8 h-8 stroke-[1.5] mb-1 ${isPlaying ? "animate-pulse" : ""}`} />
+                      <span className="text-[9px] font-bold tracking-wider uppercase opacity-80">
+                        No Cover
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="w-full flex-1 space-y-3">
                   <div className="flex items-center justify-center gap-6">
@@ -663,14 +770,15 @@ export function EpisodeMasterDetail({
                   <div className="space-y-1">
                     <div
                       onClick={handleProgressBarClick}
-                      className={`w-full bg-gray-200 h-4 rounded-full overflow-hidden relative touch-none ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
+                      className={`w-full bg-brand/20 h-3.5 rounded-full overflow-hidden relative touch-none ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
                         }`}
                     >
                       <div
                         className="bg-brand h-full rounded-full transition-all duration-100 ease-out"
                         style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
                       />
-                      <DirectorInterventionMarkers
+                      <AudioAuditMarkers
+                        key={`${selectedEpisode.id}-${selectedEpisode.status}`}
                         episodeId={selectedEpisode.id}
                         duration={duration}
                         onSeek={seekTo}

@@ -95,15 +95,19 @@ export function DirectorInterventionsPanel({
   const editable = episodeStatus === "awaiting_approval";
   const approvedCount = state.interventions.filter((intervention) => intervention.status === "approved").length;
   return (
-    <section className="space-y-4" aria-label="AI監査">
-      <p className="text-sm text-gray-600">
-        訂正台詞を確認・編集し、音声へ挿入する提案を承認してください。
-      </p>
-      <div className="space-y-3">
-        {state.interventions.map((intervention) => (
+    <section className="space-y-4" aria-label="ファクトチェック">
+      <div>
+        <h3 className="text-base font-bold text-gray-900">ファクトチェック</h3>
+        <p className="mt-1 text-xs text-gray-600">
+          訂正台詞を確認・編集し、音声へ挿入する提案を承認してください。
+        </p>
+      </div>
+      <div className="space-y-1">
+        {state.interventions.map((intervention, index) => (
           <DirectorInterventionCard
             key={intervention.id}
             intervention={intervention}
+            defaultExpanded={index === 0}
             disabled={!editable || applying}
             canSeek={canSeek}
             onChange={(change) => updateIntervention(intervention.id, change)}
@@ -117,7 +121,7 @@ export function DirectorInterventionsPanel({
           type="button"
           disabled={applying || approvedCount === 0}
           onClick={apply}
-          className="rounded-xs bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xs bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
         >
           {applying ? "音声編集を開始中…" : `承認した内容でカットイン編集を実行 (${approvedCount}件)`}
         </button>
