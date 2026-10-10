@@ -53,6 +53,8 @@ type FirestoreDirectorIntervention = {
   target_speaker?: string;
   insert_timestamp_ms?: number;
   correction_script?: string;
+  reason?: string;
+  reference_url?: string;
   audit_metrics?: {
     score?: number;
     choice?: string;
@@ -188,6 +190,8 @@ function toDirectorIntervention(
     severity,
     category: String(data.audit_metrics?.choice ?? "other"),
     correctionScript: String(data.correction_script ?? ""),
+    reason: data.reason ? String(data.reason) : undefined,
+    referenceUrl: data.reference_url ? String(data.reference_url) : null,
     status,
   };
 }

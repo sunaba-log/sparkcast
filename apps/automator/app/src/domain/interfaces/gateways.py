@@ -15,6 +15,7 @@ if TYPE_CHECKING:
         DirectorIntervention,
         DiscordMessage,
         FactCheckAuditMetric,
+        FactVerificationResult,
         NewsItem,
         SnsPromotionsResponse,
         Summary,
@@ -207,8 +208,23 @@ class DirectorScriptGeneratorGateway(Protocol):
         all_chunks: list[UtteranceChunk],
         cast_names: list[str] | None = None,
         model_id: str | None = None,
+        verification: FactVerificationResult | None = None,
     ) -> DirectorIntervention:
         """Score >= 3 のチャンクに対して、愛嬌あるカットイン訂正スクリプトを生成する."""
+
+
+class FactVerificationAgentGateway(Protocol):
+    """Google Search による自律ファクトチェック裏取りエージェント."""
+
+    def verify_chunk(
+        self,
+        *,
+        chunk: UtteranceChunk,
+        metric: FactCheckAuditMetric,
+        all_chunks: list[UtteranceChunk],
+        model_id: str | None = None,
+    ) -> FactVerificationResult | None:
+        """疑義のある発話チャンクに対して自律的にGoogle検索を実行し、裏取り検証を行う."""
 
 
 @dataclass(frozen=True)

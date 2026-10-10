@@ -82,6 +82,8 @@ export type DirectorIntervention = {
   severity: 1 | 2 | 3 | 4 | 5;
   category: string;
   correctionScript: string;
+  reason?: string;
+  referenceUrl?: string | null;
   status: DirectorInterventionStatus;
 };
 

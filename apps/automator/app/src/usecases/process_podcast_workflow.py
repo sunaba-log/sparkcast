@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         DirectorScriptGeneratorGateway,
         EpisodeRepository,
         FactCheckAuditorGateway,
+        FactVerificationAgentGateway,
         NotificationGateway,
         ObjectStorage,
         TranscriptProvider,
@@ -111,6 +112,7 @@ class ProcessPodcastWorkflow:
         knowledge_reindexer: KnowledgeReindexer | None = None,
         fact_check_auditor: FactCheckAuditorGateway | None = None,
         director_script_generator: DirectorScriptGeneratorGateway | None = None,
+        fact_verification_agent: FactVerificationAgentGateway | None = None,
     ) -> None:
         """Initialize use case dependencies.
 
@@ -130,6 +132,7 @@ class ProcessPodcastWorkflow:
         self._logger = logger
         self._fact_check_auditor = fact_check_auditor
         self._director_script_generator = director_script_generator
+        self._fact_verification_agent = fact_verification_agent
         self._transcription = transcription or EpisodeTranscription(
             transcript_provider=transcript_provider,
             episode_repository=episode_repository,
@@ -350,12 +353,28 @@ class ProcessPodcastWorkflow:
                 if severe_items and self._director_script_generator is not None:
                     cast_names = self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id)
                     for c, m in severe_items:
+                        verification = None
+                        if self._fact_verification_agent is not None:
+                            verification = self._fact_verification_agent.verify_chunk(
+                                chunk=c,
+                                metric=m,
+                                all_chunks=chunks,
+                                model_id=request.ai_model_id,
+                            )
+                            if verification is not None and not verification.is_false:
+                                self._logger.info(
+                                    "Chunk %s verified as actually true by Verification Agent. Skipping intervention.",
+                                    c.chunk_id,
+                                )
+                                continue
+
                         intervention = self._director_script_generator.generate_intervention(
                             chunk=c,
                             metric=m,
                             all_chunks=chunks,
                             cast_names=cast_names,
                             model_id=request.ai_model_id,
+                            verification=verification,
                         )
                         if intervention is None or not intervention.correction_script.strip():
                             raise ReviewIncompleteError("訂正案を生成できなかったため公開を停止しました。")
@@ -373,12 +392,13 @@ class ProcessPodcastWorkflow:
                         podcast_id=episode_ref.podcast_id,
                         episode_id=episode_ref.episode_id,
                     )
-                    self._logger.info("Marked episode %s as awaiting_approval", episode_ref.episode_id)
+                    ref_urls = [it.reference_url for it in interventions if it.reference_url]
+                    ref_text = ("\n判断根拠リンク:\n" + "\n".join(f"- {url}" for url in ref_urls)) if ref_urls else ""
                     self._notifier.send_discord_message(
                         message=(
                             f"#{latest_episode_number} AIディレクターによる訂正提案が {len(interventions)} 件あります。\n"
                             f"タイトル: {summary.title}\n"
-                            f"管理画面(UI)で承認を行ってください。"
+                            f"管理画面(UI)で承認を行ってください。{ref_text}"
                         )
                     )
                     return

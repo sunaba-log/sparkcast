@@ -312,6 +312,44 @@ class AuditBundle:
 
 
 @dataclass(frozen=True)
+class EvidenceSource:
+    """Web裏取りで取得した一次ソース情報."""
+
+    title: str
+    url: str
+    snippet: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize evidence source for Firestore."""
+        return {
+            "title": self.title,
+            "url": self.url,
+            "snippet": self.snippet,
+        }
+
+
+@dataclass(frozen=True)
+class FactVerificationResult:
+    """Verification Agent によるファクトチェック裏取り結果."""
+
+    claim: str
+    ground_truth: str
+    sources: tuple[EvidenceSource, ...] = ()
+    is_false: bool = True
+    reason: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize fact verification result for Firestore."""
+        return {
+            "claim": self.claim,
+            "ground_truth": self.ground_truth,
+            "sources": [s.to_dict() for s in self.sources],
+            "is_false": self.is_false,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class DirectorIntervention:
     """AIディレクターによる訂正介入スクリプト."""
 
@@ -322,6 +360,9 @@ class DirectorIntervention:
     correction_script: str
     reason: str
     audit_metrics: FactCheckAuditMetric
+    reference_url: str | None = None
+    reference_links: tuple[dict[str, str], ...] = ()
+    verification: FactVerificationResult | None = None
     status: str = "pending"
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -335,6 +376,9 @@ class DirectorIntervention:
         correction_script: str,
         reason: str,
         audit_metrics: FactCheckAuditMetric,
+        reference_url: str | None = None,
+        reference_links: tuple[dict[str, str], ...] | list[dict[str, str]] = (),
+        verification: FactVerificationResult | None = None,
         status: str = "pending",
         intervention_id: str | None = None,
         created_at: str | None = None,
@@ -348,6 +392,9 @@ class DirectorIntervention:
             correction_script=correction_script,
             reason=reason,
             audit_metrics=audit_metrics,
+            reference_url=reference_url,
+            reference_links=tuple(reference_links),
+            verification=verification,
             status=status,
             created_at=created_at or datetime.now(UTC).isoformat(),
         )
@@ -361,6 +408,9 @@ class DirectorIntervention:
             "insert_timestamp_ms": self.insert_timestamp_ms,
             "correction_script": self.correction_script,
             "reason": self.reason,
+            "reference_url": self.reference_url,
+            "reference_links": list(self.reference_links),
+            "verification": self.verification.to_dict() if self.verification else None,
             "status": self.status,
             "audit_metrics": {
                 "noul": self.audit_metrics.noul,

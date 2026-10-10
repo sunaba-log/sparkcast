@@ -13,7 +13,9 @@ from domain.models.common import SnsPromotionsResponse, Summary
 from domain.models.director import (
     AudioAuditPolicy,
     DirectorIntervention,
+    EvidenceSource,
     FactCheckAuditMetric,
+    FactVerificationResult,
     UtteranceChunk,
 )
 from domain.models.transcript import TranscriptSegment
@@ -458,12 +460,46 @@ def test_director_script_generator_creates_intervention():
     assert intervention.status == "pending"
     assert intervention.audit_metrics.score == 4
     assert intervention.audit_metrics.choice == "technology"
+    assert intervention.reason == "GILの自由スレッド化が導入されたのはPython 3.13"
+    assert intervention.reference_url is None
 
     # Gemini 呼び出しのプロンプト検証
     prompt_used = mock_genai_client.models.generate_content.call_args.kwargs["contents"][0]
     assert "専属『AIディレクター』" in prompt_used
     assert "小野、数森、高島" in prompt_used
     assert "第4のパーソナリティ" in prompt_used
+    assert "判断根拠となる理由" in prompt_used
+
+
+def test_director_script_generator_creates_intervention_with_reference_url():
+    """Gemini が reference_url を返した場合に DirectorIntervention に保持されること."""
+    mock_genai_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = (
+        '{"correction_script": "小野さん、その件は公式リリースで否定されてますよ〜!", '
+        '"target_speaker": "小野", "insert_timestamp_ms": 5000, '
+        '"reason": "公式ドキュメントで明記されているため", '
+        '"reference_url": "https://docs.python.org/3.13/whatsnew/3.13.html"}'
+    )
+    mock_genai_client.models.generate_content.return_value = mock_response
+
+    generator = DirectorScriptGenerator(client=mock_genai_client)
+
+    chunk = UtteranceChunk("seg_00002", "小野", 1000, 5000, "Python 3.12 で GIL なくなったよね")
+    metric = FactCheckAuditMetric(noul=0.9, score=4, choice="technology", confidence=0.9)
+
+    intervention = generator.generate_intervention(
+        chunk=chunk,
+        metric=metric,
+        all_chunks=[chunk],
+        cast_names=["小野", "数森", "高島"],
+    )
+
+    assert intervention.reason == "公式ドキュメントで明記されているため"
+    assert intervention.reference_url == "https://docs.python.org/3.13/whatsnew/3.13.html"
+    d = intervention.to_dict()
+    assert d["reason"] == "公式ドキュメントで明記されているため"
+    assert d["reference_url"] == "https://docs.python.org/3.13/whatsnew/3.13.html"
 
 
 # --- Workflow Pipeline Routing Tests ---
@@ -877,3 +913,147 @@ def test_firestore_save_and_get_director_interventions():
     # コレクションパスの検証
     col_call = mock_client.collection.call_args_list[0]
     assert col_call.args[0] == "podcasts"
+
+
+def test_pipeline_routes_with_verification_agent_providing_evidence():
+    """Verification Agent が一次ソースを収集し、ディレクター介入にエビデンスが反映されること."""
+    mock_auditor = MagicMock()
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 3000, "Python 3.12 で GIL なくなったよね")
+    metric = FactCheckAuditMetric(noul=0.9, score=4, choice="technology", confidence=0.9)
+    mock_auditor.audit_chunks.return_value = [(chunk, metric)]
+
+    mock_verification_agent = MagicMock()
+    verification_result = FactVerificationResult(
+        claim="Python 3.12 で GIL が削除された",
+        ground_truth="Python 3.13 で自由スレッド化が導入された",
+        sources=(EvidenceSource(title="Python 3.13 Release Notes", url="https://docs.python.org/3.13/"),),
+        is_false=True,
+        reason="GILフリー化は3.13の機能であるため",
+    )
+    mock_verification_agent.verify_chunk.return_value = verification_result
+
+    mock_generator = MagicMock()
+    mock_intervention = DirectorIntervention.create(
+        intervention_id="int_verified",
+        chunk_id=chunk.chunk_id,
+        target_speaker="小野",
+        insert_timestamp_ms=3000,
+        correction_script="小野さん、それ3.13ですよ!",
+        reason=verification_result.reason,
+        audit_metrics=metric,
+        reference_url="https://docs.python.org/3.13/",
+        verification=verification_result,
+    )
+    mock_generator.generate_intervention.return_value = mock_intervention
+
+    repo = _FakeEpisodeRepository()
+    storage = _FakeObjectStorage()
+    notifier = _FakeNotifier()
+    mock_firestore = MagicMock()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_FakeTranscriptProvider(),
+        object_storage=storage,
+        blob_source=_FakeBlobSource(),
+        notifier=notifier,
+        rss_manager_factory=lambda *, rss_xml: _FakeRssManager(),
+        audio_converter=lambda b, s: b"mp3",
+        audio_info_reader=lambda buf, fmt: [100, "00:01:00"],
+        firestore_manager=mock_firestore,
+        episode_repository=repo,
+        logger=logging.getLogger("test"),
+        transcription=_FakeTranscription(
+            [
+                TranscriptSegment(start=0.0, end=3.0, text="Python 3.12 で GIL なくなったよね", speaker="小野"),
+            ]
+        ),
+        fact_check_auditor=mock_auditor,
+        director_script_generator=mock_generator,
+        fact_verification_agent=mock_verification_agent,
+    )
+
+    req = ProcessPodcastWorkflowInput(
+        project_id="test-proj",
+        sns_schedule_offset_hours=1,
+        gcs_bucket="input-bucket",
+        gcs_trigger_object_name="podcasts/p1/episodes/e1/source/audio.mp3",
+        r2_bucket="out-bucket",
+        r2_key_prefix="feed",
+        ai_model_id="gemini-2.0-flash",
+        r2_custom_domain="test.example.com",
+    )
+
+    workflow.run(req)
+
+    # 1. Verification Agent が呼ばれた
+    mock_verification_agent.verify_chunk.assert_called_once()
+    # 2. Generator に verification が渡された
+    assert mock_generator.generate_intervention.call_args.kwargs["verification"] == verification_result
+    # 3. 承認待ちに遷移した
+    assert repo.awaiting_approval_called is True
+    # 4. Discord メッセージにリンクが含まれた
+    assert any("https://docs.python.org/3.13/" in msg for msg in notifier.messages)
+
+
+def test_pipeline_skips_intervention_when_verification_agent_finds_actually_true():
+    """Jevが誤認判定したがVerification Agentが実は正しいと確認した場合、自律スキップして自動公開すること."""
+    mock_auditor = MagicMock()
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 3000, "Next.js 15 は React 19 をサポートしてます")
+    metric = FactCheckAuditMetric(noul=0.9, score=3, choice="technology", confidence=0.8)
+    mock_auditor.audit_chunks.return_value = [(chunk, metric)]
+
+    mock_verification_agent = MagicMock()
+
+    # is_false=False (実は正しい)
+    mock_verification_agent.verify_chunk.return_value = FactVerificationResult(
+        claim="Next.js 15 は React 19 をサポート",
+        ground_truth="Next.js 15 は React 19 をサポートしている",
+        sources=(),
+        is_false=False,
+    )
+
+    mock_generator = MagicMock()
+    repo = _FakeEpisodeRepository()
+    storage = _FakeObjectStorage()
+    notifier = _FakeNotifier()
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_FakeTranscriptProvider(),
+        object_storage=storage,
+        blob_source=_FakeBlobSource(),
+        notifier=notifier,
+        rss_manager_factory=lambda *, rss_xml: _FakeRssManager(),
+        audio_converter=lambda b, s: b"mp3",
+        audio_info_reader=lambda buf, fmt: [100, "00:01:00"],
+        firestore_manager=MagicMock(),
+        episode_repository=repo,
+        logger=logging.getLogger("test"),
+        transcription=_FakeTranscription(
+            [
+                TranscriptSegment(start=0.0, end=3.0, text="Next.js 15 は React 19 をサポートしてます", speaker="小野"),
+            ]
+        ),
+        fact_check_auditor=mock_auditor,
+        director_script_generator=mock_generator,
+        fact_verification_agent=mock_verification_agent,
+    )
+
+    req = ProcessPodcastWorkflowInput(
+        project_id="test-proj",
+        sns_schedule_offset_hours=1,
+        gcs_bucket="input-bucket",
+        gcs_trigger_object_name="podcasts/p1/episodes/e1/source/audio.mp3",
+        r2_bucket="out-bucket",
+        r2_key_prefix="feed",
+        ai_model_id="gemini-2.0-flash",
+        r2_custom_domain="test.example.com",
+    )
+
+    workflow.run(req)
+
+    # Verification Agent が呼ばれたが、Generator はスキップされた
+    mock_verification_agent.verify_chunk.assert_called_once()
+    mock_generator.generate_intervention.assert_not_called()
+    # 介入なしのため awaiting_approval ではなく completed に進んだ
+    assert repo.awaiting_approval_called is False
+    assert repo.completed_called is True

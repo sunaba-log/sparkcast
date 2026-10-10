@@ -53,6 +53,30 @@ export function DirectorInterventionCard({
         <p className="mb-1 text-xs font-semibold text-gray-500">{intervention.speaker || "不明"}の発話</p>
         <p>{intervention.sourceText}</p>
       </div>
+      {(intervention.reason || intervention.referenceUrl) && (
+        <div className="rounded-xs border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-950 space-y-1">
+          {intervention.reason && (
+            <div>
+              <span className="font-semibold text-blue-900">判断根拠: </span>
+              <span className="leading-relaxed">{intervention.reason}</span>
+            </div>
+          )}
+          {intervention.referenceUrl && (
+            <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+              <span className="font-semibold text-blue-900">参照リンク: </span>
+              <a
+                href={intervention.referenceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand font-medium hover:underline inline-flex items-center gap-0.5 break-all"
+              >
+                {intervention.referenceUrl}
+                <span aria-hidden="true" className="text-[10px]">↗</span>
+              </a>
+            </div>
+          )}
+        </div>
+      )}
       <div>
         <label className="mb-1 block text-xs font-semibold text-gray-700" htmlFor={`correction-${intervention.id}`}>
           AIディレクターの訂正台詞

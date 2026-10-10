@@ -25,6 +25,7 @@ from services.audio_converter import AudioConverter
 from services.director_script_generator import DirectorScriptGenerator
 from services.episode_transcription import EpisodeTranscription
 from services.fact_check_auditor import FactCheckAuditor
+from services.fact_verification_agent import FactVerificationAgent
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
 from services.speech_audio import GcsSpeechAudioPreparer
@@ -298,6 +299,12 @@ def process_podcast_workflow() -> None:
         else None,
         fact_check_auditor=FactCheckAuditor(api_key=config.typesafe_api_key) if config.jev_enabled else None,
         director_script_generator=DirectorScriptGenerator(
+            project_id=config.project_id,
+            model_id=config.ai_model_id,
+        )
+        if config.director_enabled
+        else None,
+        fact_verification_agent=FactVerificationAgent(
             project_id=config.project_id,
             model_id=config.ai_model_id,
         )
