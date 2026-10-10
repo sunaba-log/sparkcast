@@ -20,6 +20,7 @@ ChoiceCategory = Literal[
     "numerical_data",
     "historical_fact",
     "other",
+    "none",
 ]
 
 PolicyFindingCategory = Literal["pii", "confidential_information", "third_party_risk"]
@@ -272,7 +273,7 @@ class FactCheckAuditMetric:
 
     noul: float  # 0.0〜1.0 (客観的事実主張の確率)
     score: int  # 1〜5 (深刻度: 1=軽微な言い間違い/スルー可 〜 5=致命的な誤認/要訂正)
-    choice: ChoiceCategory  # technology, proper_noun, numerical_data, historical_fact, other
+    choice: ChoiceCategory  # technology, proper_noun, numerical_data, other, none
     confidence: float | None = None
     raw_response: dict[str, Any] | None = None
 
@@ -286,13 +287,17 @@ class FactCheckAuditMetric:
         """Noul (事実性), score (深刻度), choice (カテゴリ) を組み合わせた複合介入判定.
 
         1. 客観的事実主張の確率 (noul) が基準値未満(感想・挨拶・比喩など)は除外。
-        2. Score 3以上(明確・重大な事実誤認)かつ noul >= min_noul は介入対象。
-        3. Score 2(軽微な誤り/グレーゾーン)でも、厳密性が求められる重要カテゴリ
+        2. 誤りなし・該当なし (choice == 'none') の場合は介入不要。
+        3. Score 3以上(明確・重大な事実誤認)かつ noul >= min_noul は介入対象。
+        4. Score 2(軽微な誤り/グレーゾーン)でも、厳密性が求められる重要カテゴリ
            (technology, numerical_data, proper_noun) かつ noul >= high_noul であれば
            リスナーへの誤解・信頼性低下防止のため介入対象とする。
-        4. Score 1(スルー可/事実に基づく)は常に介入不要。
+        5. Score 1(スルー可/事実に基づく)は常に介入不要。
         """
         if self.score <= BENIGN_SCORE_THRESHOLD:
+            return False
+
+        if self.choice == "none":
             return False
 
         if self.noul < min_noul:

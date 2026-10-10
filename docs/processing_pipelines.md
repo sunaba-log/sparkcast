@@ -213,13 +213,14 @@ sequenceDiagram
   - `3`: **明確な事実誤認 / 要訂正（ディレクター介入対象）**
   - `4`: 重大な誤認 / 信頼性に関わる（ディレクター介入対象）
   - `5`: 致命的な誤認 / 損害・混乱を招く（ディレクター介入対象）
-- **Choice (カテゴリ分類)**: `technology`, `proper_noun`, `numerical_data`, `historical_fact`, `other`。
+- **Choice (カテゴリ分類)**: `technology`, `proper_noun`, `numerical_data`, `other`, `none`。
 
 #### 介入要否の複合判定ロジック (`FactCheckAuditMetric.should_intervene`)
 単なる Score の閾値だけでなく、Noul と Choice を組み合わせることで**「誤検知（False Positive）の防止」**と**「重要カテゴリの取りこぼし防止」**を両立しています：
 1. **客観的事実の有無 (Noul 足切り)**: `noul < 0.6`（感想、挨拶、相槌、比喩・冗談など）の場合は、不要なツッコミを防ぐため Score に関わらず介入除外。
-2. **重大・明確な事実誤認**: `score >= 3` かつ `noul >= 0.6` は介入対象。
-3. **重要カテゴリの軽微な誤り**: `score == 2` であっても、リスナーへの影響や信頼性に直結する重要カテゴリ（`technology`, `numerical_data`, `proper_noun`）かつ高確信度（`noul >= 0.8`）の場合は介入対象として検出。
+2. **誤りなし/該当なしの除外**: `choice == "none"` の場合は介入除外（誤検知防止）。
+3. **重大・明確な事実誤認**: `score >= 3` かつ `noul >= 0.6` は介入対象。
+4. **重要カテゴリの軽微な誤り**: `score == 2` であっても、リスナーへの影響や信頼性に直結する重要カテゴリ（`technology`, `numerical_data`, `proper_noun`）かつ高確信度（`noul >= 0.8`）の場合は介入対象として検出。
 
 ### 4.3 音声校正ポリシー監査 (PII・機密情報・第三者リスク)
 
