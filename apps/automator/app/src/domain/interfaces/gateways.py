@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         AgendaResult,
         AudioAuditPolicy,
         AuditBundle,
+        AuditChunkTrace,
         DirectorIntervention,
         DiscordMessage,
         FactCheckAuditMetric,
@@ -195,6 +196,19 @@ class FactCheckAuditorGateway(Protocol):
         concurrency_limit: int = 10,
     ) -> AuditBundle:
         """Return the complete fact-check and audio-policy audit results."""
+
+
+class AuditTraceRecorderGateway(Protocol):
+    """Jev 監査入出力トレース保存ゲートウェイ (#220)."""
+
+    def record(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        traces: Sequence[AuditChunkTrace],
+    ) -> str | None:
+        """Format and save audit traces as JSONL, returning the stored URI or None."""
 
 
 class DirectorScriptGeneratorGateway(Protocol):

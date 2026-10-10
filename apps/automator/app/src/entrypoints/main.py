@@ -22,6 +22,7 @@ from infrastructure.secret_manager import SecretManagerClient
 from infrastructure.speech_transcriber import ChirpTranscriber
 from infrastructure.storage import GCSClient, R2Client, get_audio_info
 from services.audio_converter import AudioConverter
+from services.audit_trace_recorder import AuditTraceRecorder
 from services.director_script_generator import DirectorScriptGenerator
 from services.episode_transcription import EpisodeTranscription
 from services.fact_check_auditor import FactCheckAuditor
@@ -76,6 +77,10 @@ class PodcastEnvConfig:
     director_enabled: bool = True
     resume_from_audit: bool = False
     publish_original: bool = False
+    # Jev 監査入出力トレースログ保存(#220)
+    audit_trace_enabled: bool = False
+    audit_trace_gcs_bucket: str | None = None
+    audit_trace_local_dir: str | None = None
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -121,6 +126,9 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     director_enabled = environ.get("DIRECTOR_ENABLED", "true").lower() != "false"
     resume_from_audit = environ.get("RESUME_FROM_AUDIT", "false").lower() in ("true", "1")
     publish_original = environ.get("PUBLISH_ORIGINAL", "false").lower() in ("true", "1")
+    audit_trace_enabled = environ.get("AUDIT_TRACE_ENABLED", "false").lower() in ("true", "1")
+    audit_trace_gcs_bucket = environ.get("AUDIT_TRACE_GCS_BUCKET") or None
+    audit_trace_local_dir = environ.get("AUDIT_TRACE_LOCAL_DIR") or None
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -156,6 +164,9 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         director_enabled=director_enabled,
         resume_from_audit=resume_from_audit,
         publish_original=publish_original,
+        audit_trace_enabled=audit_trace_enabled,
+        audit_trace_gcs_bucket=audit_trace_gcs_bucket,
+        audit_trace_local_dir=audit_trace_local_dir,
     )
 
 
@@ -187,6 +198,12 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     logger.info("JEV_ENABLED: %s (api_key configured: %s)", config.jev_enabled, bool(config.typesafe_api_key))
     logger.info("DIRECTOR_ENABLED: %s", config.director_enabled)
     logger.info("PUBLISH_ORIGINAL: %s", config.publish_original)
+    logger.info(
+        "AUDIT_TRACE_ENABLED: %s (gcs_bucket=%s, local_dir=%s)",
+        config.audit_trace_enabled,
+        config.audit_trace_gcs_bucket,
+        config.audit_trace_local_dir,
+    )
     logger.info("###########################\n")
 
 
@@ -309,6 +326,9 @@ def process_podcast_workflow() -> None:
             model_id=config.ai_model_id,
         )
         if config.director_enabled
+        else None,
+        audit_trace_recorder=AuditTraceRecorder.from_env(os.environ, logger_instance=logger)
+        if config.audit_trace_enabled
         else None,
     )
     usecase.run(
