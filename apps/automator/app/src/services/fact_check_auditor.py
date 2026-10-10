@@ -34,46 +34,51 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Jev 判定用の命令と選択基準の定義
+# Jev 判定用の命令と選択基準の定義 (英語最適化・トークン削減版 / ポリシーキー維持)
+
+# 1. ファクトチェック対象のフィルタリング
 NOUL_INSTRUCTIONS = (
-    "この発言には客観的な事実に関する主張(検証可能な技術情報、仕様、数値、固有名詞、"
-    "歴史的出来事など)が含まれていますか?単なる主観的な感想、挨拶、感情表現の場合はFalseです。"
+    "Does the statement contain verifiable facts (e.g., tech specs, proper nouns, metrics)? "
+    "Return False if it only contains subjective opinions, greetings, or impressions."
 )
 
+# 2. 深刻度評価
 SCORE_INSTRUCTIONS = (
-    "発言内容に事実誤認や言い間違いが含まれていた場合、ポッドキャストのリスナーに与える誤解や混乱の深刻度を1〜5で評価してください。"
-    "1: 軽微な言い間違いでスルー可能、3: リスナーに誤解を与えるため要訂正、5: 致命的な誤認で損害や混乱を招くため要訂正。"
-    "事実に基づいている場合や、文脈上スルー可能な軽微な言いよどみは1と評価してください。"
+    "Fact-check the statement and rate the necessity of a correction from 1 to 5 based on potential listener harm or misunderstanding. "
+    "If the statement is accurate or contains only negligible slips of the tongue, you MUST rate it 1."
 )
 
 SCORE_CRITERIA = [
-    "1: 軽微な言い間違い/スルー可",
-    "2: 軽微な誤り/文脈上問題なし",
-    "3: 明確な事実誤認/要訂正",
-    "4: 重大な誤認/信頼性に関わる",
-    "5: 致命的な誤認/要訂正",
+    "1: Accurate, or negligible slip of the tongue (ignore)",
+    "2: Minor error, easily deduced from context",
+    "3: Clear factual error causing misunderstanding (requires correction)",
+    "4: Major error damaging credibility (requires correction)",
+    "5: Fatal misrepresentation causing harm/loss (immediate correction)",
 ]
 
-CHOICE_INSTRUCTIONS = "発言に含まれる事実の主張または誤認のカテゴリを選択してください。"
+# 3. カテゴリ選択
+CHOICE_INSTRUCTIONS = "Select the category of the factual claim or error in the statement."
 
 CHOICE_CRITERIA: dict[str, str] = {
-    "technology": "技術仕様、プログラミング、アーキテクチャなどの誤り",
-    "proper_noun": "製品名、企業名、人名などの固有名詞の誤り",
-    "numerical_data": "数値、統計、価格、日付などのデータ誤り",
-    "historical_fact": "歴史的事実、過去の経緯、時系列などの誤り",
-    "other": "その他、一般的な事実関係の誤り",
+    "technology": "Tech specs, architecture, programming",
+    "proper_noun": "Product, company, or person names",
+    "numerical_data": "Numbers, statistics, prices, dates",
+    "other": "Other general facts",
+    "none": "No errors / Not applicable",
 }
 
-VALID_CHOICES: set[str] = {"technology", "proper_noun", "numerical_data", "historical_fact", "other"}
+VALID_CHOICES: set[str] = {"technology", "proper_noun", "numerical_data", "other", "none"}
 POLICY_FINDING_NOUL_THRESHOLD = 0.5
+
+# 4. ポリシーチェック(キーを維持しつつ英語化でトークン圧縮)
 POLICY_QUESTIONS = {
     "confidential_information": (
-        "発話に未公開の認証情報、営業秘密、契約条件、個人の非公開情報など、"
-        "公開してはならない機密情報が含まれていますか?"
+        "Does the statement contain confidential info like undisclosed credentials, "
+        "trade secrets, contract terms, or private personal data?"
     ),
     "third_party_risk": (
-        "発話に第三者を特定可能な状態で中傷、未確認の非難、名誉・プライバシーを害する"
-        "内容、または公開に人手確認を要する第三者リスクが含まれていますか?"
+        "Does the statement contain identifiable slander, unverified accusations, "
+        "or content harming a third party's reputation/privacy that requires manual review?"
     ),
 }
 

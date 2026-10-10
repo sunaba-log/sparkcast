@@ -161,6 +161,66 @@ async def test_fact_check_auditor_mock_success():
 
 
 @pytest.mark.anyio
+async def test_fact_check_auditor_mock_success_none_choice():
+    """Jev API で choice='none'(誤りなし/該当なし)が返された場合、正しくパースされ介入不要となること."""
+    mock_client = AsyncMock()
+    mock_noul_ans = MagicMock()
+    mock_noul_ans.noul = 0.90
+    mock_score_ans = MagicMock()
+    mock_score_ans.score = 0.0  # domain_score: 1 (Accurate, or negligible slip of the tongue)
+    mock_score_ans.confidence = 0.95
+    mock_choice_ans = MagicMock()
+    mock_choice_ans.choice = "none"
+    mock_choice_ans.confidence = 0.95
+
+    mock_response = MagicMock()
+    mock_response.answers = {
+        "noul": mock_noul_ans,
+        "score": mock_score_ans,
+        "choice": mock_choice_ans,
+    }
+    mock_client.system_one.return_value = mock_response
+
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk(
+        chunk_id="seg_00001",
+        speaker="数森",
+        start_ms=1000,
+        end_ms=4500,
+        text="Python 3.13 では free-threaded CPython が実験的に導入されました。",
+    )
+
+    _, metric = await auditor.audit_single_chunk_async(mock_client, chunk)
+    assert metric.noul == 0.90
+    assert metric.score == 1
+    assert metric.choice == "none"
+    assert metric.confidence == 0.95
+    assert not metric.should_intervene()
+
+
+@pytest.mark.anyio
+async def test_fact_check_auditor_rejects_historical_fact_as_category():
+    """統合により廃止された historical_fact が返された場合は ReviewIncompleteError (ValueError) となること."""
+    mock_client = AsyncMock()
+    mock_response = MagicMock(
+        answers={
+            "noul": MagicMock(noul=0.8),
+            "score": MagicMock(score=1.0),
+            "choice": MagicMock(choice="historical_fact"),
+        }
+    )
+    mock_client.system_one.return_value = mock_response
+    auditor = FactCheckAuditor(client=mock_client)
+    chunk = UtteranceChunk("seg_00001", "小野", 0, 1000, "テスト発話")
+
+    with pytest.raises(ReviewIncompleteError, match="ValueError"):
+        await auditor.audit_single_chunk_async(mock_client, chunk)
+
+    with pytest.raises(ValueError, match="Unknown audit category: historical_fact"):
+        auditor._parse_response(mock_response)
+
+
+@pytest.mark.anyio
 async def test_fact_check_auditor_marks_incomplete_chunk_in_state():
     """不完全文を Jev へ渡す場合、文脈が欠ける可能性を明示すること."""
     mock_client = AsyncMock()
@@ -415,6 +475,12 @@ async def test_fact_check_auditor_tolerates_numerical_jitter(jitter_score: float
         # Score 2 かつ 非重要カテゴリ(historical_fact, other): noul が高くてもスルー
         (2, 0.95, "historical_fact", False),
         (2, 0.99, "other", False),
+        # none (誤りなし/該当なし): スコアや noul に関わらず常に介入不要
+        (1, 0.10, "none", False),
+        (2, 0.95, "none", False),
+        (3, 0.95, "none", False),
+        (4, 0.95, "none", False),
+        (5, 0.95, "none", False),
     ],
 )
 def test_fact_check_audit_metric_should_intervene(
