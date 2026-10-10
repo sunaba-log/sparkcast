@@ -158,6 +158,29 @@ variable "jev_api_key_secret_name" {
   default     = "jev-api-key"
 }
 
+variable "audit_trace_enabled" {
+  type        = bool
+  description = "Whether to enable Jev input/output audit trace log recording (#220)."
+  default     = true
+}
+
+variable "audit_trace_retention_days" {
+  type        = number
+  description = "Days to retain Jev audit trace JSONL objects in GCS before deletion (#220). Default 90 days."
+  default     = 90
+
+  validation {
+    condition     = var.audit_trace_retention_days > 0
+    error_message = "audit_trace_retention_days must be a positive number."
+  }
+}
+
+variable "audit_trace_prefix" {
+  type        = string
+  description = "Object prefix within GCS bucket for Jev audit trace JSONL logs (#220)."
+  default     = "audit_traces"
+}
+
 variable "sns_schedule_offset_hours" {
   type        = number
   description = "Hours after episode processing to schedule the first SNS promotion. Default 1 hour."

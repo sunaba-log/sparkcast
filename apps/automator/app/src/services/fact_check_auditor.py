@@ -11,7 +11,8 @@ import concurrent.futures
 import logging
 import math
 import os
-from typing import TYPE_CHECKING, cast
+import time
+from typing import TYPE_CHECKING, Any, cast
 
 from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, Score
 
@@ -19,6 +20,7 @@ from domain.errors import ReviewIncompleteError
 from domain.models.director import (
     AudioAuditPolicy,
     AuditBundle,
+    AuditChunkTrace,
     ChoiceCategory,
     FactCheckAuditMetric,
     PolicyFinding,
@@ -113,6 +115,12 @@ class FactCheckAuditor:
         self._logger = logger_instance or logger
         self._client = client
         self._pii_detector = pii_detector
+        self._last_traces: list[AuditChunkTrace] = []
+
+    @property
+    def last_traces(self) -> list[AuditChunkTrace]:
+        """直近の監査実行で収集されたトレース記録一覧."""
+        return list(self._last_traces)
 
     def _get_client(self) -> AsyncTypeSafeClient:
         if self._client is not None:
@@ -123,12 +131,12 @@ class FactCheckAuditor:
             )
         return AsyncTypeSafeClient(api_key=self._api_key.strip(), model=self._model)
 
-    async def audit_single_chunk_async(
+    async def _audit_single_chunk_with_trace(
         self,
         client: AsyncTypeSafeClient,
         chunk: UtteranceChunk,
-    ) -> tuple[UtteranceChunk, FactCheckAuditMetric]:
-        """1つの発話チャンクに対して Noul, Score, Choice を同時に並行評価する."""
+    ) -> tuple[UtteranceChunk, FactCheckAuditMetric, AuditChunkTrace]:
+        """1つの発話チャンクを評価し、メトリクスとトレース記録を生成する."""
         completion_note = (
             "この発話は文末まで確認できた完結文です。"
             if chunk.is_complete_sentence
@@ -142,13 +150,29 @@ class FactCheckAuditor:
         }
 
         try:
+            start_time = time.perf_counter()
             response: SystemOneResponse = await client.system_one(
                 state=state,
                 questions=questions,
                 model=self._model,
             )
+            latency_ms = round((time.perf_counter() - start_time) * 1000)
             metric = self._parse_response(response)
-            return chunk, metric
+            resp_model = getattr(response, "model", None)
+            model_name = resp_model if isinstance(resp_model, str) and resp_model else (self._model or "jev-default")
+            trace = AuditChunkTrace.create(
+                chunk=chunk,
+                metric=metric,
+                input_state=state,
+                questions={
+                    "noul": NOUL_INSTRUCTIONS,
+                    "score": SCORE_INSTRUCTIONS,
+                    "choice": CHOICE_INSTRUCTIONS,
+                },
+                latency_ms=latency_ms,
+                model=model_name,
+            )
+            return chunk, metric, trace
         except Exception as error:  # noqa: BLE001 - all API/parse failures stop publication
             error_type = type(error).__name__
             detail = str(error) if isinstance(error, (ValueError, TypeError)) else "upstream failure"
@@ -160,6 +184,16 @@ class FactCheckAuditor:
             )
             error_message = f"公開前監査を完了できませんでした ({error_type})。設定・接続を確認して再実行してください。"
             raise ReviewIncompleteError(error_message) from None
+
+    async def audit_single_chunk_async(
+        self,
+        client: AsyncTypeSafeClient,
+        chunk: UtteranceChunk,
+    ) -> tuple[UtteranceChunk, FactCheckAuditMetric]:
+        """1つの発話チャンクに対して Noul, Score, Choice を同時に並行評価する."""
+        chunk, metric, trace = await self._audit_single_chunk_with_trace(client, chunk)
+        self._last_traces = [trace]
+        return chunk, metric
 
     def _parse_response(self, response: SystemOneResponse) -> FactCheckAuditMetric:
         """Validate the complete Jev response rather than assuming a low score."""
@@ -190,12 +224,48 @@ class FactCheckAuditor:
         if confidence is not None:
             confidence = _bounded_number(confidence, 0.0, 1.0)
 
+        raw_answers: dict[str, Any] = {
+            "noul": noul_val,
+            "score": raw_score,
+            "choice": raw_choice,
+        }
+        if confidence is not None:
+            raw_answers["confidence"] = confidence
+
         return FactCheckAuditMetric(
             noul=noul_val,
             score=domain_score,
             choice=cast("ChoiceCategory", raw_choice),
             confidence=confidence,
+            raw_response=raw_answers,
         )
+
+    async def audit_chunks_with_traces_async(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        concurrency_limit: int = 10,
+    ) -> tuple[list[tuple[UtteranceChunk, FactCheckAuditMetric]], list[AuditChunkTrace]]:
+        """非同期バッチ処理でチャンク配列を並行監査し、評価メトリクスとトレース記録を返す."""
+        if not chunks:
+            self._last_traces = []
+            return [], []
+
+        client = self._get_client()
+        semaphore = asyncio.Semaphore(concurrency_limit)
+
+        async def _bounded_audit(
+            chunk: UtteranceChunk,
+        ) -> tuple[UtteranceChunk, FactCheckAuditMetric, AuditChunkTrace]:
+            async with semaphore:
+                return await self._audit_single_chunk_with_trace(client, chunk)
+
+        tasks = [_bounded_audit(c) for c in chunks]
+        triplets = await asyncio.gather(*tasks)
+        results = [(c, m) for c, m, _ in triplets]
+        traces = [t for _, _, t in triplets]
+        self._last_traces = traces
+        return results, traces
 
     async def audit_chunks_async(
         self,
@@ -204,19 +274,33 @@ class FactCheckAuditor:
         concurrency_limit: int = 10,
     ) -> list[tuple[UtteranceChunk, FactCheckAuditMetric]]:
         """非同期バッチ処理でチャンク配列を並行監査する."""
+        results, _ = await self.audit_chunks_with_traces_async(chunks, concurrency_limit=concurrency_limit)
+        return results
+
+    def audit_chunks_with_traces(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        concurrency_limit: int = 10,
+    ) -> tuple[list[tuple[UtteranceChunk, FactCheckAuditMetric]], list[AuditChunkTrace]]:
+        """同期インターフェース: イベントループを利用して非同期バッチ監査とトレース収集を実行する."""
         if not chunks:
-            return []
+            self._last_traces = []
+            return [], []
 
-        client = self._get_client()
-        semaphore = asyncio.Semaphore(concurrency_limit)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
 
-        async def _bounded_audit(chunk: UtteranceChunk) -> tuple[UtteranceChunk, FactCheckAuditMetric]:
-            async with semaphore:
-                return await self.audit_single_chunk_async(client, chunk)
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(
+                    asyncio.run,
+                    self.audit_chunks_with_traces_async(chunks, concurrency_limit=concurrency_limit),
+                ).result()
 
-        tasks = [_bounded_audit(c) for c in chunks]
-        results = await asyncio.gather(*tasks)
-        return list(results)
+        return asyncio.run(self.audit_chunks_with_traces_async(chunks, concurrency_limit=concurrency_limit))
 
     def audit_chunks(
         self,
@@ -225,23 +309,8 @@ class FactCheckAuditor:
         concurrency_limit: int = 10,
     ) -> list[tuple[UtteranceChunk, FactCheckAuditMetric]]:
         """同期インターフェース: イベントループを利用して非同期バッチ監査を実行する."""
-        if not chunks:
-            return []
-
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            # すでに実行中のイベントループがある環境(Jupyter等)の場合、新しいループを別スレッドで走らせる
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                return executor.submit(
-                    asyncio.run,
-                    self.audit_chunks_async(chunks, concurrency_limit=concurrency_limit),
-                ).result()
-
-        return asyncio.run(self.audit_chunks_async(chunks, concurrency_limit=concurrency_limit))
+        results, _ = self.audit_chunks_with_traces(chunks, concurrency_limit=concurrency_limit)
+        return results
 
     def audit_bundle(
         self,
@@ -251,7 +320,7 @@ class FactCheckAuditor:
         concurrency_limit: int = 10,
     ) -> AuditBundle:
         """Run the compatible fact check plus the fail-closed audio policy audit."""
-        fact_check_results = self.audit_chunks(chunks, concurrency_limit=concurrency_limit)
+        fact_check_results, traces = self.audit_chunks_with_traces(chunks, concurrency_limit=concurrency_limit)
         detector = self._pii_detector or PresidioPiiDetector()
         policy_findings: list[PolicyFinding] = []
         for chunk in chunks:
@@ -280,7 +349,25 @@ class FactCheckAuditor:
                     )
                 )
         policy_findings.extend(self._audit_jev_policy_questions(chunks, policy))
-        return AuditBundle(fact_check_results=fact_check_results, policy_findings=policy_findings)
+
+        findings_by_chunk: dict[str, list[PolicyFinding]] = {}
+        for finding in policy_findings:
+            findings_by_chunk.setdefault(finding.chunk_id, []).append(finding)
+
+        updated_traces = [
+            trace.with_policy_findings(
+                findings_by_chunk.get(trace.chunk_id, []),
+                policy_version=policy.version,
+            )
+            for trace in traces
+        ]
+        self._last_traces = updated_traces
+
+        return AuditBundle(
+            fact_check_results=fact_check_results,
+            policy_findings=policy_findings,
+            traces=updated_traces,
+        )
 
     def _audit_jev_policy_questions(
         self,

@@ -2,10 +2,12 @@
 
 from .gateways import (
     AgendaSerializer,
+    AuditTraceRecorderGateway,
     BlobSource,
     ChannelCredentials,
     DiscordTranscriptSource,
     EpisodeRepository,
+    FactCheckAuditorGateway,
     NewsResearcher,
     NewsSource,
     NotificationGateway,
@@ -19,10 +21,12 @@ from .gateways import (
 
 __all__ = [
     "AgendaSerializer",
+    "AuditTraceRecorderGateway",
     "BlobSource",
     "ChannelCredentials",
     "DiscordTranscriptSource",
     "EpisodeRepository",
+    "FactCheckAuditorGateway",
     "NewsResearcher",
     "NewsSource",
     "NotificationGateway",

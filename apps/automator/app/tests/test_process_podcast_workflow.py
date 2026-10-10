@@ -7,9 +7,18 @@ from dataclasses import dataclass, field
 import pytest
 
 from domain.errors import ReviewIncompleteError
-from domain.models import SnsPromotionContent, SnsPromotionsResponse, Summary
+from domain.models import (
+    AuditBundle,
+    AuditChunkTrace,
+    DirectorIntervention,
+    PolicyFinding,
+    SnsPromotionContent,
+    SnsPromotionsResponse,
+    Summary,
+)
 from domain.models.director import AudioAuditPolicy, FactCheckAuditMetric
 from domain.models.transcript import TranscriptSegment
+from services.audit_trace_recorder import AuditTraceRecorder, InMemoryTraceStorage
 from services.episode_transcription import EpisodeTranscription, TranscriptionResult
 from usecases.process_podcast_workflow import (
     ProcessPodcastWorkflow,
@@ -163,6 +172,14 @@ class _FirestoreManager:
     def create_sns_promotion(self, **values: object) -> str:
         self.promotions.append(values)
         return f"promotion-{len(self.promotions)}"
+
+    def save_policy_findings(self, **values: object) -> list[str]:
+        self.policy_findings = values
+        return ["finding_1"]
+
+    def save_director_interventions(self, **values: object) -> list[str]:
+        self.interventions = values
+        return ["intervention_1"]
 
 
 def _request(object_path: str = "podcasts/1/episodes/42/source/recording.mp3") -> ProcessPodcastWorkflowInput:
@@ -532,3 +549,210 @@ def test_workflow_skips_audit_when_policy_disabled() -> None:
     # 3. エピソードは正常に completed に遷移
     assert repository.completed is not None
     assert repository.failed is None
+
+
+def test_workflow_records_audit_traces_when_enabled() -> None:
+    """監査完了時に AuditTraceRecorder によりトレースログが保存されること (#220)."""
+
+    class _AuditorWithTraces:
+        def audit_bundle(self, chunks, policy):
+            results = [(c, FactCheckAuditMetric(noul=0.1, score=1, choice="other")) for c in chunks]
+            traces = [
+                AuditChunkTrace.create(
+                    chunk=c,
+                    metric=m,
+                    input_state="state",
+                    questions={},
+                )
+                for c, m in results
+            ]
+            return AuditBundle(fact_check_results=results, policy_findings=[], traces=traces)
+
+    class _Transcription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="テスト発話", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    repository = _EpisodeRepository()
+    firestore = _FirestoreManager()
+    storage = InMemoryTraceStorage()
+    recorder = AuditTraceRecorder(storage=storage, enabled=True)
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=firestore,
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_Transcription(),
+        fact_check_auditor=_AuditorWithTraces(),
+        audit_trace_recorder=recorder,
+    )
+
+    workflow.run(_request())
+
+    # トレースが指定ストレージに記録されたこと
+    expected_key = "audit_traces/1/42/trace.jsonl"
+    assert expected_key in storage.traces
+    assert "seg_00001" in storage.traces[expected_key]
+    assert repository.completed is not None
+
+
+def test_workflow_storage_failure_does_not_fail_episode() -> None:
+    """トレース保存処理が例外を投げても、エピソード公開自体は成功すること (#220)."""
+
+    class _AuditorWithTraces:
+        def audit_bundle(self, chunks, policy):
+            results = [(c, FactCheckAuditMetric(noul=0.1, score=1, choice="other")) for c in chunks]
+            traces = [AuditChunkTrace.create(chunk=c, metric=m, input_state="state", questions={}) for c, m in results]
+            return AuditBundle(fact_check_results=results, policy_findings=[], traces=traces)
+
+    class _Transcription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="テスト発話", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    class _FailingStorage:
+        def save_trace(self, **kwargs):
+            raise RuntimeError("Storage disk is full or network down")
+
+    repository = _EpisodeRepository()
+    recorder = AuditTraceRecorder(storage=_FailingStorage(), enabled=True)
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=_FirestoreManager(),
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_Transcription(),
+        fact_check_auditor=_AuditorWithTraces(),
+        audit_trace_recorder=recorder,
+    )
+
+    # 例外が外へ漏れず、ワークフローが成功すること
+    workflow.run(_request())
+    assert repository.completed is not None
+    assert repository.failed is None
+
+
+def test_workflow_records_traces_when_policy_findings_require_approval() -> None:
+    """ポリシー違反疑いで公開停止(awaiting_approval)になる場合でもトレースが保存されること (#220)."""
+
+    class _AuditorWithFindings:
+        def audit_bundle(self, chunks, policy):
+            results = [(c, FactCheckAuditMetric(noul=0.1, score=1, choice="other")) for c in chunks]
+            findings = [
+                PolicyFinding.create(
+                    chunk=chunks[0], category="confidential_information", source="presidio", policy_version="v1"
+                )
+            ]
+            traces = [AuditChunkTrace.create(chunk=c, metric=m, input_state="state", questions={}) for c, m in results]
+            return AuditBundle(fact_check_results=results, policy_findings=findings, traces=traces)
+
+    class _Transcription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="機密発話", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    repository = _EpisodeRepository()
+    storage = InMemoryTraceStorage()
+    recorder = AuditTraceRecorder(storage=storage, enabled=True)
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=_FirestoreManager(),
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_Transcription(),
+        fact_check_auditor=_AuditorWithFindings(),
+        audit_trace_recorder=recorder,
+    )
+
+    workflow.run(_request())
+
+    # awaiting_approval に遷移し、かつトレースは保存されていること
+    assert repository.awaiting_approval is not None
+    assert "audit_traces/1/42/trace.jsonl" in storage.traces
+
+
+def test_workflow_records_traces_when_interventions_require_approval() -> None:
+    """訂正介入提案で公開停止(awaiting_approval)になる場合でもトレースが保存されること (#220)."""
+
+    class _AuditorWithIntervention:
+        def audit_bundle(self, chunks, policy):
+            results = [(c, FactCheckAuditMetric(noul=0.9, score=4, choice="technology")) for c in chunks]
+            traces = [AuditChunkTrace.create(chunk=c, metric=m, input_state="state", questions={}) for c, m in results]
+            return AuditBundle(fact_check_results=results, policy_findings=[], traces=traces)
+
+    class _Generator:
+        def generate_intervention(self, **kwargs):
+            return DirectorIntervention(
+                intervention_id="int_00001",
+                chunk_id="seg_00001",
+                target_speaker="小野",
+                insert_timestamp_ms=5000,
+                correction_script="訂正スクリプトです",
+                reason="明確な誤り",
+                audit_metrics=kwargs["metric"],
+            )
+
+    class _Transcription:
+        def run(self, **kwargs):
+            return TranscriptionResult(
+                minutes="## 要約\nテストエピソード\n## 【目次】\n0:00 本編",
+                segments=[TranscriptSegment(start=0.0, end=5.0, text="誤り発話", speaker="小野")],
+                meta={"engine": "test"},
+            )
+
+    repository = _EpisodeRepository()
+    storage = InMemoryTraceStorage()
+    recorder = AuditTraceRecorder(storage=storage, enabled=True)
+
+    workflow = ProcessPodcastWorkflow(
+        transcript_provider=_TranscriptProvider(),
+        object_storage=_ObjectStorage(),
+        blob_source=_BlobSource(),
+        notifier=_Notifier(),
+        rss_manager_factory=_RssManager,
+        audio_converter=lambda audio, suffix: b"mp3",
+        audio_info_reader=lambda file_buffer, audio_format: [100, "00:05:00"],
+        firestore_manager=_FirestoreManager(),
+        episode_repository=repository,
+        logger=logging.getLogger("test-workflow"),
+        transcription=_Transcription(),
+        fact_check_auditor=_AuditorWithIntervention(),
+        director_script_generator=_Generator(),
+        audit_trace_recorder=recorder,
+    )
+
+    workflow.run(_request())
+
+    # awaiting_approval に遷移し、かつトレースは保存されていること
+    assert repository.awaiting_approval is not None
+    assert "audit_traces/1/42/trace.jsonl" in storage.traces

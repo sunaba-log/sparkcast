@@ -17,8 +17,10 @@ from services.episode_transcription import EpisodeTranscription, TranscriptionRe
 
 if TYPE_CHECKING:
     import logging
+    from collections.abc import Sequence
 
     from domain.interfaces import (
+        AuditTraceRecorderGateway,
         BlobSource,
         DirectorScriptGeneratorGateway,
         EpisodeRepository,
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
         ObjectStorage,
         TranscriptProvider,
     )
+    from domain.models import AuditChunkTrace
     from services.firestore_manager import FirestoreManager
 
 
@@ -113,6 +116,7 @@ class ProcessPodcastWorkflow:
         fact_check_auditor: FactCheckAuditorGateway | None = None,
         director_script_generator: DirectorScriptGeneratorGateway | None = None,
         fact_verification_agent: FactVerificationAgentGateway | None = None,
+        audit_trace_recorder: AuditTraceRecorderGateway | None = None,
     ) -> None:
         """Initialize use case dependencies.
 
@@ -133,6 +137,8 @@ class ProcessPodcastWorkflow:
         self._fact_check_auditor = fact_check_auditor
         self._director_script_generator = director_script_generator
         self._fact_verification_agent = fact_verification_agent
+        self._audit_trace_recorder = audit_trace_recorder
+        self._traces_recorded = False
         self._transcription = transcription or EpisodeTranscription(
             transcript_provider=transcript_provider,
             episode_repository=episode_repository,
@@ -320,9 +326,18 @@ class ProcessPodcastWorkflow:
                         audit_bundle = self._fact_check_auditor.audit_bundle(chunks, policy=policy)
                         audit_results = audit_bundle.fact_check_results
                         policy_findings = audit_bundle.policy_findings
+                        traces = getattr(audit_bundle, "traces", [])
                     else:
                         audit_results = self._fact_check_auditor.audit_chunks(chunks)
                         policy_findings = []
+                        traces = getattr(self._fact_check_auditor, "last_traces", [])
+                    if not traces:
+                        traces = getattr(self._fact_check_auditor, "last_traces", [])
+                    self._record_audit_traces(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                        traces=traces,
+                    )
                     expected_chunks = {chunk.chunk_id: chunk for chunk in chunks}
                     if (
                         len(audit_results) != len(chunks)
@@ -544,6 +559,14 @@ class ProcessPodcastWorkflow:
             )
         except Exception as err:
             self._logger.exception("Error occurred during podcast processing:")
+            if not getattr(self, "_traces_recorded", False) and self._audit_trace_recorder is not None:
+                last_traces = getattr(self._fact_check_auditor, "last_traces", [])
+                if last_traces:
+                    self._record_audit_traces(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                        traces=last_traces,
+                    )
             try:
                 self._episode_repository.mark_failed(
                     podcast_id=episode_ref.podcast_id,
@@ -554,6 +577,26 @@ class ProcessPodcastWorkflow:
                 self._logger.exception("Failed to persist episode failure state")
             self._notifier.send_discord_message(message=f"Podcast Processing Failed:\nError: {err}")
             raise
+
+    def _record_audit_traces(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        traces: Sequence[AuditChunkTrace],
+    ) -> None:
+        """Record audit traces if recorder is configured, without disrupting the workflow."""
+        if self._audit_trace_recorder is None or not traces:
+            return
+        try:
+            self._audit_trace_recorder.record(
+                podcast_id=podcast_id,
+                episode_id=episode_id,
+                traces=traces,
+            )
+            self._traces_recorded = True
+        except Exception:  # noqa: BLE001
+            self._logger.exception("Failed to record audit traces (non-fatal)")
 
     def _reindex_knowledge(self, podcast_id: str) -> None:
         """チャット用の索引を作り直してもらう(完了にしたあと。索引は完了したエピソードだけを対象にする).

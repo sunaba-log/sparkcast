@@ -24,6 +24,7 @@ from .common import (
 from .director import (
     AudioAuditPolicy,
     AuditBundle,
+    AuditChunkTrace,
     ChoiceCategory,
     DirectorIntervention,
     EvidenceSource,
@@ -42,6 +43,7 @@ __all__ = [
     "AgendaResult",
     "AudioAuditPolicy",
     "AuditBundle",
+    "AuditChunkTrace",
     "ChoiceCategory",
     "DirectorIntervention",
     "DiscordMessage",
