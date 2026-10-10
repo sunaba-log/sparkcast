@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import io
 import mimetypes
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from domain.errors import ReviewIncompleteError
 from domain.models import AudioAuditPolicy, EpisodeObjectReference, UtteranceChunk
@@ -116,6 +117,7 @@ class ProcessPodcastWorkflow:
         fact_check_auditor: FactCheckAuditorGateway | None = None,
         director_script_generator: DirectorScriptGeneratorGateway | None = None,
         fact_verification_agent: FactVerificationAgentGateway | None = None,
+        rss_rebuilder: Any | None = None,
         audit_trace_recorder: AuditTraceRecorderGateway | None = None,
     ) -> None:
         """Initialize use case dependencies.
@@ -129,6 +131,7 @@ class ProcessPodcastWorkflow:
         self._blob_source = blob_source
         self._notifier = notifier
         self._rss_manager_factory = rss_manager_factory
+        self._rss_rebuilder = rss_rebuilder
         self._audio_converter = audio_converter
         self._audio_info_reader = audio_info_reader
         self._firestore_manager = firestore_manager
@@ -162,9 +165,32 @@ class ProcessPodcastWorkflow:
                 episode_id=episode_ref.episode_id,
                 source_audio_path=episode_ref.object_path,
             )
-            rss_feed_bytes = self._object_storage.download_file(f"{request.r2_key_prefix}/feed.xml")
-            rss_manager = self._rss_manager_factory(rss_xml=rss_feed_bytes.decode("utf-8"))
-            latest_episode_number = rss_manager.get_total_episodes() + 1
+            rss_manager = None
+            if hasattr(self._episode_repository, "get_episode_count"):
+                try:
+                    latest_episode_number = (
+                        self._episode_repository.get_episode_count(podcast_id=episode_ref.podcast_id) + 1
+                    )
+                except Exception:  # noqa: BLE001
+                    latest_episode_number = 1
+            elif self._rss_manager_factory is not None:
+                try:
+                    rss_feed_bytes = self._object_storage.download_file(f"{request.r2_key_prefix}/feed.xml")
+                    rss_manager = self._rss_manager_factory(rss_xml=rss_feed_bytes.decode("utf-8"))
+                    latest_episode_number = rss_manager.get_total_episodes() + 1
+                except Exception:  # noqa: BLE001
+                    latest_episode_number = 1
+            else:
+                latest_episode_number = 1
+
+            # If legacy rss_manager is needed for fallback, ensure it is instantiated
+            if rss_manager is None and self._rss_rebuilder is None and self._rss_manager_factory is not None:
+                try:
+                    rss_feed_bytes = self._object_storage.download_file(f"{request.r2_key_prefix}/feed.xml")
+                    rss_manager = self._rss_manager_factory(rss_xml=rss_feed_bytes.decode("utf-8"))
+                except Exception:  # noqa: BLE001
+                    rss_manager = None
+
             self._logger.info("Latest Episode Number: %s", latest_episode_number)
 
             # 音声認識の方式(短い音声は同期認識)を決めるため、先に MP3 にして長さを測る
@@ -448,37 +474,38 @@ class ProcessPodcastWorkflow:
                 remote_key=r2_remote_key,
                 custom_domain=request.r2_custom_domain,
             )
+
+            existing_content = {}
+            if self._firestore_manager is not None:
+                existing_content = (
+                    self._firestore_manager.get_episode_content(
+                        podcast_id=episode_ref.podcast_id,
+                        episode_id=episode_ref.episode_id,
+                    )
+                    or {}
+                )
+
+            # Cache busting specifically when audio file is replaced
+            is_audio_replaced = bool(
+                existing_content.get("audio_metadata", {}).get("audio_url") or (resumed and existing_content)
+            )
+            if is_audio_replaced:
+                cache_buster = int(datetime.now(UTC).timestamp())
+                public_url_with_cache_bust = f"{public_url}?v={cache_buster}"
+            else:
+                public_url_with_cache_bust = public_url
+
             self._logger.info(
                 "Uploaded audio to R2: %s, Size: %s bytes, Duration: %s",
-                public_url,
+                public_url_with_cache_bust,
                 file_size_bytes,
                 duration_str,
             )
 
-            self._logger.info("\n## Updating RSS Feed... ##")
-            new_episode_data = {
-                "title": summary.title,
-                "description": summary.description,
-                "audio_url": public_url,
-                "file_size": file_size_bytes,
-                "itunes_duration": duration_str,
-                "creator": "sunabalog",
-                "mime_type": audio_upload_mime_type,
-                "itunes_summary": summary.description,
-                "itunes_explicit": "no",
-                "itunes_season": 1,
-                "itunes_episode_number": latest_episode_number,
-                "itunes_episode_type": "full",
-            }
-            rss_manager.add_episode(new_episode_data)
-            self._object_storage.upload_file(
-                file_content=rss_manager.get_rss_xml().encode("utf-8"),
-                remote_key=f"{request.r2_key_prefix}/feed.xml",
-                content_type="application/rss+xml; charset=utf-8",
-                public=True,
-            )
-
             if self._firestore_manager is not None:
+                rss_guid = existing_content.get("rss_guid") or str(uuid.uuid4())
+                published_at_val = existing_content.get("published_at") or datetime.now(UTC)
+
                 generated_at = datetime.now(UTC).isoformat()
                 transcript_summary = summary.description
                 ai_generated_meta = {
@@ -495,7 +522,7 @@ class ProcessPodcastWorkflow:
                 audio_metadata = {
                     "file_size_bytes": file_size_bytes,
                     "duration_str": duration_str,
-                    "audio_url": public_url,
+                    "audio_url": public_url_with_cache_bust,
                     "mime_type": audio_upload_mime_type,
                 }
                 self._firestore_manager.save_episode_content(
@@ -509,6 +536,9 @@ class ProcessPodcastWorkflow:
                     audio_metadata=audio_metadata,
                     minutes=transcript,
                     transcript_meta=transcription.meta,
+                    rss_guid=rss_guid,
+                    published_at=published_at_val,
+                    is_published=True,
                 )
                 if transcription.segments:
                     self._firestore_manager.save_transcript_segments(
@@ -549,13 +579,46 @@ class ProcessPodcastWorkflow:
                 episode_id=episode_ref.episode_id,
                 title=summary.title,
                 description=summary.description,
-                audio_url=public_url,
+                audio_url=public_url_with_cache_bust,
                 duration_seconds=_duration_to_seconds(duration_str),
             )
+
+            self._logger.info("\n## Updating RSS Feed... ##")
+            if self._rss_rebuilder is not None:
+                self._logger.info("Rebuilding complete RSS feed from database...")
+                self._rss_rebuilder.rebuild(
+                    podcast_id=episode_ref.podcast_id,
+                    r2_key_prefix=request.r2_key_prefix,
+                    r2_custom_domain=request.r2_custom_domain,
+                )
+            elif rss_manager is not None:
+                self._logger.info("Using fallback differential RSS manager...")
+                new_episode_data = {
+                    "title": summary.title,
+                    "description": summary.description,
+                    "audio_url": public_url_with_cache_bust,
+                    "file_size": file_size_bytes,
+                    "itunes_duration": duration_str,
+                    "creator": "sunabalog",
+                    "mime_type": audio_upload_mime_type,
+                    "itunes_summary": summary.description,
+                    "itunes_explicit": "no",
+                    "itunes_season": 1,
+                    "itunes_episode_number": latest_episode_number,
+                    "itunes_episode_type": "full",
+                }
+                rss_manager.add_episode(new_episode_data)
+                self._object_storage.upload_file(
+                    file_content=rss_manager.get_rss_xml().encode("utf-8"),
+                    remote_key=f"{request.r2_key_prefix}/feed.xml",
+                    content_type="application/rss+xml; charset=utf-8",
+                    public=True,
+                )
+
             self._reindex_knowledge(episode_ref.podcast_id)
             self._logger.info("\n## Notifying Discord (Success)... ##")
             self._notifier.send_discord_message(
-                message=f"Podcast Episode Published Successfully:\nTitle: {summary.title}\nURL: {public_url}"
+                message=f"Podcast Episode Published Successfully:\nTitle: {summary.title}\nURL: {public_url_with_cache_bust}"
             )
         except Exception as err:
             self._logger.exception("Error occurred during podcast processing:")

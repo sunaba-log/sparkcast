@@ -40,12 +40,26 @@ type FirestoreEpisodeContent = {
   editorial?: {
     minutes?: string;
   };
+  rss_guid?: string;
+  published_at?: Date | { toDate: () => Date } | string | null;
+  is_published?: boolean;
+  audio_metadata?: {
+    audio_url?: string;
+    duration_str?: string;
+    file_size_bytes?: number;
+    mime_type?: string;
+  };
+  ai_generated_meta?: {
+    title?: string;
+    description?: string;
+  };
 };
 
 type EpisodeContent = {
   minutes: string;
   transcriptAvailable: boolean;
   promotions: EpisodePromotion[];
+  rssGuid?: string;
 };
 
 type FirestoreDirectorIntervention = {
@@ -139,7 +153,7 @@ async function loadEpisodeContent(
     return (b.id || "").localeCompare(a.id || "");
   });
 
-  return { minutes, transcriptAvailable, promotions };
+  return { minutes, transcriptAvailable, promotions, rssGuid: content?.rss_guid };
 }
 
 function episodeContentRef(podcastId: number, episodeId: number) {
@@ -357,6 +371,7 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
     processingError: row.processing_error,
     publishedAt: row.published_at ? row.published_at.toISOString() : null,
     isPublished: Boolean(row.published_at && row.status === "completed"),
+    rssGuid: content.rssGuid,
     minutesGenerated: Boolean(content.minutes),
     transcriptAvailable: content.transcriptAvailable,
     xPostsGenerated: content.promotions.length > 0,
@@ -534,12 +549,119 @@ export async function setEpisodePublished(
   episodeId: number,
   published: boolean,
 ): Promise<boolean> {
-  const result = await (await getDbPool()).query(
+  const pool = await getDbPool();
+  const contentRef = episodeContentRef(podcastId, episodeId);
+
+  let publishedAtDate: Date | null = null;
+  if (published) {
+    const docSnapshot = await contentRef.get().catch(() => null);
+    const docData = docSnapshot?.data() as FirestoreEpisodeContent | undefined;
+    const rssGuid = docData?.rss_guid || crypto.randomUUID();
+
+    if (docData?.published_at) {
+      if (typeof docData.published_at === "object" && "toDate" in docData.published_at && typeof docData.published_at.toDate === "function") {
+        publishedAtDate = docData.published_at.toDate();
+      } else if (docData.published_at instanceof Date) {
+        publishedAtDate = docData.published_at;
+      } else if (typeof docData.published_at === "string") {
+        publishedAtDate = new Date(docData.published_at);
+      }
+    } else {
+      const dbRow = await pool.query<{ published_at: Date | null }>(
+        `SELECT published_at FROM episodes WHERE podcast_id = $1 AND episode_id = $2`,
+        [podcastId, episodeId],
+      ).catch(() => null);
+      if (dbRow?.rows?.[0]?.published_at) {
+        publishedAtDate = new Date(dbRow.rows[0].published_at);
+      } else {
+        publishedAtDate = new Date();
+      }
+    }
+
+    try {
+      await contentRef.set(
+        {
+          is_published: true,
+          rss_guid: rssGuid,
+          published_at: publishedAtDate,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      console.warn(`Failed to update firestore publish status for ep ${episodeId}:`, err);
+    }
+  } else {
+    try {
+      await contentRef.set(
+        {
+          is_published: false,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      console.warn(`Failed to update firestore unpublish status for ep ${episodeId}:`, err);
+    }
+  }
+
+  const result = await pool.query(
     `UPDATE episodes
      SET published_at = $1, updated_at = now()
      WHERE podcast_id = $2 AND episode_id = $3`,
-    [published ? new Date() : null, podcastId, episodeId],
+    [published ? (publishedAtDate ?? new Date()) : null, podcastId, episodeId],
   );
+  return result.rowCount === 1;
+}
+
+export async function updateEpisodeAudio(input: {
+  podcastId: number;
+  episodeId: number;
+  audioUrl: string;
+  durationSeconds?: number;
+  fileSizeBytes?: number;
+  mimeType?: string;
+}): Promise<boolean> {
+  const pool = await getDbPool();
+  const result = await pool.query(
+    `UPDATE episodes
+     SET audio_file_path = $1,
+         duration_seconds = COALESCE($2, duration_seconds),
+         updated_at = now()
+     WHERE podcast_id = $3 AND episode_id = $4`,
+    [input.audioUrl, input.durationSeconds ?? null, input.podcastId, input.episodeId],
+  );
+
+  try {
+    const contentRef = episodeContentRef(input.podcastId, input.episodeId);
+    const audioMetadataUpdate: Record<string, unknown> = {
+      audio_url: input.audioUrl,
+    };
+    if (input.durationSeconds !== undefined) {
+      const hours = Math.floor(input.durationSeconds / 3600);
+      const minutes = Math.floor((input.durationSeconds % 3600) / 60);
+      const seconds = input.durationSeconds % 60;
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      audioMetadataUpdate.duration_str = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    if (input.fileSizeBytes !== undefined) {
+      audioMetadataUpdate.file_size_bytes = input.fileSizeBytes;
+    }
+    if (input.mimeType !== undefined) {
+      audioMetadataUpdate.mime_type = input.mimeType;
+    }
+
+    await contentRef.set(
+      {
+        audio_metadata: audioMetadataUpdate,
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    console.warn(`Failed to update firestore audio metadata for ep ${input.episodeId}:`, err);
+  }
+
   return result.rowCount === 1;
 }
 
@@ -593,5 +715,24 @@ export async function updateEpisodeMetadata(
      WHERE podcast_id = $3 AND episode_id = $4`,
     [title ?? null, description ?? null, podcastId, episodeId],
   );
+
+  try {
+    const contentRef = episodeContentRef(podcastId, episodeId);
+    const metaUpdate: Record<string, unknown> = {};
+    if (title !== undefined) metaUpdate.title = title;
+    if (description !== undefined) metaUpdate.description = description;
+    if (Object.keys(metaUpdate).length > 0) {
+      await contentRef.set(
+        {
+          ai_generated_meta: metaUpdate,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    }
+  } catch (err) {
+    console.warn(`Failed to update firestore metadata for ep ${episodeId}:`, err);
+  }
+
   return result.rowCount === 1;
 }

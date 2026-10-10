@@ -3,6 +3,7 @@ import {
   setEpisodePublished,
   deleteEpisodeRecord,
   markEpisodeAuditing,
+  updateEpisodeAudio,
   updateEpisodeMetadata,
 } from "@/server/episodes/data-repository";
 import { getDbPool } from "@/server/db";
@@ -18,9 +19,13 @@ vi.mock("@/server/firebase-admin", () => ({
         collection: vi.fn(() => ({
           doc: vi.fn(() => ({
             delete: vi.fn().mockResolvedValue(undefined),
+            get: vi.fn().mockResolvedValue({ data: () => ({}) }),
+            set: vi.fn().mockResolvedValue(undefined),
           })),
         })),
         delete: vi.fn().mockResolvedValue(undefined),
+        get: vi.fn().mockResolvedValue({ data: () => ({}) }),
+        set: vi.fn().mockResolvedValue(undefined),
       })),
     })),
   })),
@@ -84,6 +89,25 @@ describe("data-repository episode management", () => {
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("SET title = COALESCE($1, title)"),
       ["New Title", "New Desc", 1, 42],
+    );
+  });
+
+  it("updates episode audio with metadata", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rowCount: 1 });
+    vi.mocked(getDbPool).mockResolvedValue({ query: mockQuery } as never);
+
+    const result = await updateEpisodeAudio({
+      podcastId: 1,
+      episodeId: 42,
+      audioUrl: "https://example.com/audio.mp3?v=123",
+      durationSeconds: 3661,
+      fileSizeBytes: 123456,
+      mimeType: "audio/mpeg",
+    });
+    expect(result).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("SET audio_file_path = $1"),
+      ["https://example.com/audio.mp3?v=123", 3661, 1, 42],
     );
   });
 });

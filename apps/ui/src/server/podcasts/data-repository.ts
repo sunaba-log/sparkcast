@@ -1,5 +1,6 @@
 import "server-only";
 import { getDbPool } from "@/server/db";
+import { runAutomatorJob } from "@/server/episodes/automator-jobs";
 import type { AudioAuditPolicy, PodcastSummary } from "@/types/podcast";
 
 export type { AudioAuditPolicy };
@@ -90,12 +91,29 @@ export async function createPodcast(input: {
       [input.title, input.description, DEFAULT_COVER_IMAGE_URL]
     );
     const row = inserted.rows[0];
+    const defaultRssFeedPath = `podcasts/${row.podcast_id}/feed.xml`;
+    await client.query(
+      `UPDATE podcasts
+       SET rss_feed_path = $1
+       WHERE podcast_id = $2`,
+      [defaultRssFeedPath, row.podcast_id]
+    );
+    row.rss_feed_path = defaultRssFeedPath;
+
     await client.query(
       `INSERT INTO podcast_ownerships (podcast_id, user_id, role)
        VALUES ($1, $2, 'owner')`,
       [row.podcast_id, input.ownerUserId]
     );
     await client.query("COMMIT");
+
+    runAutomatorJob({
+      action: "sync_rss",
+      podcastId: row.podcast_id,
+    }).catch((err) => {
+      console.warn("Failed to trigger sync_rss after podcast creation:", err);
+    });
+
     return {
       id: row.podcast_id,
       title: row.title,

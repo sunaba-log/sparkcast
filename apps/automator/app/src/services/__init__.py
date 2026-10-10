@@ -10,6 +10,8 @@ from .audit_trace_recorder import (
 )
 from .firestore_manager import FirestoreManager
 from .rss_manager import PodcastRssManager
+from .rss_rebuilder import PodcastRssRebuilder
+from .rss_validator import PodcastRssValidationError, PodcastRssValidator
 
 __all__ = [
     "AudioConverter",
@@ -22,5 +24,8 @@ __all__ = [
     "InMemoryTraceStorage",
     "LocalTraceStorage",
     "PodcastRssManager",
+    "PodcastRssRebuilder",
+    "PodcastRssValidationError",
+    "PodcastRssValidator",
     "TraceStorage",
 ]
