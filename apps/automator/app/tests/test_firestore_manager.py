@@ -259,6 +259,7 @@ def test_save_transcript_segments_replaces_previous_documents() -> None:
             "speaker": "小野",
             "speaker_id": "pid-1",
             "text": "こんにちは",
+            "words": [],
         },
     )
     assert operations[2][1]["speaker_id"] is None

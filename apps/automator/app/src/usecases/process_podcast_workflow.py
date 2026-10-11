@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import mimetypes
 import uuid
@@ -13,8 +14,15 @@ from typing import TYPE_CHECKING, Any, Protocol
 from domain.errors import ReviewIncompleteError
 from domain.models import AudioAuditPolicy, EpisodeObjectReference, UtteranceChunk
 from domain.models.common import Summary
-from domain.models.transcript import extract_topics
+from domain.models.transcript import extract_topics, render_transcript
 from services.episode_transcription import EpisodeTranscription, TranscriptionResult
+from services.policy_edit_plan import (
+    DuplicatePolicyEditError,
+    apply_saved_policy_plan,
+    fail_policy_plan,
+    finish_policy_plan,
+    remap_policy_segments,
+)
 
 if TYPE_CHECKING:
     import logging
@@ -94,6 +102,7 @@ class ProcessPodcastWorkflowInput:
     sns_promotion_count: int = 3
     resume_from_audit: bool = False
     publish_original: bool = False
+    edit_plan_id: str | None = None
 
 
 class ProcessPodcastWorkflow:
@@ -160,11 +169,12 @@ class ProcessPodcastWorkflow:
         self._logger.info("Detected mime type: %s", audio_source_mime_type)
 
         try:
-            self._episode_repository.mark_processing(
-                podcast_id=episode_ref.podcast_id,
-                episode_id=episode_ref.episode_id,
-                source_audio_path=episode_ref.object_path,
-            )
+            if not request.edit_plan_id:
+                self._episode_repository.mark_processing(
+                    podcast_id=episode_ref.podcast_id,
+                    episode_id=episode_ref.episode_id,
+                    source_audio_path=episode_ref.object_path,
+                )
             rss_manager = None
             if hasattr(self._episode_repository, "get_episode_count"):
                 try:
@@ -233,6 +243,8 @@ class ProcessPodcastWorkflow:
                     audio_upload_mime_type = str(audio_meta.get("mime_type", "audio/mpeg"))
                     resumed = True
 
+            if request.edit_plan_id and not resumed:
+                raise ReviewIncompleteError("確定した編集計画の元文字起こしがありません。再監査してください。")
             if not resumed:
                 self._logger.info("\n## Step1: Converting to MP3... ##")
                 original_audio_bytes = self._blob_source.download_blob_as_bytes(
@@ -258,6 +270,7 @@ class ProcessPodcastWorkflow:
                     model_id=request.ai_model_id,
                     source_audio=original_audio_bytes,
                 )
+                transcription.meta["source_md5"] = hashlib.md5(original_audio_bytes, usedforsecurity=False).hexdigest()
                 transcript = transcription.minutes
                 self._logger.info("Transcription: %s", transcription.meta)
                 self._notifier.send_discord_message(
@@ -310,7 +323,7 @@ class ProcessPodcastWorkflow:
                         minutes=transcript,
                         transcript_meta=transcription.meta,
                     )
-                    if transcription.segments:
+                    if transcription.segments and not request.edit_plan_id:
                         self._firestore_manager.save_transcript_segments(
                             podcast_id=episode_ref.podcast_id,
                             episode_id=episode_ref.episode_id,
@@ -324,7 +337,7 @@ class ProcessPodcastWorkflow:
                         )
 
             # Step 2.5: Jev 高速監査 & Gemini 訂正スクリプト生成パイプライン (#170, #217)
-            if self._fact_check_auditor is not None and not request.publish_original:
+            if self._fact_check_auditor is not None and not request.publish_original and not request.edit_plan_id:
                 policy_method = getattr(type(self._episode_repository), "get_audio_audit_policy", None)
                 policy = (
                     self._episode_repository.get_audio_audit_policy(podcast_id=episode_ref.podcast_id)
@@ -371,14 +384,15 @@ class ProcessPodcastWorkflow:
                         or any(expected_chunks.get(chunk.chunk_id) != chunk for chunk, _ in audit_results)
                     ):
                         raise ReviewIncompleteError("全発話の監査結果が揃っていないため公開を停止しました。")
-                    if policy_findings:
-                        if self._firestore_manager is None:
-                            raise ReviewIncompleteError("音声校正の検知結果の保存先がないため公開を停止しました。")
+                    if self._firestore_manager is not None:
                         self._firestore_manager.save_policy_findings(
                             podcast_id=episode_ref.podcast_id,
                             episode_id=episode_ref.episode_id,
                             findings=policy_findings,
                         )
+                    if policy_findings:
+                        if self._firestore_manager is None:
+                            raise ReviewIncompleteError("音声校正の検知結果の保存先がないため公開を停止しました。")
                         self._episode_repository.mark_awaiting_approval(
                             podcast_id=episode_ref.podcast_id,
                             episode_id=episode_ref.episode_id,
@@ -386,7 +400,6 @@ class ProcessPodcastWorkflow:
                         self._notifier.send_discord_message(
                             message=f"#{latest_episode_number} 音声校正ポリシーの要確認項目が {len(policy_findings)} 件あります。"
                         )
-                        return
                     severe_items = [(c, m) for c, m in audit_results if m.should_intervene()]
                     self._logger.info(
                         "Jev audit finished: %d chunks, %d interventions needed (composite criteria)",
@@ -429,14 +442,15 @@ class ProcessPodcastWorkflow:
                                 raise ReviewIncompleteError("訂正案を生成できなかったため公開を停止しました。")
                             interventions.append(intervention)
 
-                    if interventions:
-                        if self._firestore_manager is None:
-                            raise ReviewIncompleteError("訂正案の保存先がないため公開を停止しました。")
+                    if self._firestore_manager is not None:
                         self._firestore_manager.save_director_interventions(
                             podcast_id=episode_ref.podcast_id,
                             episode_id=episode_ref.episode_id,
                             interventions=interventions,
                         )
+                    if interventions:
+                        if self._firestore_manager is None:
+                            raise ReviewIncompleteError("訂正案の保存先がないため公開を停止しました。")
                         self._episode_repository.mark_awaiting_approval(
                             podcast_id=episode_ref.podcast_id,
                             episode_id=episode_ref.episode_id,
@@ -453,7 +467,43 @@ class ProcessPodcastWorkflow:
                             )
                         )
                         return
+                    if policy_findings:
+                        return
 
+            edit_timeline = []
+            if request.edit_plan_id:
+                try:
+                    mp3_bytes, edit_timeline, edit_plan = apply_saved_policy_plan(
+                        request.project_id,
+                        episode_ref.podcast_id,
+                        episode_ref.episode_id,
+                        request.edit_plan_id,
+                        request.gcs_trigger_object_name,
+                    )
+                except DuplicatePolicyEditError:
+                    self._logger.info("Edit plan already claimed; skipping duplicate execution")
+                    return
+                file_size_bytes, duration_str = self._audio_info_reader(
+                    file_buffer=io.BytesIO(mp3_bytes), audio_format="mp3"
+                )
+                edited_segments = remap_policy_segments(transcription.segments, edit_timeline, edit_plan)
+                if not edited_segments:
+                    raise ReviewIncompleteError("編集後に発話がありません。公開内容を確認してください。")
+                transcript = self._transcript_provider.generate_minutes(
+                    render_transcript(edited_segments),
+                    self._episode_repository.get_cast_names(podcast_id=episode_ref.podcast_id),
+                    request.ai_model_id,
+                )
+                summary = self._transcript_provider.summarize_transcript(transcript, model_id=request.ai_model_id)
+                summary.title = f"#{latest_episode_number} {summary.title}"
+                transcription = TranscriptionResult(
+                    minutes=transcript,
+                    segments=edited_segments,
+                    meta={**transcription.meta, "edit_plan_id": request.edit_plan_id},
+                )
+                self._firestore_manager.save_rendition_segments(
+                    podcast_id=episode_ref.podcast_id, episode_id=episode_ref.episode_id, segments=edited_segments
+                )
             self._logger.info("\n## Step3: Uploading to Cloudflare R2... ##")
             if mp3_bytes is None:
                 original_audio_bytes = self._blob_source.download_blob_as_bytes(
@@ -463,7 +513,11 @@ class ProcessPodcastWorkflow:
                 if file_size_bytes == 0:
                     file_size_bytes = len(mp3_bytes)
 
-            r2_remote_key = f"{request.r2_key_prefix}/ep/{latest_episode_number}/audio.mp3"
+            r2_remote_key = (
+                f"{request.r2_key_prefix}/ep/{latest_episode_number}/renditions/{request.edit_plan_id}.mp3"
+                if request.edit_plan_id
+                else f"{request.r2_key_prefix}/ep/{latest_episode_number}/audio.mp3"
+            )
             self._object_storage.upload_file(
                 file_content=mp3_bytes,
                 remote_key=r2_remote_key,
@@ -540,13 +594,13 @@ class ProcessPodcastWorkflow:
                     published_at=published_at_val,
                     is_published=True,
                 )
-                if transcription.segments:
+                if transcription.segments and not request.edit_plan_id:
                     self._firestore_manager.save_transcript_segments(
                         podcast_id=episode_ref.podcast_id,
                         episode_id=episode_ref.episode_id,
                         segments=transcription.segments,
                     )
-                else:
+                elif not request.edit_plan_id:
                     # 音声認識に失敗したとき(従来の方式)は議事録を分割して入れる
                     self._firestore_manager.save_transcript_chunks(
                         podcast_id=episode_ref.podcast_id,
@@ -583,6 +637,14 @@ class ProcessPodcastWorkflow:
                 duration_seconds=_duration_to_seconds(duration_str),
             )
 
+            if request.edit_plan_id:
+                finish_policy_plan(
+                    request.project_id,
+                    episode_ref.podcast_id,
+                    episode_ref.episode_id,
+                    request.edit_plan_id,
+                    edit_timeline,
+                )
             self._logger.info("\n## Updating RSS Feed... ##")
             if self._rss_rebuilder is not None:
                 self._logger.info("Rebuilding complete RSS feed from database...")
@@ -621,6 +683,13 @@ class ProcessPodcastWorkflow:
                 message=f"Podcast Episode Published Successfully:\nTitle: {summary.title}\nURL: {public_url_with_cache_bust}"
             )
         except Exception as err:
+            if request.edit_plan_id:
+                try:
+                    fail_policy_plan(
+                        request.project_id, episode_ref.podcast_id, episode_ref.episode_id, request.edit_plan_id
+                    )
+                except Exception:  # noqa: BLE001
+                    self._logger.exception("Failed to mark edit plan failure")
             self._logger.exception("Error occurred during podcast processing:")
             if not getattr(self, "_traces_recorded", False) and self._audit_trace_recorder is not None:
                 last_traces = getattr(self._fact_check_auditor, "last_traces", [])

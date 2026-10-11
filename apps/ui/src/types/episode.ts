@@ -100,6 +100,59 @@ export type PolicyFinding = {
   end: number;
   text: string;
   entityType: string | null;
-  action: "silence";
+  action: "silence" | "cut" | "replace";
+  segmentIds?: string[];
+  evidenceText?: string;
+  evidenceStart?: number | null;
+  evidenceEnd?: number | null;
+  wordIds?: string[];
+  contextWordIds?: string[];
+  rangePrecision?: "word" | "chunk";
+  probability?: number | null;
   status: PolicyFindingStatus;
+};
+
+export type TranscriptWord = {
+  wordId: string;
+  text: string;
+  start: number;
+  end: number;
+};
+
+export type PolicyEditProposal = {
+  id: string;
+  findingIds: string[];
+  findings: PolicyFinding[];
+  start: number;
+  end: number;
+  action: "cut" | "silence" | "replace";
+  recommendedAction: "cut" | "silence" | "replace";
+  reason: string;
+  script: string;
+  status: PolicyFindingStatus;
+  rangeConfirmed: boolean;
+  rangePrecision: "word" | "chunk";
+  assetId: string | null;
+};
+
+export type PolicyReview = {
+  version: number;
+  sourceGeneration: string;
+  transcriptRevision: string;
+  proposals: PolicyEditProposal[];
+  words: TranscriptWord[];
+  dispatchRetryPlanId?: string | null;
+};
+
+export type ReplacementAudioAsset = {
+  id: string;
+  proposalId: string;
+  kind: "synthesized" | "recorded";
+  script: string;
+  transcript: string;
+  durationMs: number;
+  objectPath: string;
+  sha256?: string;
+  sourceGeneration?: string;
+  transcriptRevision?: string;
 };

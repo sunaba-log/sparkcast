@@ -12,7 +12,7 @@ declare global {
   var podcastStorage: Storage | undefined;
 }
 
-function getStorage(): Storage {
+export function getStorage(): Storage {
   if (!globalThis.podcastStorage) {
     globalThis.podcastStorage = new Storage({
       projectId: getGoogleCloudProject(),

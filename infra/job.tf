@@ -40,9 +40,10 @@ module "cloud_run_job" {
     PODCAST_ID                               = var.podcast_id
     SNS_SCHEDULE_OFFSET_HOURS                = var.sns_schedule_offset_hours
     # 話者・時刻つきの文字起こし（#166、transcription.tf）
-    WORK_BUCKET     = google_storage_bucket.work.name
-    SPEECH_LOCATION = "asia-northeast1"
-    SPEECH_MODEL    = "long"
+    POLICY_AUDIO_BUCKET = google_storage_bucket.policy_audio.name
+    WORK_BUCKET         = google_storage_bucket.work.name
+    SPEECH_LOCATION     = "asia-northeast1"
+    SPEECH_MODEL        = "long"
     # 1 分 $0.016 → $0.003。結果が出るまでの時間に保証は無いので、待つ上限を長めにする
     SPEECH_DYNAMIC_BATCH   = "true"
     SPEECH_TIMEOUT_SECONDS = "18000"

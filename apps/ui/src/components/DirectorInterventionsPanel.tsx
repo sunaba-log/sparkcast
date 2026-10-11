@@ -67,6 +67,18 @@ export function DirectorInterventionsPanel({
     });
   };
 
+  const save = async () => {
+    if (state.status !== "loaded") return;
+    setApplying(true); setMessage("");
+    try {
+      const response = await fetch(`/api/episodes/${episodeId}/interventions`, { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interventions: interventionPayload(state.interventions) }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error);
+      setMessage("訂正介入の判断を保存しました。ポリシー監査がある場合は、そのパネルから音声編集を開始してください。");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "判断を保存できませんでした"); }
+    finally { setApplying(false); }
+  };
   const apply = async () => {
     if (state.status !== "loaded") return;
     setApplying(true);
@@ -116,6 +128,8 @@ export function DirectorInterventionsPanel({
         ))}
       </div>
       {message && <p className={`text-sm ${message.startsWith("音声編集を開始") ? "text-emerald-700" : "text-red-600"}`}>{message}</p>}
+      {editable && <button type="button" disabled={applying || state.interventions.some((i) => i.status === "pending")}
+        onClick={save} className="rounded border px-4 py-2 text-sm disabled:opacity-40">訂正介入の判断を保存</button>}
       {editable && (
         <button
           type="button"

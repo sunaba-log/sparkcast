@@ -10,6 +10,8 @@ import {
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import { isLocalUiDemoEnabled } from "@/server/env";
 
+import { policyContentRef } from "@/server/policy/repository";
+
 const reviewSchema = z.object({
   findings: z.array(z.object({
     id: z.string().min(1).max(200),
@@ -47,6 +49,7 @@ export async function POST(
     if (episode.status !== "awaiting_approval") {
       return NextResponse.json({ error: "このエピソードは承認待ちではありません" }, { status: 409 });
     }
+    if ((await policyContentRef(podcastId, episodeId).collection("policy_reviews").doc("current").get()).exists) return NextResponse.json({ error: "統合された編集案の判断を保存してください" }, { status: 409 });
     const input = reviewSchema.parse(await request.json());
     const existing = await listPolicyFindings(podcastId, episodeId);
     const submittedIds = new Set(input.findings.map((finding) => finding.id));

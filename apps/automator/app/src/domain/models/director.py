@@ -8,6 +8,8 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
+from domain.models.transcript import TranscriptWord, align_words
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -49,6 +51,14 @@ class PolicyFinding:
     end_ms: int
     text: str
     entity_type: str | None = None
+    segment_ids: tuple[str, ...] = ()
+    evidence_text: str = ""
+    evidence_start: int | None = None
+    evidence_end: int | None = None
+    word_ids: tuple[str, ...] = ()
+    context_word_ids: tuple[str, ...] = ()
+    range_precision: str = "chunk"
+    probability: float | None = None
     policy_version: str = "v1"
     review_required: bool = True
     action: str = "silence"
@@ -64,16 +74,37 @@ class PolicyFinding:
         source: PolicyFindingSource,
         policy_version: str,
         entity_type: str | None = None,
+        char_start: int | None = None,
+        char_end: int | None = None,
+        probability: float | None = None,
     ) -> PolicyFinding:
         """Create a pending finding for the exact audited utterance."""
+        selected = tuple(
+            w
+            for w in chunk.words
+            if char_start is not None
+            and char_end is not None
+            and w.char_end > w.char_start
+            and w.char_start < char_end
+            and w.char_end > char_start
+        )
+        precise = bool(selected) and selected[0].char_start <= char_start and selected[-1].char_end >= char_end
         return cls(
             finding_id=str(uuid.uuid4()),
             chunk_id=chunk.chunk_id,
             category=category,
             source=source,
-            start_ms=chunk.start_ms,
-            end_ms=chunk.end_ms,
+            start_ms=round(selected[0].start * 1000) if precise else chunk.start_ms,
+            end_ms=round(selected[-1].end * 1000) if precise else chunk.end_ms,
             text=chunk.text,
+            segment_ids=chunk.segment_ids,
+            evidence_text=chunk.text[char_start:char_end] if char_start is not None else chunk.text,
+            evidence_start=char_start,
+            evidence_end=char_end,
+            word_ids=tuple(w.word_id for w in selected) if precise else (),
+            context_word_ids=tuple(w.word_id for w in chunk.words),
+            range_precision="word" if precise else "chunk",
+            probability=probability,
             entity_type=entity_type,
             policy_version=policy_version,
         )
@@ -89,6 +120,14 @@ class PolicyFinding:
             "end_ms": self.end_ms,
             "text": self.text,
             "entity_type": self.entity_type,
+            "segment_ids": list(self.segment_ids),
+            "evidence_text": self.evidence_text,
+            "evidence_start": self.evidence_start,
+            "evidence_end": self.evidence_end,
+            "word_ids": list(self.word_ids),
+            "context_word_ids": list(self.context_word_ids),
+            "range_precision": self.range_precision,
+            "probability": self.probability,
             "policy_version": self.policy_version,
             "review_required": self.review_required,
             "action": self.action,
@@ -142,6 +181,7 @@ class UtteranceChunk:
     end_ms: int
     text: str
     speaker_id: str | None = None
+    words: tuple[TranscriptWord, ...] = field(default=(), compare=False)
     segment_ids: tuple[str, ...] = field(default=(), compare=False)
     is_complete_sentence: bool = field(default=True, compare=False)
     completion_reason: ChunkCompletionReason = field(default="sentence_terminator", compare=False)
@@ -160,6 +200,9 @@ class UtteranceChunk:
             end_ms=round(segment.end * 1000),
             text=text,
             segment_ids=(f"seg_{index:05d}",),
+            words=align_words(
+                text, tuple(replace(w, word_id=f"seg_{index:05d}:w{n:04d}") for n, w in enumerate(segment.words))
+            ),
             is_complete_sentence=is_complete_sentence,
             completion_reason="sentence_terminator" if is_complete_sentence else "transcript_end",
         )
@@ -264,7 +307,21 @@ class UtteranceChunk:
             flush_complete_sentences()
 
         flush("transcript_end", complete=False)
-        return chunks
+        # Assign each token once, including when a sentence splits an STT segment.
+        used: set[str] = set()
+        aligned_chunks = []
+        for chunk in chunks:
+            candidates = tuple(
+                replace(w, word_id=f"seg_{i:05d}:w{n:04d}")
+                for i, segment in enumerate(segments, start=1)
+                if f"seg_{i:05d}" in chunk.segment_ids
+                for n, w in enumerate(segment.words)
+                if f"seg_{i:05d}:w{n:04d}" not in used
+            )
+            aligned = tuple(w for w in align_words(chunk.text, candidates) if w.char_end > w.char_start)
+            used.update(w.word_id for w in aligned)
+            aligned_chunks.append(replace(chunk, words=aligned))
+        return aligned_chunks
 
 
 @dataclass(frozen=True)

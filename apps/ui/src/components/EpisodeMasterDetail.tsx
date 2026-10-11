@@ -60,6 +60,8 @@ type AudioAuditMarkersProps = {
   onSeek: (seconds: number) => void;
 };
 
+import { mapSourceTime, type AudioTimelinePiece } from "@/lib/policy/timeline";
+
 function AudioAuditMarkers({ episodeId, duration, onSeek }: AudioAuditMarkersProps) {
   const [interventions, setInterventions] = useState<DirectorIntervention[]>([]);
   const [policyFindings, setPolicyFindings] = useState<PolicyFinding[]>([]);
@@ -76,15 +78,22 @@ function AudioAuditMarkers({ episodeId, duration, onSeek }: AudioAuditMarkersPro
         .catch(() => []),
       fetch(`/api/episodes/${episodeId}/policy-findings`, { cache: "no-store" })
         .then(async (res) => {
-          if (!res.ok) return [];
-          const data = (await res.json()) as { findings?: PolicyFinding[] };
-          return data.findings ?? [];
+          if (!res.ok) return { findings: [], timeline: [] };
+          const data = (await res.json()) as { findings?: PolicyFinding[]; timeline?: AudioTimelinePiece[] };
+          return { findings: data.findings ?? [], timeline: data.timeline ?? [] };
         })
-        .catch(() => []),
-    ]).then(([intervs, findings]) => {
+        .catch(() => ({ findings: [], timeline: [] })),
+    ]).then(([intervs, { findings, timeline }]) => {
       if (!cancelled) {
-        setInterventions(intervs);
-        setPolicyFindings(findings);
+        setInterventions(intervs.flatMap((item) => {
+          const insertAt = mapSourceTime(item.insertAt, timeline);
+          return insertAt === null ? [] : [{ ...item, insertAt }];
+        }));
+        setPolicyFindings(findings.flatMap((item) => {
+          const start = mapSourceTime(item.start, timeline);
+          const end = mapSourceTime(item.end, timeline);
+          return start === null ? [] : [{ ...item, start, end: Math.max(start, end ?? start) }];
+        }));
       }
     });
 
@@ -244,6 +253,9 @@ export function EpisodeMasterDetail({
 
   // Audio player state
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackEnd = useRef<number | null>(null);
+  const playbackTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => { if (playbackTimer.current) clearInterval(playbackTimer.current); }, []);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -310,6 +322,8 @@ export function EpisodeMasterDetail({
   };
 
   const seekTo = (seconds: number) => {
+    playbackEnd.current = null;
+    if (playbackTimer.current) clearInterval(playbackTimer.current);
     if (audioRef.current) {
       audioRef.current.currentTime = seconds;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => undefined);
@@ -980,11 +994,28 @@ export function EpisodeMasterDetail({
                     }}
                   />
                   <PolicyFindingsPanel
+                    sourceAudioUrl={selectedEpisode.sourceAudioUrl ?? previewAudioUrl}
                     key={`${selectedEpisode.id}-policy`}
                     episodeId={selectedEpisode.id}
                     episodeStatus={selectedEpisode.status}
                     canSeek={Boolean(previewAudioUrl)}
                     onSeek={seekTo}
+                    onPlayRange={(start, end) => {
+                      document.querySelectorAll("audio").forEach((audio) => audio.pause());
+                      if (playbackTimer.current) clearInterval(playbackTimer.current);
+                      const source = audioRef.current;
+                      if (!source) return;
+                      source.currentTime = start;
+                      playbackEnd.current = end;
+                      void source.play().then(() => {
+                        playbackTimer.current = setInterval(() => {
+                          if (source.paused || source.currentTime >= end) {
+                            source.pause();
+                            if (playbackTimer.current) clearInterval(playbackTimer.current);
+                          }
+                        }, 20);
+                      }).catch(() => undefined);
+                    }}
                     onStatusChanged={(nextStatus) => {
                       setEpisodes((previous) =>
                         previous.map((episode) =>

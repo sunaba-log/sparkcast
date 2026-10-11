@@ -23,7 +23,7 @@ from google.cloud import storage
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech
 
-from domain.models.transcript import TranscriptSegment
+from domain.models.transcript import TranscriptSegment, TranscriptWord, align_words
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,14 @@ def words_to_segments(words: list[Word]) -> list[TranscriptSegment]:
         if current:
             text = _join(current)
             if text:
-                segments.append(TranscriptSegment(start=current[0].start, end=current[-1].end, text=text))
+                segments.append(
+                    TranscriptSegment(
+                        start=current[0].start,
+                        end=current[-1].end,
+                        text=text,
+                        words=align_words(text, tuple(TranscriptWord(w.text, w.start, w.end) for w in current)),
+                    )
+                )
             current.clear()
 
     for word in words:
@@ -127,7 +134,14 @@ def sentences_to_segments(transcript: str, words: list[Word]) -> list[Transcript
             at = segments[-1].end if segments else (words[-1].end if words else 0.0)
             segments.append(TranscriptSegment(start=at, end=at, text=sentence))
             continue
-        segments.append(TranscriptSegment(start=taken[0].start, end=taken[-1].end, text=sentence))
+        segments.append(
+            TranscriptSegment(
+                start=taken[0].start,
+                end=taken[-1].end,
+                text=sentence,
+                words=align_words(sentence, tuple(TranscriptWord(w.text, w.start, w.end) for w in taken)),
+            )
+        )
     return segments
 
 
