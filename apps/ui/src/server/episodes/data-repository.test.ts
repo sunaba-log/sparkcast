@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  findEpisode,
   setEpisodePublished,
   deleteEpisodeRecord,
   markEpisodeAuditing,
@@ -7,6 +8,7 @@ import {
   updateEpisodeMetadata,
 } from "@/server/episodes/data-repository";
 import { getDbPool } from "@/server/db";
+import { getAdminFirestore } from "@/server/firebase-admin";
 
 vi.mock("@/server/db", () => ({
   getDbPool: vi.fn(),
@@ -109,5 +111,24 @@ describe("data-repository episode management", () => {
       expect.stringContaining("SET audio_file_path = $1"),
       ["https://example.com/audio.mp3?v=123", 3661, 1, 42],
     );
+  });
+});
+
+ describe("episode preview URLs", () => {
+  it.each(["awaiting_approval", "awaiting_publish_confirmation", "completed", "upload_pending"])("returns source preview independently of publication for %s", async (status) => {
+    const collection = { get: vi.fn().mockResolvedValue({ docs: [] }), orderBy: vi.fn() };
+    collection.orderBy.mockReturnValue(collection);
+    const content = { get: vi.fn().mockResolvedValue({ data: () => ({ minutes: "minutes" }) }), collection: vi.fn(() => collection) };
+    vi.mocked(getAdminFirestore).mockReturnValue({ collection: () => ({ doc: () => ({ collection: () => ({ doc: () => content }) }) }) } as never);
+    vi.mocked(getDbPool).mockResolvedValue({ query: vi.fn().mockResolvedValue({ rows: [{
+      episode_id: 42, podcast_id: 1, title: "Episode", description: null,
+      source_audio_path: "podcasts/1/episodes/42/source/audio.m4a",
+      audio_file_path: "https://example.com/edited.mp3", status,
+      created_at: new Date(), published_at: null, artwork_url: null, processing_error: null,
+    }] }) } as never);
+    const episode = await findEpisode(1, 42);
+    expect(episode?.sourceAudioUrl).toBe(status === "upload_pending" ? null : "/api/episodes/42/source-audio");
+    expect(episode?.audioUrl).toBe(status === "completed" ? "https://example.com/edited.mp3" : null);
+    expect(episode?.isPublished).toBe(false);
   });
 });

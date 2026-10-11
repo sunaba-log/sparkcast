@@ -224,6 +224,8 @@ export function EpisodeMasterDetail({
   // Selected episode
   const selectedEpisode = episodes.find((e) => e.id === selectedId) || episodes[0];
 
+  const previewAudioUrl = selectedEpisode?.audioUrl || selectedEpisode?.sourceAudioUrl;
+
   // Editable form state for selected episode
   const [title, setTitle] = useState<string>(selectedEpisode?.title ?? "");
   const [description, setDescription] = useState<string>(selectedEpisode?.description ?? "");
@@ -270,10 +272,10 @@ export function EpisodeMasterDetail({
       audioRef.current.pause();
       audioRef.current.load();
     }
-  }, [selectedId]);
+  }, [selectedId, previewAudioUrl]);
 
   const togglePlay = () => {
-    if (!audioRef.current || !selectedEpisode?.audioUrl) return;
+    if (!audioRef.current || !previewAudioUrl) return;
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -737,10 +739,13 @@ export function EpisodeMasterDetail({
                 </div>
 
                 <div className="w-full flex-1 space-y-3">
+                  {previewAudioUrl && !selectedEpisode.audioUrl && (
+                    <p className="text-center text-xs text-gray-500">元音声プレビュー（編集・合成前）</p>
+                  )}
                   <div className="flex items-center justify-center gap-6">
                     <button
                       onClick={handleSkipBackward}
-                      disabled={!selectedEpisode.audioUrl}
+                      disabled={!previewAudioUrl}
                       className="flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
                       title="15秒戻る"
                     >
@@ -748,7 +753,7 @@ export function EpisodeMasterDetail({
                     </button>
                     <button
                       onClick={togglePlay}
-                      disabled={!selectedEpisode.audioUrl}
+                      disabled={!previewAudioUrl}
                       className="w-11 h-11 rounded-full flex items-center justify-center shadow border border-gray-200 text-gray-800 disabled:opacity-40 hover:scale-105 active:scale-95 transition-transform bg-brand text-white cursor-pointer"
                       title={isPlaying ? "一時停止" : "再生"}
                     >
@@ -760,7 +765,7 @@ export function EpisodeMasterDetail({
                     </button>
                     <button
                       onClick={handleSkipForward}
-                      disabled={!selectedEpisode.audioUrl}
+                      disabled={!previewAudioUrl}
                       className="flex h-11 w-11 items-center justify-center rounded-full text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:hover:text-gray-600 transition-colors cursor-pointer"
                       title="15秒進む"
                     >
@@ -772,7 +777,7 @@ export function EpisodeMasterDetail({
                   <div className="space-y-1">
                     <div
                       onClick={handleProgressBarClick}
-                      className={`w-full bg-brand/20 h-3.5 rounded-full overflow-hidden relative touch-none ${selectedEpisode.audioUrl ? "cursor-pointer" : "cursor-not-allowed"
+                      className={`w-full bg-brand/20 h-3.5 rounded-full overflow-hidden relative touch-none ${previewAudioUrl ? "cursor-pointer" : "cursor-not-allowed"
                         }`}
                     >
                       <div
@@ -787,7 +792,7 @@ export function EpisodeMasterDetail({
                       />
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-500 font-medium">
-                      {selectedEpisode.audioUrl ? (
+                      {previewAudioUrl ? (
                         <>
                           <span>{formatTime(currentTime)}</span>
                           <span>{formatTime(duration)}</span>
@@ -803,10 +808,10 @@ export function EpisodeMasterDetail({
                   </div>
                 </div>
 
-                {selectedEpisode.audioUrl && (
+                {previewAudioUrl && (
                   <audio
                     ref={audioRef}
-                    src={selectedEpisode.audioUrl}
+                    src={previewAudioUrl}
                     onTimeUpdate={() => {
                       if (audioRef.current) {
                         setCurrentTime(audioRef.current.currentTime);
@@ -915,7 +920,7 @@ export function EpisodeMasterDetail({
                   episodeId={selectedEpisode.id}
                   available={selectedEpisode.transcriptAvailable}
                   currentTime={currentTime}
-                  canSeek={Boolean(selectedEpisode.audioUrl)}
+                  canSeek={Boolean(previewAudioUrl)}
                   onSeek={(seconds) => {
                     seekTo(seconds);
                   }}
@@ -962,7 +967,7 @@ export function EpisodeMasterDetail({
                     key={selectedEpisode.id}
                     episodeId={selectedEpisode.id}
                     episodeStatus={selectedEpisode.status}
-                    canSeek={Boolean(selectedEpisode.audioUrl)}
+                    canSeek={Boolean(previewAudioUrl)}
                     onSeek={seekTo}
                     onEditingStarted={() => {
                       setEpisodes((previous) =>
@@ -978,7 +983,7 @@ export function EpisodeMasterDetail({
                     key={`${selectedEpisode.id}-policy`}
                     episodeId={selectedEpisode.id}
                     episodeStatus={selectedEpisode.status}
-                    canSeek={Boolean(selectedEpisode.audioUrl)}
+                    canSeek={Boolean(previewAudioUrl)}
                     onSeek={seekTo}
                     onStatusChanged={(nextStatus) => {
                       setEpisodes((previous) =>
