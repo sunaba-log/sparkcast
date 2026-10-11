@@ -29,6 +29,7 @@ export type Episode = {
   status: EpisodeStatus;
   audioFileName: string;
   audioUrl: string | null;
+  sourceAudioUrl?: string | null;
   artworkUrl: string | null;
   processingError: string | null;
   publishedAt?: string | null;

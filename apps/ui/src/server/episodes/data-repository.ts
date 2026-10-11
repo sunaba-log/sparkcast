@@ -367,6 +367,9 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
     status: row.status,
     audioFileName: audioFileName(row.source_audio_path ?? row.audio_file_path),
     audioUrl: row.status === "completed" ? row.audio_file_path : null,
+    sourceAudioUrl: row.source_audio_path && row.status !== "upload_pending"
+      ? `/api/episodes/${row.episode_id}/source-audio`
+      : null,
     artworkUrl: row.artwork_url || null,
     processingError: row.processing_error,
     publishedAt: row.published_at ? row.published_at.toISOString() : null,

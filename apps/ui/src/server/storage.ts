@@ -37,3 +37,15 @@ export async function createAudioUploadUrl(
 
   return { uploadUrl, expiresAt };
 }
+
+export async function createAudioPreviewUrl(objectPath: string): Promise<string> {
+  const [url] = await getStorage()
+    .bucket(getUploadBucket())
+    .file(objectPath)
+    .getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: new Date(Date.now() + getSignedUrlTtlMs()),
+    });
+  return url;
+}
