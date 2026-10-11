@@ -9,6 +9,7 @@ export type AutomatorJobTriggerInput = {
   gcsTriggerObjectName?: string;
   resumeFromAudit?: boolean;
   publishOriginal?: boolean;
+  editPlanId?: string;
 };
 
 export function buildAutomatorJobOverrides(input: AutomatorJobTriggerInput) {
@@ -25,6 +26,9 @@ export function buildAutomatorJobOverrides(input: AutomatorJobTriggerInput) {
   }
   if (input.resumeFromAudit) {
     env.push({ name: "RESUME_FROM_AUDIT", value: "true" });
+  }
+  if (input.editPlanId) {
+    env.push({ name: "EDIT_PLAN_ID", value: input.editPlanId });
   }
   if (input.publishOriginal) {
     env.push({ name: "PUBLISH_ORIGINAL", value: "true" });

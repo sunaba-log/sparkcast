@@ -336,6 +336,9 @@ class FactCheckAuditor:
                     source="presidio",
                     policy_version=policy.version,
                     entity_type=entity.entity_type,
+                    char_start=entity.start,
+                    char_end=entity.end,
+                    probability=entity.score,
                 )
                 for entity in detector.detect(chunk, policy)
             )
@@ -407,6 +410,7 @@ class FactCheckAuditor:
                                 PolicyFinding.create(
                                     chunk=chunk,
                                     category=cast("PolicyFindingCategory", category),
+                                    probability=value,
                                     source="jev",
                                     policy_version=policy.version,
                                 )

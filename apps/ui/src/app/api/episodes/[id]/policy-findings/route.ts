@@ -5,6 +5,8 @@ import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import { isLocalUiDemoEnabled } from "@/server/env";
 import { UI_DEMO_POLICY_FINDINGS } from "@/server/ui-demo";
 
+import { policyContentRef } from "@/server/policy/repository";
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -24,7 +26,8 @@ export async function GET(
       return NextResponse.json({ error: "エピソードが見つかりません" }, { status: 404 });
     }
     const findings = await listPolicyFindings(podcastId, episodeId);
-    return NextResponse.json({ findings }, { headers: { "Cache-Control": "no-store" } });
+    const content = await policyContentRef(podcastId, episodeId).get();
+    return NextResponse.json({ findings, timeline: content.data()?.audio_timeline ?? [] }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof Error && error.message === "NO_PODCAST_SELECTED") {
       return NextResponse.json({ error: "チャンネルを選択してください" }, { status: 400 });

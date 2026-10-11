@@ -3,9 +3,51 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 
 UNKNOWN_SPEAKER = "不明"
+
+
+@dataclass(frozen=True)
+class TranscriptWord:
+    """An aligned STT token on the immutable source timeline."""
+
+    text: str
+    start: float
+    end: float
+    char_start: int = 0
+    char_end: int = 0
+    word_id: str = ""
+    timing_confident: bool = True
+
+
+def align_words(text: str, words: tuple[TranscriptWord, ...]) -> tuple[TranscriptWord, ...]:
+    """Align tokens conservatively; ambiguous or missing tokens have no character span."""
+
+    def normalized(value: str) -> tuple[str, list[int]]:
+        chars, positions = [], []
+        for index, char in enumerate(value):
+            for part in unicodedata.normalize("NFKC", char):
+                for folded in part.casefold():
+                    if folded.isalnum():
+                        chars.append(folded)
+                        positions.append(index)
+        return "".join(chars), positions
+
+    normalized_text, positions = normalized(text)
+    cursor = 0
+    aligned = []
+    for word in words:
+        token, _ = normalized(word.text)
+        at = normalized_text.find(token, cursor) if token else -1
+        if at < 0 or not word.timing_confident or word.start >= word.end:
+            aligned.append(replace(word, char_start=0, char_end=0, timing_confident=False))
+            continue
+        end = at + len(token)
+        aligned.append(replace(word, char_start=positions[at], char_end=positions[end - 1] + 1))
+        cursor = end
+    return tuple(aligned)
 
 
 @dataclass(frozen=True)
@@ -18,6 +60,7 @@ class TranscriptSegment:
     speaker: str = UNKNOWN_SPEAKER
     # 収録ルームの参加者 ID など、話者を一意に指す値(無ければ None)
     speaker_id: str | None = None
+    words: tuple[TranscriptWord, ...] = ()
 
     def with_speaker(self, speaker: str, speaker_id: str | None = None) -> TranscriptSegment:
         """話者を差し替えた写しを返す."""

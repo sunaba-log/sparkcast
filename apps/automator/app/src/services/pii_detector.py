@@ -20,6 +20,9 @@ class DetectedEntity:
     """A local PII match; text is intentionally retained only until the finding is persisted."""
 
     entity_type: str
+    start: int | None = None
+    end: int | None = None
+    score: float | None = None
 
 
 class PresidioPiiDetector:
@@ -84,7 +87,7 @@ class PresidioPiiDetector:
 
         allowed = {term.casefold() for term in policy.allowed_terms}
         return [
-            DetectedEntity(result.entity_type)
+            DetectedEntity(result.entity_type, result.start, result.end, result.score)
             for result in results
             if chunk.text[result.start : result.end].casefold() not in allowed
         ]

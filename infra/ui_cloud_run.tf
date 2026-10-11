@@ -45,6 +45,14 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
       }
+      env {
+        name  = "POLICY_MEDIA_URL"
+        value = google_cloud_run_v2_service.policy_media.uri
+      }
+      env {
+        name  = "POLICY_AUDIO_BUCKET"
+        value = google_storage_bucket.policy_audio.name
+      }
       # Supabase(Postgres) へ DATABASE_URL で接続する。
       # CLOUD_SQL_INSTANCE_CONNECTION_NAME を渡さないことで db-pool.ts の
       # DATABASE_URL 経路（discrete params + SSL）に載る。

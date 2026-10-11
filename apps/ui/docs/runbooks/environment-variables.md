@@ -133,3 +133,19 @@ client allows this redirect URI:
 ```text
 https://<cloud-run-domain>/__/auth/handler
 ```
+
+### ポリシー監査の代替音声・編集計画
+
+| 変数 | 要否 | 内容 |
+|---|---|---|
+| `POLICY_MEDIA_URL` | Required | 非公開Cloud RunサービスのURL。Terraformの `policy_media.uri` をUIへ設定する。合成音声、録音の再監査、文脈プレビューを処理する。 |
+| `POLICY_AUDIO_BUCKET` | Required | 永続的な代替音声・プレビュー用GCSバケット。UI、編集ジョブ、mediaサービスへ設定する。Eventarc入力バケットと7日削除のSTT作業バケットを流用しない。 |
+| `POLICY_MEDIA_ID_TOKEN` | ローカルのみOptional | 対象サービスをaudienceにしたIDトークン。Cloud Run上ではメタデータサーバから取得する。 |
+
+UIは利用者を認証してからmediaサービスへIDトークンでアクセスする。録音は120秒までとし、PCM化・再文字起こし・PII／Jev再監査を完了した音声だけを置換に使用する。合成台詞も同じポリシーで検査する。
+
+統合編集は `AUDIO_EDITOR_URL` ではなく、既存automatorジョブへ `EDIT_PLAN_ID` と `RESUME_FROM_AUDIT=true` を渡す。承認・範囲・音声ハッシュ・原本のGCS generationをFirestoreの `audio_edit_plans` に凍結する。送信結果が不明な場合は編集状態を保持し、「保存済みの編集要求を再送」で同じplanだけを再送する。workerはplanを一度だけ取得し、重複実行でエピソード状態を変更しない。
+
+編集失敗はエピソードとplanの状態を確認し、既存の再監査操作で原音声からやり直す。再監査では以前の判断を破棄し、新たな編集案を承認する。原本と検知用文字起こしは保持し、編集済み文字起こしは `rendition_transcripts` に保存する。配信音声は `renditions/{plan_id}.mp3` へ生成する。
+
+GCPのAPI呼び出しは既存のADC経路を使用する。サービスアカウントでの認証とAPI利用権限については[Cloud TTS認証](https://docs.cloud.google.com/text-to-speech/docs/authentication)を参照。

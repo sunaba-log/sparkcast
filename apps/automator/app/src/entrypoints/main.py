@@ -76,6 +76,7 @@ class PodcastEnvConfig:
     director_enabled: bool = True
     resume_from_audit: bool = False
     publish_original: bool = False
+    edit_plan_id: str | None = None
     # Jev 監査入出力トレースログ保存(#220)
     audit_trace_enabled: bool = False
     audit_trace_gcs_bucket: str | None = None
@@ -165,6 +166,7 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         director_enabled=director_enabled,
         resume_from_audit=resume_from_audit,
         publish_original=publish_original,
+        edit_plan_id=environ.get("EDIT_PLAN_ID") or None,
         audit_trace_enabled=audit_trace_enabled,
         audit_trace_gcs_bucket=audit_trace_gcs_bucket,
         audit_trace_local_dir=audit_trace_local_dir,
@@ -355,6 +357,7 @@ def process_podcast_workflow() -> None:
             sns_promotion_count=config.sns_promotion_count,
             resume_from_audit=config.resume_from_audit,
             publish_original=config.publish_original,
+            edit_plan_id=config.edit_plan_id,
         )
     )
 

@@ -130,7 +130,24 @@ def condense(signal: np.ndarray, rate: int, regions: list[tuple[float, float]]) 
 def remap_segments(segments: list[TranscriptSegment], time_map: TimeMap) -> list[TranscriptSegment]:
     """認識した発話の時刻を、元のトラックの時刻に戻す."""
     return [
-        replace(segment, start=time_map.to_original(segment.start), end=time_map.to_original(segment.end))
+        replace(
+            segment,
+            start=time_map.to_original(segment.start),
+            end=time_map.to_original(segment.end),
+            words=tuple(
+                replace(
+                    word,
+                    start=time_map.to_original(word.start),
+                    end=time_map.to_original(word.end),
+                    timing_confident=word.timing_confident
+                    and any(
+                        begin <= word.start <= word.end <= begin + length
+                        for begin, _original, length in time_map.pieces
+                    ),
+                )
+                for word in segment.words
+            ),
+        )
         for segment in segments
     ]
 

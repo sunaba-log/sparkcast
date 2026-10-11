@@ -84,6 +84,14 @@ type FirestorePolicyFinding = {
   end_ms?: number;
   text?: string;
   entity_type?: string | null;
+  segment_ids?: string[];
+  evidence_text?: string;
+  evidence_start?: number;
+  evidence_end?: number;
+  word_ids?: string[];
+  context_word_ids?: string[];
+  range_precision?: "word" | "chunk";
+  probability?: number;
   action?: string;
   status?: string;
 };
@@ -169,8 +177,10 @@ export async function listTranscriptSegments(
   podcastId: number,
   episodeId: number,
 ): Promise<TranscriptSegment[]> {
-  const snapshot = await episodeContentRef(podcastId, episodeId)
-    .collection("transcripts")
+  const root = episodeContentRef(podcastId, episodeId);
+  const content = await root.get();
+  const snapshot = await root
+    .collection(content.data()?.active_edit_plan_id ? "rendition_transcripts" : "transcripts")
     .orderBy("chunk_id")
     .get();
   return snapshot.docs
@@ -278,7 +288,15 @@ function toPolicyFinding(id: string, data: FirestorePolicyFinding): PolicyFindin
     end: Number(data.end_ms ?? 0) / 1_000,
     text: String(data.text ?? ""),
     entityType: data.entity_type ? String(data.entity_type) : null,
-    action: "silence",
+    action: data.action === "cut" || data.action === "replace" ? data.action : "silence",
+    segmentIds: data.segment_ids ?? [],
+    evidenceText: data.evidence_text,
+    evidenceStart: data.evidence_start ?? null,
+    evidenceEnd: data.evidence_end ?? null,
+    wordIds: data.word_ids ?? [],
+    contextWordIds: data.context_word_ids ?? [],
+    rangePrecision: data.range_precision ?? "chunk",
+    probability: data.probability ?? null,
     status,
   };
 }
