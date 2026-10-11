@@ -6,6 +6,9 @@ output "repository_id" {
 output "docker_image_name" {
   description = "full name of the built and pushed docker image"
   value       = local.docker_image
+
+  # The tag is computed before publication; consumers must wait for the push.
+  depends_on = [null_resource.docker_push]
 }
 
 output "docker_image_digest" {
