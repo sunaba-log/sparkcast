@@ -11,6 +11,7 @@ import { UI_DEMO_DIRECTOR_INTERVENTIONS } from "@/server/ui-demo";
 
 import { z } from "zod";
 import { policyApiContext, PolicyApiError } from "@/server/policy/api-context";
+import { moveToPublishConfirmationIfAllRejected } from "@/server/policy/review-gate";
 
 export async function GET(
   _request: Request,
@@ -102,7 +103,12 @@ export async function POST(
       interventions: input.interventions,
       updatedBy: user.uid,
     });
-    return NextResponse.json({ ok: true });
+    // 訂正介入を後から却下した場合も、全件却下なら原音声公開の確認へ進める（判断の順序に依存しない）
+    const moved = await moveToPublishConfirmationIfAllRejected(podcastId, episodeId);
+    return NextResponse.json({
+      ok: true,
+      status: moved ? "awaiting_publish_confirmation" : "awaiting_approval",
+    });
   } catch (error) {
     return NextResponse.json(
       {

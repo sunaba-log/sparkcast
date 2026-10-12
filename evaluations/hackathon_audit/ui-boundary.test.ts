@@ -135,8 +135,6 @@ async function openReview(id = ids.EA) {
   const r = await call(reviewRoute, 'GET', id);
   return r.json;
 }
-// 状態列の長さ（migrations/002 は VARCHAR(20)）。ロジックの検証では、修正を仮定して一時的に広げる
-const widenStatus = async (len: number) => (await getDbPool()).query(`ALTER TABLE episodes ALTER COLUMN status TYPE VARCHAR(${len})`);
 const record = (row: any) => { RESULTS.push(row); console.log(JSON.stringify(row)); };
 
 describe.skipIf(!enabled)('hackathon audit: UI/API boundary (emulator)', () => {
@@ -147,89 +145,94 @@ describe.skipIf(!enabled)('hackathon audit: UI/API boundary (emulator)', () => {
     await closeDbPool();
   });
 
-  test('V1-UI-01 retry-audit has no state precondition (awaiting_approval with pending items, completed, editing)', async () => {
+  // ---- 修正後（I-01〜I-05）の確認。修正前の観測は evidence/before/ui-boundary-observations.json ----
+  const setStatus = (st: string, staleHours = 0) => getDbPool().then((pool) => pool.query(`UPDATE episodes SET status=$3, updated_at=now() - ($4 || ' hours')::interval WHERE podcast_id=$1 AND episode_id=$2`, [ids.PA, ids.EA, st, String(staleHours)]));
+  const rejectIntervention = () => call(interventionsRoute, 'POST', ids.EA, { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'rejected' }] });
+  const saveProposals = async (statusValue: 'approved' | 'rejected') => {
+    const review = await openReview();
+    return call(reviewRoute, 'POST', ids.EA, { operation: 'save', version: review.version, proposals: review.proposals.map((p: any) => ({ ...p, status: statusValue, action: 'cut', rangeConfirmed: true })) });
+  };
+
+  test('V1-UI-01 (I-03) retry-audit only from failed / awaiting states or a stuck job', async () => {
     const out: Record<string, unknown> = {};
-    for (const s of ['awaiting_approval', 'completed', 'editing']) {
-      await (await getDbPool()).query(`UPDATE episodes SET status=$3 WHERE podcast_id=$1 AND episode_id=$2`, [ids.PA, ids.EA, s]);
+    for (const [st, stale] of [['failed', 0], ['awaiting_approval', 0], ['awaiting_publish_confirmation', 0], ['completed', 0], ['editing', 0], ['auditing', 0], ['editing', 8]] as const) {
+      await setStatus(st, stale);
       m.jobs.length = 0;
       const r = await call(retryRoute, 'POST', ids.EA);
-      out[s] = { http: r.status, after: await status(ids.PA, ids.EA), jobs: m.jobs.length, resumeFromAudit: m.jobs[0]?.resumeFromAudit };
+      out[`${st}${stale ? `(${stale}h stale)` : ''}`] = { http: r.status, after: await status(ids.PA, ids.EA), jobs: m.jobs.length };
     }
     record({ case: 'V1-UI-01', result: out });
-    expect(Object.values(out).every((v: any) => v.http === 200 && v.after === 'auditing' && v.jobs === 1)).toBe(true);
+    const ok = (k: string) => (out[k] as any).http === 200 && (out[k] as any).jobs === 1;
+    const refused = (k: string, st: string) => (out[k] as any).http === 409 && (out[k] as any).jobs === 0 && (out[k] as any).after === st;
+    expect(ok('failed') && ok('awaiting_approval') && ok('awaiting_publish_confirmation') && ok('editing(8h stale)')).toBe(true);
+    expect(refused('completed', 'completed') && refused('editing', 'editing') && refused('auditing', 'auditing')).toBe(true);
   });
 
-  test('V1-UI-08 the all-rejected transition fails on the schema built from the repository migrations', async () => {
-    const legacy = await call(legacyReviewRoute, 'POST', ids.EA, { findings: [{ id: 'f_A', status: 'rejected' }] });
-    const s1 = await status(ids.PA, ids.EA);
-    await seed(); m.user = user(A);
-    await call(interventionsRoute, 'POST', ids.EA, { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'rejected' }] });
-    const review = await openReview();
-    const unified = await call(reviewRoute, 'POST', ids.EA, { operation: 'save', version: review.version, proposals: review.proposals.map((p: any) => ({ ...p, status: 'rejected', rangeConfirmed: true })) });
-    const publish = await call(originalRoute, 'POST', ids.EA);
-    const len = (await (await getDbPool()).query(`SELECT character_maximum_length l FROM information_schema.columns WHERE table_name='episodes' AND column_name='status'`)).rows[0].l;
-    record({ case: 'V1-UI-08', statusColumnLength: len, valueLength: 'awaiting_publish_confirmation'.length, legacy: [legacy.status, s1], unified: [unified.status, unified.json?.error], publishOriginal: publish.status, finalStatus: await status(ids.PA, ids.EA), jobs: m.jobs.length });
-    expect(legacy.status).toBe(500);
-    expect(unified.status).toBe(409);
-    expect(m.jobs.length).toBe(0);
+  test('V1-UI-08 (I-01) rejecting every item reaches publish confirmation and publishes the original once', async () => {
+    const r1 = await saveProposals('rejected');
+    const r2 = await rejectIntervention();
+    const st = await status(ids.PA, ids.EA);
+    const p = await call(originalRoute, 'POST', ids.EA);
+    record({ case: 'V1-UI-08', saveProposals: [r1.status, r1.json?.status], rejectIntervention: [r2.status, r2.json?.status], status: st, publish: p.status, jobs: m.jobs });
+    expect(st).toBe('awaiting_publish_confirmation');
+    expect(p.status).toBe(200);
+    expect(m.jobs).toEqual([expect.objectContaining({ publishOriginal: true })]);
   });
 
-  test('V1-UI-02 legacy route: rejecting all policy findings ignores pending fact-check interventions, then original is published', async () => {
-    await widenStatus(40);
+  test('V1-UI-02 (I-05) legacy route cannot reach original publication while an intervention is undecided', async () => {
     const r1 = await call(legacyReviewRoute, 'POST', ids.EA, { findings: [{ id: 'f_A', status: 'rejected' }] });
     const s1 = await status(ids.PA, ids.EA);
-    const r2 = await call(originalRoute, 'POST', ids.EA);
-    const pending = (await call(interventionsRoute, 'GET', ids.EA)).json.interventions.map((i: any) => i.status);
-    record({ case: 'V1-UI-02', reviewHttp: r1.status, statusAfterReview: s1, publishHttp: r2.status, jobs: m.jobs, interventionStatuses: pending });
-    expect(s1).toBe('awaiting_publish_confirmation');
-    expect(m.jobs).toEqual([expect.objectContaining({ publishOriginal: true })]);
-    expect(pending).toEqual(['pending']);
-    await widenStatus(20);
-  });
-
-  test('V1-UI-03 unified route: all rejected requires interventions rejected first (order dependent)', async () => {
-    await widenStatus(40);
-    const review = await openReview();
-    const rejectAll = review.proposals.map((p: any) => ({ ...p, status: 'rejected', rangeConfirmed: true }));
-    const r1 = await call(reviewRoute, 'POST', ids.EA, { operation: 'save', version: review.version, proposals: rejectAll });
-    const i1 = await call(interventionsRoute, 'POST', ids.EA, { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'rejected' }] });
-    const afterInterventions = await status(ids.PA, ids.EA);
-    const p1 = await call(originalRoute, 'POST', ids.EA);
-    const again = await openReview();
-    const r2 = await call(reviewRoute, 'POST', ids.EA, { operation: 'save', version: again.version, proposals: again.proposals });
-    const p2 = await call(originalRoute, 'POST', ids.EA);
-    record({ case: 'V1-UI-03', firstSave: [r1.status, r1.json?.status], interventions: i1.status, afterInterventions, publishBeforeResave: p1.status, resave: [r2.status, r2.json?.status], publishAfterResave: p2.status, jobs: m.jobs.length });
-    expect(r1.json?.status).toBe('awaiting_approval');
-    expect(p1.status).toBe(409);
-    expect(r2.json?.status).toBe('awaiting_publish_confirmation');
-    expect(p2.status).toBe(200);
-    await widenStatus(20);
-  });
-
-  test('V1-UI-04 fact-check interventions only: rejecting all leaves no route to publish', async () => {
-    await seed({ findings: false });
-    m.user = user(A);
-    const i1 = await call(interventionsRoute, 'POST', ids.EA, { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'rejected' }] });
-    const review = await openReview();
-    const save = await call(reviewRoute, 'POST', ids.EA, { operation: 'save', version: review.version, proposals: [] });
-    const apply = await call(applyRoute, 'POST', ids.EA, { planVersion: review.version });
-    const original = await call(originalRoute, 'POST', ids.EA);
-    record({ case: 'V1-UI-04', interventions: i1.status, proposals: review.proposals.length, save: [save.status, save.json?.status ?? save.json?.error], apply: [apply.status, apply.json?.error], original: original.status, finalStatus: await status(ids.PA, ids.EA), jobs: m.jobs.length });
-    expect(original.status).toBe(409);
+    const p = await call(originalRoute, 'POST', ids.EA);
+    await setStatus('awaiting_publish_confirmation'); // 状態を直接変えても、公開直前の判定で止まる
+    const forced = await call(originalRoute, 'POST', ids.EA);
+    record({ case: 'V1-UI-02', legacy: [r1.status, r1.json?.status], statusAfter: s1, publish: p.status, publishWithForcedStatus: [forced.status, forced.json?.error], jobs: m.jobs.length });
+    expect(s1).toBe('awaiting_approval');
+    expect([p.status, forced.status]).toEqual([409, 409]);
     expect(m.jobs.length).toBe(0);
   });
 
-  test('V1-UI-09 fact-check-only approval from the interventions panel goes to the legacy external editor (AUDIO_EDITOR_URL)', async () => {
+  test('V1-UI-03 (I-04) the order of decisions does not matter', async () => {
+    const r1 = await rejectIntervention();
+    const r2 = await saveProposals('rejected');
+    record({ case: 'V1-UI-03', interventionsFirst: r1.json?.status, thenProposals: r2.json?.status });
+    expect(r1.json?.status).toBe('awaiting_approval');
+    expect(r2.json?.status).toBe('awaiting_publish_confirmation');
+  });
+
+  test('V1-UI-04 (I-04) fact-check interventions only: rejecting all leads to publish confirmation', async () => {
+    await seed({ findings: false });
+    m.user = user(A);
+    await openReview();
+    const r = await rejectIntervention();
+    const p = await call(originalRoute, 'POST', ids.EA);
+    record({ case: 'V1-UI-04', reject: r.json?.status, publish: p.status, jobs: m.jobs.map((j) => j.publishOriginal) });
+    expect(r.json?.status).toBe('awaiting_publish_confirmation');
+    expect(p.status).toBe(200);
+  });
+
+  test('V1-UI-09 (I-04) fact-check-only approval from the interventions panel creates the frozen edit plan', async () => {
     await seed({ findings: false });
     m.user = user(A);
     delete process.env.AUDIO_EDITOR_URL;
-    await openReview(); // 画面表示時と同じく統合レビューを作成（提案0件ならパネルは非表示）
+    await openReview();
     const payload = { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'approved' }] };
-    await call(interventionsRoute, 'POST', ids.EA, payload);
-    const r = await call(applyRoute, 'POST', ids.EA, payload); // DirectorInterventionsPanel と同じ本文（planVersion なし）
-    record({ case: 'V1-UI-09', http: r.status, error: r.json?.error, status: await status(ids.PA, ids.EA), jobs: m.jobs.length, note: 'infra に AUDIO_EDITOR_URL の定義はない' });
-    expect(r.status).toBe(503);
-    expect(m.jobs.length).toBe(0);
+    const r = await call(applyRoute, 'POST', ids.EA, payload);
+    const plan = r.json?.planId ? (await getAdminFirestore().collection('podcasts').doc(String(ids.PA)).collection('episodes_contents').doc(String(ids.EA)).collection('audio_edit_plans').doc(r.json.planId).get()).data() : null;
+    record({ case: 'V1-UI-09', http: r.status, status: await status(ids.PA, ids.EA), corrections: plan?.corrections, jobs: m.jobs.map((j) => j.editPlanId) });
+    expect(r.status).toBe(200);
+    expect(plan?.corrections).toEqual([{ startMs: 3000, script: 'Aの訂正です。' }]);
+    expect(m.jobs).toEqual([expect.objectContaining({ editPlanId: r.json.planId })]);
+  });
+
+  test('V1-UI-10 normal operations: approve with edits, and partial decisions stop the panel request', async () => {
+    const partial = await call(applyRoute, 'POST', ids.EA, { interventions: [] });
+    await call(interventionsRoute, 'POST', ids.EA, { interventions: [{ id: 'i_A', correctionScript: 'Aの訂正です。', status: 'approved' }] });
+    const saved = await saveProposals('approved');
+    const apply = await call(applyRoute, 'POST', ids.EA, { planVersion: saved.json.version });
+    record({ case: 'V1-UI-10', panelWithoutDecisions: partial.status, saved: [saved.status, saved.json?.status], apply: apply.status, status: await status(ids.PA, ids.EA), jobs: m.jobs.length });
+    expect(partial.status).toBe(409);
+    expect(apply.status).toBe(200);
+    expect(m.jobs.length).toBe(1);
   });
 
   test('V1-UI-05 edit cannot start while items are undecided or with a stale version (no job, no state change)', async () => {

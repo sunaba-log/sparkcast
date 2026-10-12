@@ -7,6 +7,7 @@ import {
 import { runAutomatorJob } from "@/server/episodes/automator-jobs";
 import { getDbPool } from "@/server/db";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
+import { canPublishOriginal } from "@/server/policy/review-gate";
 
 export async function POST(
   _request: Request,
@@ -20,6 +21,10 @@ export async function POST(
     const episode = await findEpisode(podcastId, episodeId);
     if (!episode || !Number.isInteger(episodeId) || episodeId <= 0) {
       return NextResponse.json({ error: "エピソードが見つかりません" }, { status: 404 });
+    }
+    // 状態に加えて、要確認事項がすべて却下済みであることを公開直前にも確認する
+    if (!(await canPublishOriginal(podcastId, episodeId))) {
+      return NextResponse.json({ error: "未判断または承認済みの確認事項があります" }, { status: 409 });
     }
     if (!(await markEpisodePublishingOriginal(podcastId, episodeId))) {
       return NextResponse.json({ error: "最終公開確認が必要です" }, { status: 409 });

@@ -248,6 +248,8 @@ class ProcessPodcastWorkflow:
                     audio_upload_mime_type = str(audio_meta.get("mime_type", "audio/mpeg"))
                     resumed = True
 
+            if request.publish_original:
+                self._assert_all_review_items_rejected(episode_ref.podcast_id, episode_ref.episode_id)
             if request.edit_plan_id and not resumed:
                 raise ReviewIncompleteError("確定した編集計画の元文字起こしがありません。再監査してください。")
             if not resumed:
@@ -738,6 +740,23 @@ class ProcessPodcastWorkflow:
                 self._logger.exception("Failed to persist episode failure state")
             self._notifier.send_discord_message(message=f"Podcast Processing Failed:\nError: {err}")
             raise
+
+    def _assert_all_review_items_rejected(self, podcast_id: str, episode_id: str) -> None:
+        """原音声の公開は、要確認事項(音声校正の指摘・訂正介入)がすべて却下済みのときだけ行う.
+
+        UI の状態遷移に加え、ジョブ側でも保存済みの判断を確かめる(直接起動された場合も迂回できない)。
+        """
+        if self._firestore_manager is None:
+            raise ReviewIncompleteError("判断の保存先がないため原音声を公開しません。")
+        statuses = [
+            item.get("status")
+            for item in [
+                *self._firestore_manager.get_policy_findings(podcast_id=podcast_id, episode_id=episode_id),
+                *self._firestore_manager.get_director_interventions(podcast_id=podcast_id, episode_id=episode_id),
+            ]
+        ]
+        if any(status != "rejected" for status in statuses):
+            raise ReviewIncompleteError("未判断または承認済みの確認事項があるため、原音声を公開しません。")
 
     def _record_audit_traces(
         self,

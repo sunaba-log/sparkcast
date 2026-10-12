@@ -23,12 +23,14 @@ export function DirectorInterventionsPanel({
   canSeek,
   onSeek,
   onEditingStarted,
+  onStatusChanged,
 }: {
   episodeId: string;
   episodeStatus: EpisodeStatus;
   canSeek: boolean;
   onSeek: (seconds: number) => void;
   onEditingStarted: () => void;
+  onStatusChanged?: (status: EpisodeStatus) => void;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [applying, setApplying] = useState(false);
@@ -75,7 +77,12 @@ export function DirectorInterventionsPanel({
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interventions: interventionPayload(state.interventions) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
-      setMessage("訂正介入の判断を保存しました。ポリシー監査がある場合は、そのパネルから音声編集を開始してください。");
+      if (body.status) onStatusChanged?.(body.status);
+      setMessage(
+        body.status === "awaiting_publish_confirmation"
+          ? "すべての確認事項が却下されました。原音声の公開を確認してください。"
+          : "訂正介入の判断を保存しました。ポリシー監査がある場合は、そのパネルから音声編集を開始してください。",
+      );
     } catch (error) { setMessage(error instanceof Error ? error.message : "判断を保存できませんでした"); }
     finally { setApplying(false); }
   };

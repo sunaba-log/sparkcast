@@ -992,6 +992,15 @@ export function EpisodeMasterDetail({
                         ),
                       );
                     }}
+                    onStatusChanged={(nextStatus) => {
+                      setEpisodes((previous) =>
+                        previous.map((episode) =>
+                          episode.id === selectedEpisode.id
+                            ? { ...episode, status: nextStatus }
+                            : episode,
+                        ),
+                      );
+                    }}
                   />
                   <PolicyFindingsPanel
                     sourceAudioUrl={selectedEpisode.sourceAudioUrl ?? previewAudioUrl}

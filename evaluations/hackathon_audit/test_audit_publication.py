@@ -69,12 +69,14 @@ def _case(auditor, **kw):
 
 
 def test_v1_01_publish_original_job_does_not_check_review_state():
-    """V1-01 PUBLISH_ORIGINAL のジョブは監査を飛ばし、承認状態を自分では確認しない（UI側の状態遷移だけが前提）."""
+    """V1-01 原音声公開ジョブは監査を飛ばす。修正後（I-05）は保存済みの判断がすべて却下のときだけ公開する（拒否側は apps のテストで確認）."""
     auditor = BundleAuditor((LOW, [_secret_finding]))
     case = _case(auditor)
     fs = case.usecase._firestore_manager
     fs.get_episode_content.return_value = {"minutes": SEG.text, "transcript_summary": f"紹介文 {SECRET}"}
     fs.get_transcript_segments.return_value = [SEG]
+    fs.get_policy_findings.return_value = [{"status": "rejected"}]
+    fs.get_director_interventions.return_value = []
     case.usecase.run(replace(case.request, resume_from_audit=True, publish_original=True))
     assert auditor.calls == 0
     assert _published(case)
@@ -82,19 +84,24 @@ def test_v1_01_publish_original_job_does_not_check_review_state():
     assert SECRET in case.usecase._transcript_provider.generate_sns_promotions.call_args.kwargs["summary_description"]
 
 
-def test_v1_02_reaudit_without_findings_publishes_and_discards_pending_review():
-    """V1-02 指摘で承認待ちになった後の再監査で、指摘が出なければ自動公開される（前回の未判断の指摘は空で上書き）."""
+def test_v1_02_reaudit_after_earlier_review_waits_for_confirmation_instead_of_publishing():
+    """V1-02（修正後 I-03）：承認待ちの後の再監査で指摘が出なくても、以前の確認事項を履歴に残し、公開の確認待ちにする.
+
+    修正前は前回の未判断の指摘を空で上書きして自動公開した（evidence/before）。
+    """
     auditor = BundleAuditor((LOW, [_secret_finding]), (LOW, []))
     case = _case(auditor)
+    fs = case.usecase._firestore_manager
+    fs.archive_review.return_value = False
     case.usecase.run(case.request)
     assert not _published(case)
     case.repository.mark_awaiting_approval.assert_called()
-    fs = case.usecase._firestore_manager
     fs.get_episode_content.return_value = {"minutes": SEG.text, "transcript_summary": "s"}
     fs.get_transcript_segments.return_value = [SEG]
+    fs.archive_review.return_value = True  # 1回目の指摘が残っている
     case.usecase.run(replace(case.request, resume_from_audit=True))
-    assert _published(case)
-    assert fs.save_policy_findings.call_args_list[-1].kwargs["findings"] == []
+    assert not _published(case)
+    case.repository.mark_awaiting_publish_confirmation.assert_called_once()
 
 
 def _verification(is_false: bool):

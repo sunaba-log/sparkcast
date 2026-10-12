@@ -8,10 +8,7 @@ import {
   policyContentRef,
 } from "@/server/policy/repository";
 import { suggestPolicyEdits } from "@/server/policy/suggestions";
-import {
-  markEpisodeAwaitingPublishConfirmation,
-  listDirectorInterventions,
-} from "@/server/episodes/data-repository";
+import { moveToPublishConfirmationIfAllRejected } from "@/server/policy/review-gate";
 import type { PolicyEditProposal } from "@/types/episode";
 
 import { isLocalUiDemoEnabled } from "@/server/env";
@@ -162,24 +159,11 @@ export async function POST(
       proposals,
       user.uid,
     );
-    let status = "awaiting_approval";
-    if (
+    const status =
       input.operation === "save" &&
-      proposals.length &&
-      proposals.every((p) => p.status === "rejected")
-    ) {
-      const interventions = await listDirectorInterventions(
-        podcastId,
-        episodeId,
-      );
-      if (interventions.every((i) => i.status === "rejected")) {
-        if (
-          !(await markEpisodeAwaitingPublishConfirmation(podcastId, episodeId))
-        )
-          throw new Error("状態が更新されています。");
-        status = "awaiting_publish_confirmation";
-      }
-    }
+      (await moveToPublishConfirmationIfAllRejected(podcastId, episodeId))
+        ? "awaiting_publish_confirmation"
+        : "awaiting_approval";
     return NextResponse.json({ ...saved, status });
   } catch (error) {
     return failure(error);

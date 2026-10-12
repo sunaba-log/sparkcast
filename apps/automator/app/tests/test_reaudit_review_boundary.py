@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import replace
 from unittest.mock import MagicMock
 
+import pytest
+
+from domain.errors import ReviewIncompleteError
 from domain.models import FactCheckAuditMetric
 from domain.models.director import AuditBundle, PolicyFinding
 from domain.models.transcript import TranscriptSegment
@@ -74,3 +77,35 @@ def test_archive_is_taken_before_new_results_overwrite_old_ones():
     fs.save_director_interventions.side_effect = lambda **_k: order("save_interventions")
     case.usecase.run(request)
     assert [c.args[0] for c in order.call_args_list][:2] == ["archive", "save_findings"]
+
+
+def _original_case(findings: list[dict], interventions: list[dict]):
+    case = _workflow(auditor=_Auditor(findings=False))
+    fs = case.usecase._firestore_manager
+    fs.get_episode_content.return_value = {
+        "minutes": "m",
+        "transcript_summary": "s",
+        "ai_generated_meta": {"title": "#1 t"},
+    }
+    fs.get_transcript_segments.return_value = [TranscriptSegment(0, 3, "Ten.", speaker="Speaker A")]
+    fs.get_policy_findings.return_value = findings
+    fs.get_director_interventions.return_value = interventions
+    return case, replace(case.request, resume_from_audit=True, publish_original=True)
+
+
+def test_publish_original_job_refuses_when_items_are_undecided_or_approved():
+    for findings, interventions in (
+        ([{"status": "rejected"}], [{"status": "pending"}]),
+        ([{"status": "approved"}], []),
+    ):
+        case, request = _original_case(findings, interventions)
+        with pytest.raises(ReviewIncompleteError):
+            case.usecase.run(request)
+        _assert_not_published(case)
+
+
+def test_publish_original_job_publishes_when_all_items_rejected_or_none():
+    for findings, interventions in (([{"status": "rejected"}], [{"status": "rejected"}]), ([], [])):
+        case, request = _original_case(findings, interventions)
+        case.usecase.run(request)
+        case.repository.mark_completed.assert_called_once()

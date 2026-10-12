@@ -168,7 +168,25 @@ export function PolicyFindingsPanel({
     return (
       <p className="text-sm text-gray-500">音声校正結果を読み込んでいます…</p>
     );
-  if (!review.proposals.length) return null;
+  if (!review.proposals.length) {
+    // 指摘が無い回（訂正介入だけを全件却下した回、再監査で指摘が無かった回）でも原音声公開の確認ができるようにする
+    if (episodeStatus !== "awaiting_publish_confirmation") return null;
+    return (
+      <section className="space-y-2 border-t border-brand/20 pt-5" aria-label="原音声の公開確認">
+        <p className="text-sm text-gray-700">
+          確認事項はすべて却下されたか、再監査で新しい指摘がありませんでした。原音声のまま公開してよいか確認してください。
+        </p>
+        {message && <p className="text-sm text-red-600">{message}</p>}
+        <button
+          disabled={saving}
+          onClick={() => request("publish")}
+          className="rounded bg-orange-700 px-4 py-2 text-sm text-white"
+        >
+          原音声を公開する
+        </button>
+      </section>
+    );
+  }
   const editable = episodeStatus === "awaiting_approval";
   const locked = saving || busyCards.length > 0;
   const allDecided = review.proposals.every((p) => p.status !== "pending");

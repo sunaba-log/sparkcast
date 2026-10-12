@@ -4,7 +4,6 @@ import { getSessionUser } from "@/server/auth";
 import {
   findEpisode,
   listDirectorInterventions,
-  listPolicyFindings,
   markEpisodeEditing,
   updateDirectorInterventions,
 } from "@/server/episodes/data-repository";
@@ -13,6 +12,7 @@ import { isLocalUiDemoEnabled } from "@/server/env";
 
 import {
   createPolicyEditPlan,
+  loadPolicyReview,
   policyContentRef,
 } from "@/server/policy/repository";
 import { runAutomatorJob } from "@/server/episodes/automator-jobs";
@@ -114,151 +114,86 @@ export async function POST(
       );
     }
 
-    const [existingInterventions, policyFindings] = await Promise.all([
-      listDirectorInterventions(podcastId, episodeId),
-      listPolicyFindings(podcastId, episodeId),
-    ]);
-    if (input.planVersion !== undefined) {
-      if (existingInterventions.some((item) => item.status === "pending")) {
+    // 訂正介入パネル（planVersion なし）からの要求も、統合レビューと同じ編集計画で処理する。
+    // 外部編集サービスへ判断を直接送る旧経路は廃止した（判断の確認を迂回できないようにする）。
+    let planVersion = input.planVersion;
+    if (planVersion === undefined) {
+      const existing = await listDirectorInterventions(podcastId, episodeId);
+      const ids = new Set(input.interventions.map((item) => item.id));
+      if (
+        ids.size !== input.interventions.length ||
+        ids.size !== existing.length ||
+        existing.some((item) => !ids.has(item.id)) ||
+        input.interventions.some((item) => item.status === "pending")
+      ) {
         return NextResponse.json(
-          { error: "既存の訂正介入を先に判断・保存してください。" },
+          { error: "すべての訂正介入を判断してください" },
           { status: 409 },
         );
       }
-      // Claim the episode before enqueuing to prevent concurrent edits or duplicate submissions.
-      if (!(await markEpisodeEditing(podcastId, episodeId))) {
-        return NextResponse.json(
-          { error: "エピソードの状態が更新されています" },
-          { status: 409 },
-        );
-      }
-      let planId: string | undefined;
-      try {
-        const plan = await createPolicyEditPlan(
+      if (input.interventions.length > 0) {
+        await updateDirectorInterventions({
           podcastId,
           episodeId,
-          input.planVersion,
-        );
-        planId = plan.id;
-        const job = await runAutomatorJob({
-          podcastId,
-          gcsTriggerObjectName: plan.sourcePath,
-          resumeFromAudit: true,
-          editPlanId: plan.id,
+          interventions: input.interventions,
+          updatedBy: user.uid,
         });
-        if (job.skipped) throw new Error("音声編集ジョブが設定されていません");
-        return NextResponse.json({
-          ok: true,
-          status: "editing",
-          planId: plan.id,
-        });
-      } catch (error) {
-        // An ambiguous network failure may have dispatched the job; never unlock for automatic resend.
-        if (planId) {
-          await policyContentRef(podcastId, episodeId)
-            .collection("audio_edit_plans")
-            .doc(planId)
-            .set({ dispatchError: true }, { merge: true });
-        } else {
-          await (
-            await getDbPool()
-          ).query(
-            "UPDATE episodes SET status = 'awaiting_approval' WHERE podcast_id = $1 AND episode_id = $2 AND status = 'editing'",
-            [podcastId, episodeId],
-          );
-        }
-        throw error;
       }
-    }
-    const unifiedReview = await policyContentRef(podcastId, episodeId)
-      .collection("policy_reviews")
-      .doc("current")
-      .get();
-    if (unifiedReview.exists && policyFindings.length > 0)
-      return NextResponse.json(
-        { error: "統合された編集案を保存してから編集を開始してください" },
-        { status: 409 },
-      );
-    if (policyFindings.some((finding) => finding.status === "pending")) {
-      return NextResponse.json(
-        { error: "すべての音声校正項目を判断してください" },
-        { status: 409 },
-      );
-    }
-    if (
-      !input.interventions.some(
-        (intervention) => intervention.status === "approved",
-      ) &&
-      !policyFindings.some((finding) => finding.status === "approved")
-    ) {
-      return NextResponse.json(
-        { error: "承認した校正項目を1件以上選択してください" },
-        { status: 400 },
-      );
-    }
-    const existingIds = new Set(
-      existingInterventions.map((intervention) => intervention.id),
-    );
-    if (
-      input.interventions.some(
-        (intervention) => !existingIds.has(intervention.id),
-      )
-    ) {
-      return NextResponse.json(
-        { error: "存在しない訂正案が含まれています" },
-        { status: 400 },
-      );
-    }
-    const editorUrl = process.env.AUDIO_EDITOR_URL;
-    if (!editorUrl) {
-      console.error("AUDIO_EDITOR_URL is not configured");
-      return NextResponse.json(
-        { error: "音声編集ジョブが設定されていません" },
-        { status: 503 },
-      );
+      planVersion = (await loadPolicyReview(podcastId, episodeId)).version;
     }
 
-    if (input.interventions.length > 0) {
-      await updateDirectorInterventions({
-        podcastId,
-        episodeId,
-        interventions: input.interventions,
-        updatedBy: user.uid,
-      });
-    }
-    const response = await fetch(editorUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(process.env.AUDIO_EDITOR_API_TOKEN
-          ? { Authorization: `Bearer ${process.env.AUDIO_EDITOR_API_TOKEN}` }
-          : {}),
-      },
-      body: JSON.stringify({
-        podcastId,
-        episodeId,
-        interventions: input.interventions.filter(
-          (intervention) => intervention.status === "approved",
-        ),
-        policyFindings: policyFindings.filter(
-          (finding) => finding.status === "approved",
-        ),
-      }),
-    });
-    if (!response.ok) {
-      console.error("Audio editor rejected intervention job", response.status);
+    const interventions = await listDirectorInterventions(podcastId, episodeId);
+    if (interventions.some((item) => item.status === "pending")) {
       return NextResponse.json(
-        { error: "音声編集ジョブを開始できませんでした" },
-        { status: 502 },
-      );
-    }
-    if (!(await markEpisodeEditing(podcastId, episodeId))) {
-      return NextResponse.json(
-        { error: "エピソードの状態が更新されたため、もう一度確認してください" },
+        { error: "既存の訂正介入を先に判断・保存してください。" },
         { status: 409 },
       );
     }
-    return NextResponse.json({ ok: true, status: "editing" });
+    // Claim the episode before enqueuing to prevent concurrent edits or duplicate submissions.
+    if (!(await markEpisodeEditing(podcastId, episodeId))) {
+      return NextResponse.json(
+        { error: "エピソードの状態が更新されています" },
+        { status: 409 },
+      );
+    }
+    let plan: Awaited<ReturnType<typeof createPolicyEditPlan>>;
+    try {
+      plan = await createPolicyEditPlan(podcastId, episodeId, planVersion);
+    } catch (error) {
+      // 計画を作る前の検証失敗（未判断・古い版・範囲不正など）は、編集を始めずに承認待ちへ戻す
+      await (
+        await getDbPool()
+      ).query(
+        "UPDATE episodes SET status = 'awaiting_approval' WHERE podcast_id = $1 AND episode_id = $2 AND status = 'editing'",
+        [podcastId, episodeId],
+      );
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "編集計画を作成できませんでした",
+        },
+        { status: 409 },
+      );
+    }
+    try {
+      const job = await runAutomatorJob({
+        podcastId,
+        gcsTriggerObjectName: plan.sourcePath,
+        resumeFromAudit: true,
+        editPlanId: plan.id,
+      });
+      if (job.skipped) throw new Error("音声編集ジョブが設定されていません");
+      return NextResponse.json({ ok: true, status: "editing", planId: plan.id });
+    } catch (error) {
+      // An ambiguous network failure may have dispatched the job; never unlock for automatic resend.
+      await policyContentRef(podcastId, episodeId)
+        .collection("audio_edit_plans")
+        .doc(plan.id)
+        .set({ dispatchError: true }, { merge: true });
+      throw error;
+    }
   } catch (error) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
       return NextResponse.json(

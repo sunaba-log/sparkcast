@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { moveToPublishConfirmationIfAllRejected } from "@/server/policy/review-gate";
 import { z, ZodError } from "zod";
 import { getSessionUser } from "@/server/auth";
 import {
   findEpisode,
   listPolicyFindings,
-  markEpisodeAwaitingPublishConfirmation,
   updatePolicyFindings,
 } from "@/server/episodes/data-repository";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
@@ -66,13 +66,11 @@ export async function POST(
       findings: input.findings,
       updatedBy: user.uid,
     });
-    const hasApproved = input.findings.some((finding) => finding.status === "approved");
-    if (!hasApproved && !(await markEpisodeAwaitingPublishConfirmation(podcastId, episodeId))) {
-      return NextResponse.json({ error: "エピソードの状態が更新されたため、もう一度確認してください" }, { status: 409 });
-    }
+    // 旧経路でも、訂正介入を含むすべての要確認事項が却下されたときだけ原音声公開の確認へ進める
+    const moved = await moveToPublishConfirmationIfAllRejected(podcastId, episodeId);
     return NextResponse.json({
       ok: true,
-      status: hasApproved ? "awaiting_approval" : "awaiting_publish_confirmation",
+      status: moved ? "awaiting_publish_confirmation" : "awaiting_approval",
     });
   } catch (error) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
