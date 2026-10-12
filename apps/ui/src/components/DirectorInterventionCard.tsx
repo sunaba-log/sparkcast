@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, CirclePlay, Play } from "lucide-react";
+import { ChevronDown, Play, Tally1, Tally2 } from "lucide-react";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -247,9 +247,8 @@ export function DirectorInterventionCard({
         onClick={() => setIsExpanded((prev) => !prev)}
       >
         <ChevronDown
-          className={`w-4 h-4 text-gray-700 shrink-0 transition-transform duration-200 ${
-            isExpanded ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-gray-700 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+            }`}
         />
         <button
           type="button"
@@ -363,7 +362,9 @@ export function DirectorInterventionCard({
                 title="対象範囲を再生"
                 aria-label="対象範囲を再生"
               >
+                <Tally1 className="w-3.5 h-3.5" />
                 <Play className="w-3.5 h-3.5 fill-current" />
+                <Tally1 className="w-3.5 h-3.5 rotate-180" />
               </button>
               <button
                 type="button"
@@ -375,7 +376,9 @@ export function DirectorInterventionCard({
                 title="前後を含めて再生"
                 aria-label="前後を含めて再生"
               >
-                <CirclePlay className="w-3.5 h-3.5" />
+                <Tally2 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5" />
+                <Tally2 className="w-3.5 h-3.5 rotate-180" />
               </button>
             </div>
           </div>
@@ -384,11 +387,10 @@ export function DirectorInterventionCard({
               <button
                 key={action}
                 type="button"
-                className={`${actionButton} ${
-                  currentAction === action
-                    ? "bg-brand text-white border-brand"
-                    : "bg-white hover:bg-gray-50 text-gray-700"
-                }`}
+                className={`${actionButton} ${currentAction === action
+                  ? "bg-brand text-white border-brand"
+                  : "bg-white hover:bg-gray-50 text-gray-700"
+                  }`}
                 aria-pressed={currentAction === action}
                 disabled={locked}
                 onClick={() => {
@@ -561,11 +563,10 @@ export function DirectorInterventionCard({
               disabled={locked}
               onClick={() => onChange({ status: "approved" })}
               aria-pressed={intervention.status === "approved"}
-              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center ${
-                intervention.status === "approved"
-                  ? "bg-emerald-700 text-white ring-2 ring-emerald-600 ring-offset-1"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              }`}
+              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center ${intervention.status === "approved"
+                ? "bg-emerald-700 text-white ring-2 ring-emerald-600 ring-offset-1"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                }`}
             >
               承認
             </button>
@@ -574,11 +575,10 @@ export function DirectorInterventionCard({
               disabled={locked}
               onClick={() => onChange({ status: "rejected" })}
               aria-pressed={intervention.status === "rejected"}
-              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                intervention.status === "rejected"
-                  ? "bg-gray-600 text-white border border-gray-600"
-                  : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700"
-              }`}
+              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-medium transition-colors cursor-pointer flex items-center justify-center ${intervention.status === "rejected"
+                ? "bg-gray-600 text-white border border-gray-600"
+                : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700"
+                }`}
             >
               却下
             </button>
