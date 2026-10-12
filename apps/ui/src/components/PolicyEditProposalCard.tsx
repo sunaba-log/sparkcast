@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, CirclePlay, Play } from "lucide-react";
+import { ChevronDown, Play, Tally1, Tally2 } from "lucide-react";
+
+
+
 import { formatDirectorTimestamp } from "@/components/DirectorInterventionCard";
 import {
   createTrackRecorder,
@@ -363,7 +366,9 @@ export function PolicyEditProposalCard({
                 title="対象範囲を再生"
                 aria-label="対象範囲を再生"
               >
+                <Tally1 className="w-3.5 h-3.5" />
                 <Play className="w-3.5 h-3.5 fill-current" />
+                <Tally1 className="w-3.5 h-3.5 rotate-180" />
               </button>
               <button
                 type="button"
@@ -375,7 +380,9 @@ export function PolicyEditProposalCard({
                 title="前後を含めて再生"
                 aria-label="前後を含めて再生"
               >
-                <CirclePlay className="w-3.5 h-3.5" />
+                <Tally2 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5 " />
+                <Tally2 className="w-3.5 h-3.5 rotate-180" />
               </button>
             </div>
           </div>
