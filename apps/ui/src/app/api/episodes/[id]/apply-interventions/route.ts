@@ -27,7 +27,9 @@ const applySchema = z.object({
         id: z.string().min(1).max(200),
         correctionScript: z.string().min(1).max(10_000),
         status: z.enum(["pending", "approved", "rejected"]),
-        action: z.enum(["cut", "silence", "replace"]).optional(),
+        action: z.enum(["insert", "cut", "silence", "replace"]).optional(),
+        start: z.number().min(0).optional(),
+        end: z.number().min(0).optional(),
       }),
     )
     .default([]),

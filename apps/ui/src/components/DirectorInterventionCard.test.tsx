@@ -24,7 +24,7 @@ describe("DirectorInterventionCard", () => {
       />,
     );
 
-    expect(html).toContain("00:12:34.500");
+    expect(html).toContain("00:12:32.500 - 00:12:34.500");
     expect(html).toContain("深刻度4/5");
     expect(html).toContain("事実誤認");
     expect(html).not.toContain("田中の発話");
@@ -36,6 +36,8 @@ describe("DirectorInterventionCard", () => {
         intervention={{
           id: "intervention-1",
           insertAt: 754.5,
+          start: 750.0,
+          end: 754.5,
           sourceText: "この製品は2020年に発売されました。",
           speaker: "田中",
           severity: 4,
@@ -51,14 +53,19 @@ describe("DirectorInterventionCard", () => {
       />,
     );
 
-    expect(html).toContain("00:12:34.500");
+    expect(html).toContain("00:12:30.000 - 00:12:34.500");
     expect(html).toContain("深刻度4/5");
     expect(html).toContain("事実誤認");
     expect(html).toContain("田中の発話");
     expect(html).toContain("この製品は2020年に発売されました。");
+    expect(html).toContain("開始（秒）");
+    expect(html).toContain("終了（秒）");
+    expect(html).toContain("対象範囲を再生");
+    expect(html).toContain("前後を含めて再生");
+    expect(html).toContain("訂正を挿入");
     expect(html).toContain("カット");
     expect(html).toContain("無音化");
-    expect(html).toContain("代替音声による置換");
+    expect(html).toContain("代替音声で置換");
     expect(html).toContain("AIディレクターの台詞提案");
     expect(html).toContain("正しくは2021年発売です。");
     expect(html).toContain("承認");
@@ -86,7 +93,7 @@ describe("DirectorInterventionCard", () => {
         onSeek={() => undefined}
       />,
     );
-    expect(cutHtml).toContain("対象の発話をカットします。");
+    expect(cutHtml).toContain("を音声から削除します。");
     expect(cutHtml).not.toContain("AIディレクターの台詞提案");
 
     const silenceHtml = renderToStaticMarkup(
@@ -109,7 +116,7 @@ describe("DirectorInterventionCard", () => {
         onSeek={() => undefined}
       />,
     );
-    expect(silenceHtml).toContain("対象の発話を無音化します。");
+    expect(silenceHtml).toContain("を無音化します。");
     expect(silenceHtml).not.toContain("AIディレクターの台詞提案");
   });
 

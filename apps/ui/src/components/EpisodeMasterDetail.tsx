@@ -331,6 +331,28 @@ export function EpisodeMasterDetail({
     setCurrentTime(seconds);
   };
 
+  const playRange = (start: number, end: number) => {
+    document.querySelectorAll("audio").forEach((audio) => audio.pause());
+    if (playbackTimer.current) clearInterval(playbackTimer.current);
+    const source = audioRef.current;
+    if (!source) return;
+    source.currentTime = start;
+    playbackEnd.current = end;
+    void source
+      .play()
+      .then(() => {
+        setIsPlaying(true);
+        playbackTimer.current = setInterval(() => {
+          if (source.paused || source.currentTime >= end) {
+            source.pause();
+            setIsPlaying(false);
+            if (playbackTimer.current) clearInterval(playbackTimer.current);
+          }
+        }, 20);
+      })
+      .catch(() => undefined);
+  };
+
   // When selected episode changes, sync form state
   const handleSelectEpisode = (ep: Episode) => {
     router.push(`/episodes?episode=${encodeURIComponent(ep.id)}`);
@@ -983,6 +1005,7 @@ export function EpisodeMasterDetail({
                     episodeStatus={selectedEpisode.status}
                     canSeek={Boolean(previewAudioUrl)}
                     onSeek={seekTo}
+                    onPlayRange={playRange}
                     onEditingStarted={() => {
                       setEpisodes((previous) =>
                         previous.map((episode) =>
@@ -1000,22 +1023,7 @@ export function EpisodeMasterDetail({
                     episodeStatus={selectedEpisode.status}
                     canSeek={Boolean(previewAudioUrl)}
                     onSeek={seekTo}
-                    onPlayRange={(start, end) => {
-                      document.querySelectorAll("audio").forEach((audio) => audio.pause());
-                      if (playbackTimer.current) clearInterval(playbackTimer.current);
-                      const source = audioRef.current;
-                      if (!source) return;
-                      source.currentTime = start;
-                      playbackEnd.current = end;
-                      void source.play().then(() => {
-                        playbackTimer.current = setInterval(() => {
-                          if (source.paused || source.currentTime >= end) {
-                            source.pause();
-                            if (playbackTimer.current) clearInterval(playbackTimer.current);
-                          }
-                        }, 20);
-                      }).catch(() => undefined);
-                    }}
+                    onPlayRange={playRange}
                     onStatusChanged={(nextStatus) => {
                       setEpisodes((previous) =>
                         previous.map((episode) =>
