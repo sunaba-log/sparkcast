@@ -132,6 +132,9 @@ class NotificationGateway(Protocol):
 class EpisodeRepository(Protocol):
     """Persist processing state for a Cloud SQL episode."""
 
+    def assign_episode_number(self, *, podcast_id: str, episode_id: str) -> int:
+        """Assign (once) and return the episode number within the podcast."""
+
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         """Mark an uploaded episode as processing."""
 

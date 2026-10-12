@@ -49,36 +49,48 @@ def _publish(pid: int, eid: int, *, publish_original: bool = False) -> str:
     return keys[0]
 
 
-def test_v1_10_episode_number_and_audio_key_collide_when_an_earlier_upload_is_published_later():
-    """3件アップロード済みの番組で E1・E3 を公開し、承認待ちだった E2 を後から原音声で公開する.
+def _row(eid: int):
+    with psycopg.connect(DB) as conn, conn.cursor() as cur:
+        cur.execute("SELECT episode_number, title, audio_file_path FROM episodes WHERE episode_id=%s", (eid,))
+        return cur.fetchone()
 
-    番号は「その番組の全エピソード行数（未公開・処理中を含む）+1」で公開時に決まるため、
-    3件とも #4 になり、同じ公開音声キー ep/4/audio.mp3 に書き込まれる（前の公開音声を上書き）。
+
+def test_v1_10_episode_number_and_audio_key_are_unique_regardless_of_publish_order():
+    """修正後（I-02）：3件アップロード済みの番組で E1・E3 を公開し、承認待ちだった E2 を後から原音声で公開する.
+
+    修正前は3件とも #4・ep/4/audio.mp3 になり、後の公開が前の公開音声を上書きした（evidence/before）。
+    修正後は、番号を処理開始時に一度だけ採番し、公開音声キーは番組ID・エピソードIDで決まる。
     """
     pid, (e1, e2, e3) = _seed()
     k1 = _publish(pid, e1)
     k3 = _publish(pid, e3)
     k2 = _publish(pid, e2, publish_original=True)
-    with psycopg.connect(DB) as conn, conn.cursor() as cur:
-        cur.execute("SELECT episode_id, title, audio_file_path FROM episodes WHERE podcast_id=%s ORDER BY episode_id", (pid,))
-        rows = cur.fetchall()
+    rows = {e: _row(e) for e in (e1, e2, e3)}
     print({"case": "V1-10", "keys": {"E1": k1, "E3": k3, "E2(later)": k2}, "rows": rows})
-    assert k1.endswith("/ep/4/audio.mp3")  # 1件目の公開でも番号は 件数(3)+1
-    assert k1 == k3 == k2  # 後の公開が前のエピソードの公開音声を上書きする
+    assert len({k1, k2, k3}) == 3
+    assert k2 == f"synthetic/podcasts/{pid}/episodes/{e2}/audio.mp3"
+    assert sorted(r[0] for r in rows.values()) == [1, 2, 3]
+    assert rows[e1][1].startswith("#1 ") and rows[e3][1].startswith("#2 ") and rows[e2][1].startswith("#3 ")
 
 
-def test_v1_11_sequential_uploads_are_numbered_from_two():
-    """1件ずつアップロード・公開しても、番号は自分自身の行を数えるため #2 から始まる（重複はしない）."""
+def test_v1_11_number_is_stable_on_reprocessing_and_existing_urls_are_kept():
+    """同じ回を再処理しても番号は変わらない。既存の公開回（旧形式のURL）は他の回の公開で変更されない."""
     with psycopg.connect(DB) as conn, conn.cursor() as cur:
         cur.execute("INSERT INTO podcasts (title) VALUES ('EVAL sequential') RETURNING podcast_id")
         pid = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO episodes (podcast_id, title, status, audio_file_path, episode_number, published_at) "
+            "VALUES (%s, '#7 既存回', 'completed', 'https://example.invalid/sunabalog/ep/7/audio.mp3', 7, now()) RETURNING episode_id",
+            (pid,),
+        )
+        old = cur.fetchone()[0]
+        cur.execute("INSERT INTO episodes (podcast_id, title, status) VALUES (%s, 'S1', 'uploaded') RETURNING episode_id", (pid,))
+        eid = cur.fetchone()[0]
         conn.commit()
-    keys = []
-    for title in ("S1", "S2"):
-        with psycopg.connect(DB) as conn, conn.cursor() as cur:
-            cur.execute("INSERT INTO episodes (podcast_id, title, status) VALUES (%s, %s, 'uploaded') RETURNING episode_id", (pid, title))
-            eid = cur.fetchone()[0]
-            conn.commit()
-        keys.append(_publish(pid, eid))
-    print({"case": "V1-11", "keys": keys})
-    assert keys == ["synthetic/ep/2/audio.mp3", "synthetic/ep/3/audio.mp3"]
+    k_first = _publish(pid, eid)
+    n_first = _row(eid)[0]
+    k_again = _publish(pid, eid, publish_original=True)
+    print({"case": "V1-11", "keys": [k_first, k_again], "number": [n_first, _row(eid)[0]], "existing": _row(old)})
+    assert n_first == 8 and _row(eid)[0] == 8
+    assert k_first == k_again == f"synthetic/podcasts/{pid}/episodes/{eid}/audio.mp3"
+    assert _row(old) == (7, "#7 既存回", "https://example.invalid/sunabalog/ep/7/audio.mp3")

@@ -276,7 +276,7 @@ def test_workflow_uses_object_path_ids_for_cloud_sql_and_firestore() -> None:
         "episode_id": "42",
         "title": "#4 Generated title",
         "description": "Generated description",
-        "audio_url": "https://podcast.example.com/dev/ep/4/audio.mp3",
+        "audio_url": "https://podcast.example.com/dev/podcasts/1/episodes/42/audio.mp3",
         "duration_seconds": 3723,
     }
     assert repository.failed is None

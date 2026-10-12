@@ -176,7 +176,12 @@ class ProcessPodcastWorkflow:
                     source_audio_path=episode_ref.object_path,
                 )
             rss_manager = None
-            if hasattr(self._episode_repository, "get_episode_count"):
+            if callable(getattr(type(self._episode_repository), "assign_episode_number", None)):
+                # 番号は一度だけ採番して保存する(公開順序や再実行で変わらない)
+                latest_episode_number = self._episode_repository.assign_episode_number(
+                    podcast_id=episode_ref.podcast_id, episode_id=episode_ref.episode_id
+                )
+            elif hasattr(self._episode_repository, "get_episode_count"):
                 try:
                     latest_episode_number = (
                         self._episode_repository.get_episode_count(podcast_id=episode_ref.podcast_id) + 1
@@ -513,10 +518,12 @@ class ProcessPodcastWorkflow:
                 if file_size_bytes == 0:
                     file_size_bytes = len(mp3_bytes)
 
+            # 公開音声の保存先は不変の番組ID・エピソードIDで決める(番号は表示用で、重複や変更があっても上書きしない)
+            episode_key = f"{request.r2_key_prefix}/podcasts/{episode_ref.podcast_id}/episodes/{episode_ref.episode_id}"
             r2_remote_key = (
-                f"{request.r2_key_prefix}/ep/{latest_episode_number}/renditions/{request.edit_plan_id}.mp3"
+                f"{episode_key}/renditions/{request.edit_plan_id}.mp3"
                 if request.edit_plan_id
-                else f"{request.r2_key_prefix}/ep/{latest_episode_number}/audio.mp3"
+                else f"{episode_key}/audio.mp3"
             )
             self._object_storage.upload_file(
                 file_content=mp3_bytes,

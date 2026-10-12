@@ -24,6 +24,32 @@ class PostgresEpisodeRepository:
             row = cursor.fetchone()
         return row[0] if row else 0
 
+    def assign_episode_number(self, *, podcast_id: str, episode_id: str) -> int:
+        """番組内のエピソード番号を一度だけ採番して返す(採番済みならその番号).
+
+        公開時の件数から計算すると、未公開の回や後から公開する回で番号が重複する。
+        番組単位のロック内で最大値+1を割り当て、以後は変えない。
+        """
+        with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"episode_number:{podcast_id}",))
+            cursor.execute(
+                """
+                UPDATE episodes
+                SET episode_number = COALESCE(
+                    episode_number,
+                    (SELECT COALESCE(MAX(episode_number), 0) + 1 FROM episodes WHERE podcast_id = %s)
+                )
+                WHERE podcast_id = %s AND episode_id = %s
+                RETURNING episode_number
+                """,
+                (podcast_id, podcast_id, episode_id),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            msg = f"Episode not found: podcast_id={podcast_id}, episode_id={episode_id}"
+            raise LookupError(msg)
+        return int(row[0])
+
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         """Mark an uploaded episode as processing."""
         self._execute_update(
