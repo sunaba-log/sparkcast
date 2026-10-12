@@ -9,8 +9,10 @@
 | 5. 根拠となるログ・出力 | `evidence/before/`（修正前 `423ad74`）、`evidence/after/`（修正後 `dbfceea`） |
 | 6. 不具合・残課題 | [ISSUES.md](ISSUES.md) |
 | 7. 主張できること・条件付き・言えないこと | [CLAIMS.md](CLAIMS.md) |
-| 実API評価の手順・費用見積もり | [REAL_API_RUNBOOK.md](REAL_API_RUNBOOK.md) |
+| **記事執筆用の引き継ぎ（代表ケース・言えること）** | [ARTICLE_HANDOFF.md](ARTICLE_HANDOFF.md) |
+| メンバー向けの統合レビュー案内（第4回と今回） | [docs/review/README.md](../../docs/review/README.md) |
+| 実API評価の手順・費用見積もり（任意） | [REAL_API_RUNBOOK.md](REAL_API_RUNBOOK.md) |
 | I-06・Discord 通知の修正提案（未実装） | [PROPOSALS.md](PROPOSALS.md) |
 | dev 実環境の確認・検証用バケット（読み取り手順） | [DEV_CHECK.md](DEV_CHECK.md) |
 
-製品コードの修正（I-01〜I-05）は、検証時点のコミットとは別のコミットにしている：`b053ab5`・`fcfce23`・`f8c4598`・`dbfceea`。未マージ・未配備。
+製品コードの修正（I-01〜I-05）は、検証時点のコミットとは別のコミットにしている：`b053ab5`・`fcfce23`・`f8c4598`・`dbfceea`。未マージ・未配備。PR は作っていない（PR プレビューが、共有 dev DB に migration を先に適用するため）。追加の実装は停止中。

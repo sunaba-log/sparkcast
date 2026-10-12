@@ -7,6 +7,7 @@
 | 検証時点のコミット | `423ad746a8d1c2226ee3bb809e71dd67b8756100`（develop）。§0〜§6 はこの時点の結果（修正前）。証拠は `evidence/before/` |
 | 修正 | I-01 `b053ab5`、I-02 `fcfce23`、I-03 `f8c4598`、I-04・I-05 `dbfceea`。I-06 と I-09 は提案のみ（`PROPOSALS.md`） |
 | 修正後の確認 | `dbfceea` で実施。結果は §A。証拠は `evidence/after/` |
+| 提出版 | **未確定**（修正候補を取り込むかは、メンバーのレビュー後に決める。`CLAIMS.md`） |
 | マージ・配備 | **未マージ・未配備。** ブランチ `claude/hackathon-audit-verification` にだけある。PR は作っていない（develop 向けの PR を作ると、PR プレビューが共有 dev DB に migrations 015・016 を適用する） |
 | 確認した環境 | [モック]・[エミュレータ]・[ローカル] のみ。**[実API]・[dev実環境]・ブラウザでの画面操作は未確認** |
 | 人の確認 | 音声と訂正案を人が確認する作業は未実施（実API評価の後。§6） |

@@ -23,6 +23,8 @@ DBURL="$(gcloud secrets versions access latest --secret=supabase-database-url-de
 PGOPTIONS='-c default_transaction_read_only=on' psql "$DBURL" -At -c "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns WHERE table_schema='public' AND table_name='episodes' AND column_name IN ('status','episode_number') ORDER BY 1"
 PGOPTIONS='-c default_transaction_read_only=on' psql "$DBURL" -At -c "SELECT migration_name FROM schema_migrations ORDER BY migration_name DESC LIMIT 5"
 PGOPTIONS='-c default_transaction_read_only=on' psql "$DBURL" -At -c "SELECT status, count(*) FROM episodes GROUP BY status ORDER BY 1"
+PGOPTIONS='-c default_transaction_read_only=on' psql "$DBURL" -At -c "SELECT count(*) AS podcasts, count(*) FILTER (WHERE rss_feed_path IS NULL) AS feed_path_null, count(*) FILTER (WHERE rss_feed_path LIKE 'podcasts/%') AS per_podcast_feed FROM podcasts"
+python3 -c 'import sys,urllib.parse as u; p=u.urlparse(sys.argv[1]); print("host:", "pooler" if "pooler" in (p.hostname or "") else "direct-or-other", "port:", p.port)' "$DBURL"
 unset DBURL
 ```
 
@@ -35,7 +37,12 @@ unset DBURL
 | `episode_number` の行がある | 016 がすでに適用されている（PR プレビューなどによる） |
 | 015・016 が `schema_migrations` にある | 修正の migrations が dev に適用済み |
 
-3つ目のクエリは状態ごとの件数だけを表示する。内容は表示しない。
+3つ目・4つ目のクエリは件数だけを表示する。内容は表示しない。最後の行は、接続先の種類とポート番号だけを表示する（ホスト名・パスワードは表示しない）。
+
+| 結果 | 判断 |
+| --- | --- |
+| `feed_path_null` が 0 より大きい | `rss_feed_path` のない番組は、RSS の再構築時に既定のフィード（`{R2_KEY_PREFIX}/feed.xml`）へ書き込む（develop のコード確認）。第4回 F1 の要否の判断材料になる |
+| `port: 6543` | Supabase のトランザクションモード。第4回 F4 と今回の I-02 は、トランザクション内だけで有効なロック（`pg_advisory_xact_lock`）を使うため、コード上は対応する（実環境では未確認） |
 
 ## 2. `AUDIO_EDITOR_URL` の有無（I-04）と、Discord 通知先の設定方式（I-19）
 
