@@ -1,0 +1,183 @@
+[
+ {
+  "case": "V1-UI-01",
+  "result": {
+   "awaiting_approval": {
+    "http": 200,
+    "after": "auditing",
+    "jobs": 1,
+    "resumeFromAudit": true
+   },
+   "completed": {
+    "http": 200,
+    "after": "auditing",
+    "jobs": 1,
+    "resumeFromAudit": true
+   },
+   "editing": {
+    "http": 200,
+    "after": "auditing",
+    "jobs": 1,
+    "resumeFromAudit": true
+   }
+  }
+ },
+ {
+  "case": "V1-UI-08",
+  "statusColumnLength": 20,
+  "valueLength": 29,
+  "legacy": [
+   500,
+   "awaiting_approval"
+  ],
+  "unified": [
+   409,
+   "value too long for type character varying(20)"
+  ],
+  "publishOriginal": 409,
+  "finalStatus": "awaiting_approval",
+  "jobs": 0
+ },
+ {
+  "case": "V1-UI-02",
+  "reviewHttp": 200,
+  "statusAfterReview": "awaiting_publish_confirmation",
+  "publishHttp": 200,
+  "jobs": [],
+  "interventionStatuses": [
+   "pending"
+  ]
+ },
+ {
+  "case": "V1-UI-03",
+  "firstSave": [
+   200,
+   "awaiting_approval"
+  ],
+  "interventions": 200,
+  "afterInterventions": "awaiting_approval",
+  "publishBeforeResave": 409,
+  "resave": [
+   200,
+   "awaiting_publish_confirmation"
+  ],
+  "publishAfterResave": 200,
+  "jobs": 1
+ },
+ {
+  "case": "V1-UI-04",
+  "interventions": 200,
+  "proposals": 0,
+  "save": [
+   200,
+   "awaiting_approval"
+  ],
+  "apply": [
+   500,
+   "音声編集を開始できませんでした"
+  ],
+  "original": 409,
+  "finalStatus": "awaiting_approval",
+  "jobs": 0
+ },
+ {
+  "case": "V1-UI-09",
+  "http": 503,
+  "error": "音声編集ジョブが設定されていません",
+  "status": "awaiting_approval",
+  "jobs": 0,
+  "note": "infra に AUDIO_EDITOR_URL の定義はない"
+ },
+ {
+  "case": "V1-UI-05",
+  "interventionsPending": 409,
+  "proposalsPending": 500,
+  "saved": 200,
+  "staleVersion": [
+   500,
+   "音声編集を開始できませんでした"
+  ],
+  "status": "awaiting_approval",
+  "jobs": 0
+ },
+ {
+  "case": "V1-UI-06",
+  "http": [
+   200,
+   409
+  ],
+  "jobs": 1,
+  "plans": 1,
+  "status": "editing"
+ },
+ {
+  "case": "V1-UI-07",
+  "reviewGet": [
+   409,
+   "監査後に原音声が変更されています。再監査してください。"
+  ],
+  "apply": [
+   409,
+   "既存の訂正介入を先に判断・保存してください。"
+  ],
+  "jobs": 0,
+  "status": "awaiting_approval"
+ },
+ {
+  "case": "V2-UI-01",
+  "interventionSave": 200,
+  "apply": 200,
+  "correctionContainsSecret": true,
+  "jobs": 1
+ },
+ {
+  "case": "V2-UI-02",
+  "http": 200,
+  "note": "API はスクリプトを検査せず音声処理サービス（verify_text）に委ねる。本テストでは処理サービスを差し替えたため、検査は実行されていない"
+ },
+ {
+  "case": "V2-UI-03",
+  "ragContainsSecret": true,
+  "episodeTranscriptApiContainsSecret": false
+ },
+ {
+  "case": "V4-01",
+  "results": {
+   "cookie=none GET policy-findings": 404,
+   "cookie=none GET policy-review": 404,
+   "cookie=none POST policy-review save": 404,
+   "cookie=none POST policy-review suggest": 404,
+   "cookie=none GET interventions": 404,
+   "cookie=none POST interventions": 404,
+   "cookie=none GET policy-audio (B asset)": 404,
+   "cookie=none GET policy-audio (B asset via A episode)": 404,
+   "cookie=none POST policy-audio synthesize": 404,
+   "cookie=none POST apply-interventions": 404,
+   "cookie=none POST apply-interventions retry B plan": 404,
+   "cookie=none POST review-policy-findings": 404,
+   "cookie=none POST retry-audit": 404,
+   "cookie=none POST confirm-original-publish": 404,
+   "cookie=none GET source-audio": 404,
+   "cookie=none GET transcript": 404,
+   "cookie=PB GET policy-findings": 404,
+   "cookie=PB GET policy-review": 404,
+   "cookie=PB POST policy-review save": 404,
+   "cookie=PB POST policy-review suggest": 404,
+   "cookie=PB GET interventions": 404,
+   "cookie=PB POST interventions": 404,
+   "cookie=PB GET policy-audio (B asset)": 404,
+   "cookie=PB GET policy-audio (B asset via A episode)": 404,
+   "cookie=PB POST policy-audio synthesize": 404,
+   "cookie=PB POST apply-interventions": 404,
+   "cookie=PB POST apply-interventions retry B plan": 404,
+   "cookie=PB POST review-policy-findings": 404,
+   "cookie=PB POST retry-audit": 404,
+   "cookie=PB POST confirm-original-publish": 404,
+   "cookie=PB GET source-audio": 404,
+   "cookie=PB GET transcript": 404
+  },
+  "podcastBUnchanged": true,
+  "jobsForB": 0,
+  "jobsTotal": 0
+ }
+]
