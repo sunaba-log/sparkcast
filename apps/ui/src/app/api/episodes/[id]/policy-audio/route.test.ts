@@ -138,6 +138,49 @@ describe("POST /api/episodes/[id]/policy-audio", () => {
     expect(body.asset.proposalId).toBe("proposal-1");
   });
 
+  it("validates recorded audio for a director insert without a policy version", async () => {
+    const audioBase64 = Buffer.from("recorded-audio").toString("base64");
+    const response = await callPost({
+      operation: "recording",
+      proposalId: "intervention-1",
+      script: "テスト台詞",
+      action: "insert",
+      audioBase64,
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).asset.kind).toBe("recorded");
+    expect(mocks.processPolicyMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: "recording", audioBase64 }),
+    );
+    expect(mocks.fileSave).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, 2])("rejects missing or stale policy version %s", async (version) => {
+    const response = await callPost({
+      operation: "synthesize",
+      version,
+      proposalId: "proposal-1",
+      script: "代替台詞",
+      action: "replace",
+    });
+    expect(response.status).toBe(409);
+    expect(mocks.processPolicyMedia).not.toHaveBeenCalled();
+  });
+
+  it("validates recorded audio for a policy replacement", async () => {
+    const response = await callPost({
+      operation: "recording",
+      version: 1,
+      proposalId: "proposal-1",
+      script: "代替台詞",
+      action: "replace",
+      audioBase64: Buffer.from("recorded-audio").toString("base64"),
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).asset.kind).toBe("recorded");
+  });
+
   it("fails when proposalId is not found in policy review or director interventions", async () => {
     const response = await callPost({
       operation: "synthesize",

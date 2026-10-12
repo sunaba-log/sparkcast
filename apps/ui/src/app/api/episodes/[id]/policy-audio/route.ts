@@ -45,7 +45,7 @@ export async function POST(
     const review = await loadPolicyReview(podcastId, episodeId);
     const isPolicyProposal = review.proposals.some((p) => p.id === input.proposalId);
     if (isPolicyProposal) {
-      if (input.version !== undefined && review.version !== input.version) {
+      if (input.version === undefined || review.version !== input.version) {
         throw new Error("内容が更新されています。再読み込みしてください。");
       }
     } else {
