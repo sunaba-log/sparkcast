@@ -438,9 +438,14 @@ export function PolicyEditProposalCard({
                   onChange={(event) => change({ script: event.target.value })}
                 />
               </label>
-              <div className="flex gap-2">
+              <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
                 <button
-                  className={button}
+                  type="button"
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "synthesize"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "synthesize"}
                   disabled={locked}
                   onClick={() => {
@@ -453,7 +458,12 @@ export function PolicyEditProposalCard({
                   合成音声
                 </button>
                 <button
-                  className={button}
+                  type="button"
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "recording"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "recording"}
                   disabled={locked}
                   onClick={() => {

@@ -437,10 +437,14 @@ export function DirectorInterventionCard({
                   className="w-full rounded-xs border border-brand/60 px-3 py-2 text-xs leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
                 <button
                   type="button"
-                  className={`${actionButton} ${kind === "synthesize" ? "bg-brand text-white border-brand" : ""}`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "synthesize"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "synthesize"}
                   disabled={locked}
                   onClick={() => {
@@ -455,7 +459,11 @@ export function DirectorInterventionCard({
                 </button>
                 <button
                   type="button"
-                  className={`${actionButton} ${kind === "recording" ? "bg-brand text-white border-brand" : ""}`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "recording"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "recording"}
                   disabled={locked}
                   onClick={() => {
