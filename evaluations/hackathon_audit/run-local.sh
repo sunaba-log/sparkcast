@@ -3,7 +3,7 @@
 # 使い方：evaluations/hackathon_audit/run-local.sh [出力ディレクトリ]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUT="${1:-$ROOT/evaluations/hackathon_audit/evidence}"
+OUT="${1:-$ROOT/evaluations/hackathon_audit/evidence/after}"
 mkdir -p "$OUT"
 export EVIDENCE_DIR="$OUT"
 # test_episode_numbering.py はローカル PostgreSQL（run-ui.sh が起動・作成）を使う。無ければスキップ

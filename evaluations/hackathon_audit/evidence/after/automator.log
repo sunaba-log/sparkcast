@@ -2,8 +2,8 @@ warning: The `UV_NATIVE_TLS` environment variable is deprecated and will be remo
 ..................................                                       [100%]
 =============================== warnings summary ===============================
 .venv/lib/python3.12/site-packages/pydub/utils.py:14
-  apps/automator/app/.venv/lib/python3.12/site-packages/pydub/utils.py:14: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+  <repo>/apps/automator/app/.venv/lib/python3.12/site-packages/pydub/utils.py:14: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
     import audioop
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-34 passed, 1 warning in 7.36s
+34 passed, 1 warning in 8.75s

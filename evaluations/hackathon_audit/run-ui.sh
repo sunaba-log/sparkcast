@@ -3,7 +3,7 @@
 # 使い方：evaluations/hackathon_audit/run-ui.sh [出力JSON]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUT="${1:-$ROOT/evaluations/hackathon_audit/evidence/ui-results.json}"
+OUT="${1:-$ROOT/evaluations/hackathon_audit/evidence/after/ui-results.json}"
 WORK="${EVAL_WORK_DIR:-$(mktemp -d)}"
 # PostgreSQL は root で起動できないため、root 実行時は専用ユーザーのホームにデータを置く
 PGDATA_DIR="$WORK/pg"

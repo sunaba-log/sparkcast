@@ -83,6 +83,8 @@ class JevProxy:
             {
                 "api": "jev.system_one",
                 "questions": sorted(kwargs.get("questions", {})),
+                # 送信側で数えた入力の文字数（発話＋指示＋基準）。Jev は入力トークン課金のため、usage が無くても見積もれるようにする
+                "input_chars": len(kwargs.get("state", "")) + len(json.dumps(_plain(kwargs.get("questions", {})), ensure_ascii=False)),
                 "ms": round((time.perf_counter() - started) * 1000),
                 "model": getattr(response, "model", None),
                 "usage": _plain(getattr(response, "usage", None)),
@@ -253,7 +255,7 @@ def phase_text(args) -> None:
         rows.append({"case": case["id"], "kind": case["kind"], **row, "judge": _auto_judge(case, row)})
     out = _out_dir(args, "text")
     (out / "text_results.json").write_text(json.dumps({"meta": _meta(args, budget), "total_ms": round((time.perf_counter() - t0) * 1000), "audit_bundle_ms": result["audit_bundle_ms"], "calls": calls, "rows": rows}, ensure_ascii=False, indent=1))
-    print(json.dumps({"out": str(out / "text_results.json"), **budget.used, "auto_match": sum(r["judge"]["auto_match"] for r in rows), "cases": len(rows)}, ensure_ascii=False))
+    print(json.dumps({"out": str(out / "text_results.json"), **budget.used, "jev_input_chars": sum(c.get("input_chars", 0) for c in calls), "auto_match": sum(r["judge"]["auto_match"] for r in rows), "cases": len(rows)}, ensure_ascii=False))
 
 
 def _bucket(args):
@@ -353,7 +355,7 @@ def phase_audio(args) -> None:
             ensure_ascii=False, indent=1,
         )
     )
-    print(json.dumps({"out": str(out), **budget.used, "chunks": len(chunks), "findings": len(findings_ui)}, ensure_ascii=False))
+    print(json.dumps({"out": str(out), **budget.used, "jev_input_chars": sum(c.get("input_chars", 0) for c in calls), "chunks": len(chunks), "findings": len(findings_ui)}, ensure_ascii=False))
 
 
 def _ranges(out: Path) -> list[dict]:

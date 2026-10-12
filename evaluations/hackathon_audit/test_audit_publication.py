@@ -68,7 +68,7 @@ def _case(auditor, **kw):
     return case
 
 
-def test_v1_01_publish_original_job_does_not_check_review_state():
+def test_v1_01_publish_original_job_skips_audit_and_requires_all_rejected():
     """V1-01 原音声公開ジョブは監査を飛ばす。修正後（I-05）は保存済みの判断がすべて却下のときだけ公開する（拒否側は apps のテストで確認）."""
     auditor = BundleAuditor((LOW, [_secret_finding]))
     case = _case(auditor)
