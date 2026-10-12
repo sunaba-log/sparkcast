@@ -1,5 +1,5 @@
 {
- "init_seconds": 2.96,
+ "init_seconds": 2.46,
  "policy": {
   "version": "eval-1",
   "enabled": true,
@@ -21,7 +21,7 @@
    "expected_term": true,
    "actual_term": true,
    "match": true,
-   "detect_ms": 299.6
+   "detect_ms": 293.1
   },
   {
    "case": "D02",
@@ -32,7 +32,7 @@
    "expected_term": true,
    "actual_term": false,
    "match": false,
-   "detect_ms": 14.1
+   "detect_ms": 14.3
   },
   {
    "case": "D03",
@@ -43,7 +43,7 @@
    "expected_term": true,
    "actual_term": false,
    "match": false,
-   "detect_ms": 12.9
+   "detect_ms": 13.8
   },
   {
    "case": "D04",
@@ -54,7 +54,7 @@
    "expected_term": true,
    "actual_term": false,
    "match": false,
-   "detect_ms": 14.5
+   "detect_ms": 13.5
   },
   {
    "case": "D05",
@@ -65,7 +65,7 @@
    "expected_term": true,
    "actual_term": false,
    "match": false,
-   "detect_ms": 13.0
+   "detect_ms": 13.9
   },
   {
    "case": "D06",
@@ -89,7 +89,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": true,
-   "detect_ms": 26.9
+   "detect_ms": 26.2
   },
   {
    "case": "D07",
@@ -105,7 +105,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": true,
-   "detect_ms": 35.2
+   "detect_ms": 37.8
   },
   {
    "case": "D08",
@@ -116,7 +116,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": false,
-   "detect_ms": 14.5
+   "detect_ms": 15.1
   },
   {
    "case": "D09",
@@ -127,7 +127,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": true,
-   "detect_ms": 12.8
+   "detect_ms": 14.1
   },
   {
    "case": "D10",
@@ -138,7 +138,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": true,
-   "detect_ms": 13.0
+   "detect_ms": 14.3
   },
   {
    "case": "D11",
@@ -154,7 +154,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": true,
-   "detect_ms": 13.4
+   "detect_ms": 14.3
   },
   {
    "case": "D12",
@@ -165,7 +165,7 @@
    "expected_term": true,
    "actual_term": true,
    "match": true,
-   "detect_ms": 16.7
+   "detect_ms": 21.8
   },
   {
    "case": "D14",
@@ -176,7 +176,7 @@
    "expected_term": false,
    "actual_term": false,
    "match": false,
-   "detect_ms": 16.8
+   "detect_ms": 19.7
   },
   {
    "case": "D13",
@@ -187,7 +187,7 @@
    "expected_term": true,
    "actual_term": true,
    "match": true,
-   "detect_ms": 18.1
+   "detect_ms": 20.4
   }
  ]
 }

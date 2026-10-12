@@ -1,1 +1,4 @@
 __pycache__/
+# 音声は利用者のPCに残す（人が試聴する）。JSON の結果だけを記録する
+real_runs/*/*.wav
+real_runs/*-dryrun/

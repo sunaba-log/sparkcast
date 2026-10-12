@@ -1,0 +1,4 @@
+対象コミット bb3ecd8bcfa0（評価コードのみ追加）。上：automator 全テスト、下：UI 全テスト
+======================= 549 passed, 1 warning in 28.36s ========================
+ Test Files  50 passed (50)
+      Tests  210 passed (210)
