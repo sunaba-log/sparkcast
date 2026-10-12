@@ -76,9 +76,7 @@ def process_media(data: dict) -> dict:
         replacement = base64.b64decode(data["audioBase64"], validate=True) if data.get("audioBase64") else None
         edit_start = end - left if action == "insert" else start - left
         edit_end = end - left
-        audio, _ = render_policy_audio(
-            source[left:right], [PolicyAudioEdit(edit_start, edit_end, action, replacement)]
-        )
+        audio, _ = render_policy_audio(source[left:right], [PolicyAudioEdit(edit_start, edit_end, action, replacement)])
         text = ""
     else:
         raise ValueError("Unknown media operation.")
