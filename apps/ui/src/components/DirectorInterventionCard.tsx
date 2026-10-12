@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Play, Tally1, Tally2 } from "lucide-react";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -247,9 +247,8 @@ export function DirectorInterventionCard({
         onClick={() => setIsExpanded((prev) => !prev)}
       >
         <ChevronDown
-          className={`w-4 h-4 text-gray-700 shrink-0 transition-transform duration-200 ${
-            isExpanded ? "rotate-180" : ""
-          }`}
+          className={`w-4 h-4 text-gray-700 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""
+            }`}
         />
         <button
           type="button"
@@ -289,8 +288,8 @@ export function DirectorInterventionCard({
             <p className="text-xs font-bold text-gray-900 mb-1">
               {intervention.speaker || "話者"}の発話
             </p>
-            <p className="text-sm text-gray-800 leading-relaxed">
-              {intervention.sourceText}
+            <p className="text-xs text-gray-800 leading-relaxed">
+              「{intervention.sourceText}」
             </p>
           </div>
           {(intervention.reason || intervention.referenceUrl) && (
@@ -357,45 +356,56 @@ export function DirectorInterventionCard({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className={actionButton}
+                className={`${actionButton} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={!canSeek || !onPlayRange || start >= end}
                 onClick={() => onPlayRange?.(start, end)}
+                title="対象範囲を再生"
+                aria-label="対象範囲を再生"
               >
-                対象範囲を再生
+                <Tally1 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <Tally1 className="w-3.5 h-3.5 rotate-180" />
               </button>
               <button
                 type="button"
-                className={actionButton}
+                className={`${actionButton} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={!canSeek || !onPlayRange}
                 onClick={() =>
                   onPlayRange?.(Math.max(0, start - 2), end + 2)
                 }
+                title="前後を含めて再生"
+                aria-label="前後を含めて再生"
               >
-                前後を含めて再生
+                <Tally2 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5" />
+                <Tally2 className="w-3.5 h-3.5 rotate-180" />
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(labels) as Array<keyof typeof labels>).map((action) => (
-              <button
-                key={action}
-                type="button"
-                className={`${actionButton} ${
-                  currentAction === action
-                    ? "bg-brand text-white border-brand"
-                    : "bg-white hover:bg-gray-50 text-gray-700"
-                }`}
-                aria-pressed={currentAction === action}
-                disabled={locked}
-                onClick={() => {
-                  generation.current++;
-                  setPreviewUrl("");
-                  onChange({ action });
-                }}
-              >
-                {labels[action]}
-              </button>
-            ))}
+          <div className="inline-flex w-full sm:w-auto p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
+            {(Object.keys(labels) as Array<keyof typeof labels>).map((action) => {
+              const isSelected = currentAction === action;
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    isSelected
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
+                  aria-pressed={isSelected}
+                  disabled={locked}
+                  onClick={() => {
+                    generation.current++;
+                    setPreviewUrl("");
+                    onChange({ action });
+                  }}
+                >
+                  {labels[action]}
+                </button>
+              );
+            })}
           </div>
           {(currentAction === "insert" || currentAction === "replace") && (
             <div className="space-y-2">
@@ -424,13 +434,17 @@ export function DirectorInterventionCard({
                     setAsset(null);
                     onChange({ correctionScript: event.target.value, assetId: null });
                   }}
-                  className="w-full rounded-xs border border-brand/60 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
+                  className="w-full rounded-xs border border-brand/60 px-3 py-2 text-xs leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
                 <button
                   type="button"
-                  className={`${actionButton} ${kind === "synthesize" ? "bg-brand text-white border-brand" : ""}`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "synthesize"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "synthesize"}
                   disabled={locked}
                   onClick={() => {
@@ -445,7 +459,11 @@ export function DirectorInterventionCard({
                 </button>
                 <button
                   type="button"
-                  className={`${actionButton} ${kind === "recording" ? "bg-brand text-white border-brand" : ""}`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    kind === "recording"
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                  }`}
                   aria-pressed={kind === "recording"}
                   disabled={locked}
                   onClick={() => {
@@ -547,7 +565,7 @@ export function DirectorInterventionCard({
             </p>
           )}
           {message && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-xs text-red-600">
               {message}
             </p>
           )}
@@ -557,11 +575,10 @@ export function DirectorInterventionCard({
               disabled={locked}
               onClick={() => onChange({ status: "approved" })}
               aria-pressed={intervention.status === "approved"}
-              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center ${
-                intervention.status === "approved"
-                  ? "bg-emerald-700 text-white ring-2 ring-emerald-600 ring-offset-1"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-              }`}
+              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center ${intervention.status === "approved"
+                ? "bg-emerald-700 text-white ring-2 ring-emerald-600 ring-offset-1"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                }`}
             >
               承認
             </button>
@@ -570,11 +587,10 @@ export function DirectorInterventionCard({
               disabled={locked}
               onClick={() => onChange({ status: "rejected" })}
               aria-pressed={intervention.status === "rejected"}
-              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-medium transition-colors cursor-pointer flex items-center justify-center ${
-                intervention.status === "rejected"
-                  ? "bg-gray-600 text-white border border-gray-600"
-                  : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700"
-              }`}
+              className={`min-h-[36px] px-5 py-2 rounded-xs text-xs font-medium transition-colors cursor-pointer flex items-center justify-center ${intervention.status === "rejected"
+                ? "bg-gray-600 text-white border border-gray-600"
+                : "bg-white hover:bg-gray-50 border border-gray-300 text-gray-700"
+                }`}
             >
               却下
             </button>

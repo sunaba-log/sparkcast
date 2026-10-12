@@ -130,7 +130,7 @@ function AudioAuditMarkers({ episodeId, duration, onSeek }: AudioAuditMarkersPro
               onSeek(intervention.insertAt);
             }}
             title={`[ファクトチェック] ${formatTime(intervention.insertAt)}: ${intervention.category || "訂正提案"}`}
-            className="absolute top-0 bottom-0 z-10 w-2 -translate-x-1/2 bg-red-600 hover:bg-red-700 ring-1 ring-white cursor-pointer transition-transform hover:scale-110"
+            className="absolute top-0 bottom-0 z-10 w-2 -translate-x-1/2 bg-red-600/90 hover:bg-red-700 ring-1 ring-white/80 cursor-pointer transition-transform hover:scale-110"
             style={{ left: `${leftPercent}%` }}
             aria-label={`ファクトチェック ${formatTime(intervention.insertAt)}`}
           />
@@ -152,7 +152,7 @@ function AudioAuditMarkers({ episodeId, duration, onSeek }: AudioAuditMarkersPro
               onSeek(finding.start);
             }}
             title={`[ポリシー監査] ${formatTime(finding.start)} - ${formatTime(finding.end)}: ${finding.category || "規約・校正"}`}
-            className="absolute top-0 bottom-0 z-10 min-w-[6px] bg-[#ffb6b0] hover:bg-[#ffa099] ring-1 ring-white cursor-pointer transition-transform hover:scale-110"
+            className="absolute top-0 bottom-0 z-10 min-w-[6px] bg-[#ffb6b0]/85 hover:bg-[#ffa099] ring-1 ring-white/80 cursor-pointer transition-transform hover:scale-110"
             style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
             aria-label={`ポリシー監査 ${formatTime(finding.start)}`}
           />
@@ -817,7 +817,7 @@ export function EpisodeMasterDetail({
                         }`}
                     >
                       <div
-                        className="bg-brand h-full rounded-full transition-all duration-100 ease-out"
+                        className="bg-brand h-full transition-all duration-100 ease-out"
                         style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
                       />
                       <AudioAuditMarkers
@@ -826,6 +826,12 @@ export function EpisodeMasterDetail({
                         duration={duration}
                         onSeek={seekTo}
                       />
+                      {duration > 0 && (
+                        <div
+                          className="pointer-events-none absolute top-0 bottom-0 z-20 w-0.5 -translate-x-1/2 bg-white shadow-xs ring-1 ring-black/20"
+                          style={{ left: `${(currentTime / duration) * 100}%` }}
+                        />
+                      )}
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-500 font-medium">
                       {previewAudioUrl ? (
@@ -1017,7 +1023,6 @@ export function EpisodeMasterDetail({
                     }}
                   />
                   <PolicyFindingsPanel
-                    sourceAudioUrl={selectedEpisode.sourceAudioUrl ?? previewAudioUrl}
                     key={`${selectedEpisode.id}-policy`}
                     episodeId={selectedEpisode.id}
                     episodeStatus={selectedEpisode.status}

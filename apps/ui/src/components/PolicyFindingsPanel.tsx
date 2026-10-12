@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { PolicyEditProposalCard } from "@/components/PolicyEditProposalCard";
 import type { EpisodeStatus, PolicyReview } from "@/types/episode";
 
@@ -11,9 +11,7 @@ export function PolicyFindingsPanel({
   onSeek,
   onPlayRange,
   onStatusChanged,
-  sourceAudioUrl,
 }: {
-  sourceAudioUrl?: string | null;
   episodeId: string;
   episodeStatus: EpisodeStatus;
   canSeek: boolean;
@@ -21,39 +19,6 @@ export function PolicyFindingsPanel({
   onPlayRange?: (start: number, end: number) => void;
   onStatusChanged: (status: EpisodeStatus) => void;
 }) {
-  const sourcePlayer = useRef<HTMLAudioElement | null>(null);
-  const stopTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const playRange = (start: number, end?: number) => {
-    const audio = sourcePlayer.current;
-    if (!audio) {
-      if (end !== undefined) onPlayRange?.(start, end);
-      else onSeek(start);
-      return;
-    }
-    if (stopTimer.current) clearInterval(stopTimer.current);
-    document.querySelectorAll("audio").forEach((player) => player.pause());
-    audio.currentTime = start;
-    void audio
-      .play()
-      .then(() => {
-        if (end !== undefined)
-          stopTimer.current = setInterval(() => {
-            if (audio.paused || audio.currentTime >= end) {
-              audio.pause();
-              if (stopTimer.current) clearInterval(stopTimer.current);
-            }
-          }, 20);
-      })
-      .catch(() =>
-        setMessage("原音声を再生できませんでした。再読み込みしてください。"),
-      );
-  };
-  useEffect(
-    () => () => {
-      if (stopTimer.current) clearInterval(stopTimer.current);
-    },
-    [],
-  );
   const [review, setReview] = useState<PolicyReview | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -150,7 +115,7 @@ export function PolicyFindingsPanel({
           ? "確定した編集計画から新しい配信音声を生成しています。"
           : operation === "suggest"
             ? "指摘を統合し、範囲とアクションを提案しました。試聴して確認してください。"
-            : "判断を保存しました。",
+            : "すべての判断を保存しました。",
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "処理に失敗しました");
@@ -183,21 +148,6 @@ export function PolicyFindingsPanel({
           重複する指摘をまとめて判断します。範囲と音声を確認し、すべての判断を保存してから編集を開始してください。
         </p>
       </div>
-      {sourceAudioUrl && (
-        <div className="text-xs text-gray-600">
-          原音声確認
-          <audio
-            ref={sourcePlayer}
-            controls
-            src={sourceAudioUrl}
-            onPlay={(event) => {
-              document.querySelectorAll("audio").forEach((player) => {
-                if (player !== event.currentTarget) player.pause();
-              });
-            }}
-          />
-        </div>
-      )}
       {editable && (
         <button
           className="rounded border px-3 py-2 text-sm disabled:opacity-40"
@@ -225,8 +175,8 @@ export function PolicyFindingsPanel({
             (busyCards.length > 0 && !busyCards.includes(proposal.id))
           }
           canSeek={canSeek}
-          onSeek={(seconds) => playRange(seconds)}
-          onPlayRange={(start, end) => playRange(start, end)}
+          onSeek={onSeek}
+          onPlayRange={onPlayRange}
           onBusy={(busy) =>
             setBusyCards((ids) =>
               busy
@@ -250,7 +200,7 @@ export function PolicyFindingsPanel({
         />
       ))}
       {message && (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-xs">
           {message}
         </p>
       )}
@@ -260,36 +210,40 @@ export function PolicyFindingsPanel({
       <div className="flex flex-wrap gap-3">
         {episodeStatus === "editing" && review.dispatchRetryPlanId && (
           <button
+            type="button"
             disabled={locked}
             onClick={() => request("retry")}
-            className="rounded border px-4 py-2 text-sm"
+            className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             保存済みの編集要求を再送
           </button>
         )}
         {editable && (
           <button
+            type="button"
             disabled={locked || !allDecided}
             onClick={() => request("save")}
-            className="rounded bg-brand px-4 py-2 text-sm text-white disabled:opacity-40"
+            className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            すべての判断を確定
+            すべての判断を保存
           </button>
         )}
         {editable && (
           <button
+            type="button"
             disabled={locked || dirty || !allDecided}
             onClick={() => request("apply")}
-            className="rounded bg-emerald-700 px-4 py-2 text-sm text-white disabled:opacity-40"
+            className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             承認した内容で音声編集を開始
           </button>
         )}
         {episodeStatus === "awaiting_publish_confirmation" && (
           <button
+            type="button"
             disabled={locked}
             onClick={() => request("publish")}
-            className="rounded bg-orange-700 px-4 py-2 text-sm text-white"
+            className="rounded bg-orange-700 px-4 py-2 text-sm text-white hover:bg-orange-800 disabled:opacity-40 cursor-pointer"
           >
             原音声を公開する
           </button>

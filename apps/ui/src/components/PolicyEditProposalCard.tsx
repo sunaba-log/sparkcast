@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Play, Tally1, Tally2 } from "lucide-react";
+
+
+
 import { formatDirectorTimestamp } from "@/components/DirectorInterventionCard";
 import {
   createTrackRecorder,
@@ -262,12 +265,16 @@ export function PolicyEditProposalCard({
           <ChevronDown className={`w-4 h-4 ${expanded ? "rotate-180" : ""}`} />
         </button>
         <button
-          className="font-mono text-xs text-brand"
-          disabled={!canSeek}
-          onClick={() => onSeek(proposal.start)}
+          type="button"
+          disabled={disabled || !canSeek}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (onPlayRange) onPlayRange(proposal.start, proposal.end);
+            else onSeek(proposal.start);
+          }}
+          className="font-mono text-xs font-semibold text-brand hover:underline disabled:cursor-default disabled:no-underline"
         >
-          {formatDirectorTimestamp(proposal.start)} -{" "}
-          {formatDirectorTimestamp(proposal.end)}
+          {formatDirectorTimestamp(proposal.start)} - {formatDirectorTimestamp(proposal.end)}
         </button>
         {[...new Set(proposal.findings.map((finding) => finding.category))].map(
           (category) => (
@@ -293,7 +300,7 @@ export function PolicyEditProposalCard({
       {expanded && (
         <div className="space-y-3 border-t p-4">
           {proposal.findings.map((finding) => (
-            <div key={finding.id} className="text-sm">
+            <div key={finding.id} className="text-xs">
               <p className="font-semibold">
                 {categories[finding.category]}・{finding.source}{" "}
                 {finding.entityType}
@@ -301,9 +308,14 @@ export function PolicyEditProposalCard({
               <FindingText finding={finding} />
             </div>
           ))}
-          <p className="text-sm">
-            推奨：{labels[proposal.recommendedAction]} — {proposal.reason}
-          </p>
+          <div className="rounded-xs border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-950 space-y-1">
+            <div>
+              <span className="font-semibold text-blue-900">推奨: </span>
+              <span className="leading-relaxed">
+                {labels[proposal.recommendedAction]} — {proposal.reason}
+              </span>
+            </div>
+          </div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <label className="text-xs">
@@ -345,22 +357,32 @@ export function PolicyEditProposalCard({
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                className={button}
+                type="button"
+                className={`${button} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={
                   !canSeek || !onPlayRange || proposal.start >= proposal.end
                 }
                 onClick={() => onPlayRange?.(proposal.start, proposal.end)}
+                title="対象範囲を再生"
+                aria-label="対象範囲を再生"
               >
-                対象範囲を再生
+                <Tally1 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <Tally1 className="w-3.5 h-3.5 rotate-180" />
               </button>
               <button
-                className={button}
+                type="button"
+                className={`${button} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={!canSeek || !onPlayRange}
                 onClick={() =>
                   onPlayRange?.(Math.max(0, proposal.start - 2), proposal.end + 2)
                 }
+                title="前後を含めて再生"
+                aria-label="前後を含めて再生"
               >
-                前後を含めて再生
+                <Tally2 className="w-3.5 h-3.5" />
+                <Play className="w-3.5 h-3.5 " />
+                <Tally2 className="w-3.5 h-3.5 rotate-180" />
               </button>
             </div>
           </div>
@@ -370,7 +392,7 @@ export function PolicyEditProposalCard({
               : "単語時刻から推定した範囲です。語頭・語尾を試聴して確認してください。"}{" "}
             ミックス音声の範囲全体に適用されます。
           </p>
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={proposal.rangeConfirmed}
@@ -381,36 +403,47 @@ export function PolicyEditProposalCard({
             />
             対象範囲を確認した
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="inline-flex w-full sm:w-auto p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
             {(Object.keys(labels) as Array<keyof typeof labels>).map(
-              (action) => (
-                <button
-                  key={action}
-                  className={`${button} ${proposal.action === action ? "bg-brand text-white" : ""}`}
-                  aria-pressed={proposal.action === action}
-                  disabled={locked}
-                  onClick={() => change({ action })}
-                >
-                  {labels[action]}
-                </button>
-              ),
+              (action) => {
+                const isSelected = proposal.action === action;
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${isSelected
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                      }`}
+                    aria-pressed={isSelected}
+                    disabled={locked}
+                    onClick={() => change({ action })}
+                  >
+                    {labels[action]}
+                  </button>
+                );
+              },
             )}
           </div>
           {proposal.action === "replace" && (
             <div className="space-y-2">
-              <label className="block text-sm font-semibold">
+              <label className="block text-xs font-semibold">
                 AIディレクターの台詞提案
                 <textarea
                   aria-label="代替台詞"
-                  className="mt-1 block w-full rounded border p-2 text-sm font-normal"
+                  className="mt-1 block w-full rounded border p-2 text-xs font-normal"
                   value={proposal.script}
                   disabled={locked}
                   onChange={(event) => change({ script: event.target.value })}
                 />
               </label>
-              <div className="flex gap-2">
+              <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
                 <button
-                  className={button}
+                  type="button"
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "synthesize"
+                    ? "bg-brand text-white shadow-xs font-semibold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                    }`}
                   aria-pressed={kind === "synthesize"}
                   disabled={locked}
                   onClick={() => {
@@ -423,7 +456,11 @@ export function PolicyEditProposalCard({
                   合成音声
                 </button>
                 <button
-                  className={button}
+                  type="button"
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "recording"
+                    ? "bg-brand text-white shadow-xs font-semibold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                    }`}
                   aria-pressed={kind === "recording"}
                   disabled={locked}
                   onClick={() => {
@@ -470,15 +507,17 @@ export function PolicyEditProposalCard({
               )}
             </div>
           )}
-          <button
-            className={button}
-            disabled={
-              locked || (proposal.action === "replace" && !proposal.assetId)
-            }
-            onClick={() => media("preview")}
-          >
-            編集後の前後を確認
-          </button>
+          <div>
+            <button
+              className={button}
+              disabled={
+                locked || (proposal.action === "replace" && !proposal.assetId)
+              }
+              onClick={() => media("preview")}
+            >
+              編集後の前後を確認
+            </button>
+          </div>
           {previewUrl && (
             <audio
               aria-label="編集プレビュー"
@@ -495,7 +534,7 @@ export function PolicyEditProposalCard({
             </p>
           )}
           {message && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-xs text-red-600">
               {message}
             </p>
           )}

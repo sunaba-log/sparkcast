@@ -81,7 +81,7 @@ export function DirectorInterventionsPanel({
         headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interventions: interventionPayload(state.interventions) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
-      setMessage("訂正介入の判断を保存しました。ポリシー監査がある場合は、そのパネルから音声編集を開始してください。");
+      setMessage("すべての判断を保存しました。ポリシー監査がある場合は、そのパネルから音声編集を開始してください。");
     } catch (error) { setMessage(error instanceof Error ? error.message : "判断を保存できませんでした"); }
     finally { setApplying(false); }
   };
@@ -135,18 +135,26 @@ export function DirectorInterventionsPanel({
           />
         ))}
       </div>
-      {message && <p className={`text-sm ${message.startsWith("音声編集を開始") ? "text-emerald-700" : "text-red-600"}`}>{message}</p>}
-      {editable && <button type="button" disabled={applying || state.interventions.some((i) => i.status === "pending")}
-        onClick={save} className="rounded border px-4 py-2 text-sm disabled:opacity-40">訂正介入の判断を保存</button>}
+      {message && <p className={`text-xs ${message.startsWith("音声編集を開始") ? "text-emerald-700" : "text-red-600"}`}>{message}</p>}
       {editable && (
-        <button
-          type="button"
-          disabled={applying || approvedCount === 0}
-          onClick={apply}
-          className="rounded-xs bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-        >
-          {applying ? "音声編集を開始中…" : `承認した内容でカットイン編集を実行 (${approvedCount}件)`}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={applying || state.interventions.some((i) => i.status === "pending")}
+            onClick={save}
+            className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            すべての判断を保存
+          </button>
+          <button
+            type="button"
+            disabled={applying || approvedCount === 0}
+            onClick={apply}
+            className="rounded bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {applying ? "音声編集を開始中…" : `承認した内容で音声編集を開始 (${approvedCount}件)`}
+          </button>
+        </div>
       )}
     </section>
   );
