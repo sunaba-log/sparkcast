@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Play, Tally1, Tally2 } from "lucide-react";
+import { ChevronDown, Mic, Play, Sparkles, Square, Tally1, Tally2 } from "lucide-react";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -20,9 +20,9 @@ const severityStyles: Record<DirectorIntervention["severity"], string> = {
 };
 
 const labels = {
-  insert: "訂正を挿入",
   cut: "カット",
   silence: "無音化",
+  insert: "訂正を挿入",
   replace: "代替音声で置換",
 };
 const actionButton =
@@ -437,73 +437,76 @@ export function DirectorInterventionCard({
                   className="w-full rounded-xs border border-brand/60 px-3 py-2 text-xs leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
                 />
               </div>
-              <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
-                <button
-                  type="button"
-                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
-                    kind === "synthesize"
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex w-full sm:w-auto p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
+                  <button
+                    type="button"
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "synthesize"
                       ? "bg-brand text-white shadow-xs font-semibold"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-                  }`}
-                  aria-pressed={kind === "synthesize"}
-                  disabled={locked}
-                  onClick={() => {
-                    setKind("synthesize");
-                    setAudioUrl("");
-                    setAsset(null);
-                    setPreviewUrl("");
-                    onChange({ assetId: null });
-                  }}
-                >
-                  合成音声
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
-                    kind === "recording"
+                      }`}
+                    aria-pressed={kind === "synthesize"}
+                    disabled={locked}
+                    onClick={() => {
+                      setKind("synthesize");
+                      setAudioUrl("");
+                      setAsset(null);
+                      setPreviewUrl("");
+                      onChange({ assetId: null });
+                    }}
+                  >
+                    合成音声
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "recording"
                       ? "bg-brand text-white shadow-xs font-semibold"
                       : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-                  }`}
-                  aria-pressed={kind === "recording"}
-                  disabled={locked}
-                  onClick={() => {
-                    setKind("recording");
-                    setAudioUrl("");
-                    setAsset(null);
-                    setPreviewUrl("");
-                    onChange({ assetId: null });
-                  }}
-                >
-                  ブラウザ録音
-                </button>
+                      }`}
+                    aria-pressed={kind === "recording"}
+                    disabled={locked}
+                    onClick={() => {
+                      setKind("recording");
+                      setAudioUrl("");
+                      setAsset(null);
+                      setPreviewUrl("");
+                      onChange({ assetId: null });
+                    }}
+                  >
+                    ブラウザ録音
+                  </button>
+                </div>
+                {kind === "synthesize" ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xs border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={locked || !intervention.correctionScript.trim()}
+                    onClick={() => media("synthesize")}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-brand" />
+                    台詞から音声を生成
+                  </button>
+                ) : recording ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xs bg-red-600 hover:bg-red-700 text-white shadow-xs transition-colors cursor-pointer"
+                    onClick={stopRecording}
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    録音を停止・検証
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xs border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={locked || !intervention.correctionScript.trim()}
+                    onClick={startRecording}
+                  >
+                    <Mic className="w-3.5 h-3.5 text-red-600" />
+                    録音する／取り直す
+                  </button>
+                )}
               </div>
-              {kind === "synthesize" ? (
-                <button
-                  type="button"
-                  className={actionButton}
-                  disabled={locked || !intervention.correctionScript.trim()}
-                  onClick={() => media("synthesize")}
-                >
-                  台詞から音声を生成
-                </button>
-              ) : recording ? (
-                <button
-                  type="button"
-                  className={actionButton}
-                  onClick={stopRecording}
-                >
-                  録音を停止・検証
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={actionButton}
-                  disabled={locked || !intervention.correctionScript.trim()}
-                  onClick={startRecording}
-                >
-                  録音する／取り直す
-                </button>
-              )}
               {audioUrl && intervention.assetId && (
                 <div className="text-xs space-y-1">
                   <p className="text-gray-700">
