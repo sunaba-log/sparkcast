@@ -411,11 +411,10 @@ export function PolicyEditProposalCard({
                   <button
                     key={action}
                     type="button"
-                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
-                      isSelected
-                        ? "bg-brand text-white shadow-xs font-semibold"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-                    }`}
+                    className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${isSelected
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                      }`}
                     aria-pressed={isSelected}
                     disabled={locked}
                     onClick={() => change({ action })}
@@ -441,11 +440,10 @@ export function PolicyEditProposalCard({
               <div className="inline-flex p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
                 <button
                   type="button"
-                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
-                    kind === "synthesize"
-                      ? "bg-brand text-white shadow-xs font-semibold"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-                  }`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "synthesize"
+                    ? "bg-brand text-white shadow-xs font-semibold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                    }`}
                   aria-pressed={kind === "synthesize"}
                   disabled={locked}
                   onClick={() => {
@@ -459,11 +457,10 @@ export function PolicyEditProposalCard({
                 </button>
                 <button
                   type="button"
-                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
-                    kind === "recording"
-                      ? "bg-brand text-white shadow-xs font-semibold"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-                  }`}
+                  className={`px-3 py-1 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${kind === "recording"
+                    ? "bg-brand text-white shadow-xs font-semibold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
+                    }`}
                   aria-pressed={kind === "recording"}
                   disabled={locked}
                   onClick={() => {
@@ -510,15 +507,17 @@ export function PolicyEditProposalCard({
               )}
             </div>
           )}
-          <button
-            className={button}
-            disabled={
-              locked || (proposal.action === "replace" && !proposal.assetId)
-            }
-            onClick={() => media("preview")}
-          >
-            編集後の前後を確認
-          </button>
+          <div>
+            <button
+              className={button}
+              disabled={
+                locked || (proposal.action === "replace" && !proposal.assetId)
+              }
+              onClick={() => media("preview")}
+            >
+              編集後の前後を確認
+            </button>
+          </div>
           {previewUrl && (
             <audio
               aria-label="編集プレビュー"
