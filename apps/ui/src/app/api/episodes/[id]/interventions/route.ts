@@ -77,6 +77,7 @@ export async function POST(
               action: z.enum(["insert", "cut", "silence", "replace"]).optional(),
               start: z.number().min(0).optional(),
               end: z.number().min(0).optional(),
+              assetId: z.string().uuid().nullable().optional(),
             }),
           )
           .min(1),

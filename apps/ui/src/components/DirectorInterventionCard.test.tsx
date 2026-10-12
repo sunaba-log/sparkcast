@@ -148,4 +148,59 @@ describe("DirectorInterventionCard", () => {
     expect(html).toContain("参照リンク:");
     expect(html).toContain("https://docs.python.org/3.13/whatsnew/3.13.html");
   });
+
+  it("renders voice synthesis and recording controls for insert and replace actions", () => {
+    const insertHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        episodeId="ep-123"
+        intervention={{
+          id: "intervention-voice-insert",
+          insertAt: 50.0,
+          sourceText: "テスト発話",
+          speaker: "ホスト",
+          severity: 2,
+          category: "事実誤認",
+          correctionScript: "訂正します",
+          status: "pending",
+          action: "insert",
+        }}
+        defaultExpanded={true}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(insertHtml).toContain("合成音声");
+    expect(insertHtml).toContain("ブラウザ録音");
+    expect(insertHtml).toContain("台詞から音声を生成");
+    expect(insertHtml).toContain("編集後の前後を確認");
+
+    const replaceHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        episodeId="ep-123"
+        intervention={{
+          id: "intervention-voice-replace",
+          insertAt: 50.0,
+          sourceText: "テスト発話",
+          speaker: "ホスト",
+          severity: 2,
+          category: "事実誤認",
+          correctionScript: "代替台詞です",
+          status: "pending",
+          action: "replace",
+        }}
+        defaultExpanded={true}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(replaceHtml).toContain("代替台詞");
+    expect(replaceHtml).toContain("合成音声");
+    expect(replaceHtml).toContain("ブラウザ録音");
+    expect(replaceHtml).toContain("台詞から音声を生成");
+    expect(replaceHtml).toContain("編集後の前後を確認");
+  });
 });

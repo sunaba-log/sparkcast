@@ -78,6 +78,7 @@ type FirestoreDirectorIntervention = {
   };
   status?: string;
   action?: string;
+  asset_id?: string | null;
 };
 
 type FirestorePolicyFinding = {
@@ -242,6 +243,7 @@ function toDirectorIntervention(
     referenceUrl: data.reference_url ? String(data.reference_url) : null,
     status,
     action,
+    assetId: data.asset_id ?? null,
   };
 }
 
@@ -287,6 +289,7 @@ export async function updateDirectorInterventions(input: {
       action?: DirectorInterventionAction;
       start?: number;
       end?: number;
+      assetId?: string | null;
     }
   >;
   updatedBy: string;
@@ -309,6 +312,9 @@ export async function updateDirectorInterventions(input: {
     }
     if (intervention.end !== undefined) {
       updateData.end_ms = Math.round(intervention.end * 1000);
+    }
+    if (intervention.assetId !== undefined) {
+      updateData.asset_id = intervention.assetId;
     }
     batch.set(
       collection.doc(intervention.id),

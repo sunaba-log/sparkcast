@@ -91,6 +91,7 @@ export type DirectorIntervention = {
   referenceUrl?: string | null;
   status: DirectorInterventionStatus;
   action?: DirectorInterventionAction;
+  assetId?: string | null;
 };
 
 export type PolicyFindingStatus = "pending" | "approved" | "rejected";

@@ -10,18 +10,19 @@ import {
 } from "@/server/policy/repository";
 import { processPolicyMedia } from "@/server/policy/media";
 import { getPodcast } from "@/server/podcasts/data-repository";
+import { listDirectorInterventions } from "@/server/episodes/data-repository";
 import type { ReplacementAudioAsset } from "@/types/episode";
 
 const schema = z.object({
   operation: z.enum(["synthesize", "recording", "preview"]),
-  version: z.number().int().positive(),
+  version: z.number().int().positive().optional(),
   proposalId: z.string().min(1).max(10000),
   script: z.string().max(4000),
   audioBase64: z
     .string()
     .max(16 * 1024 * 1024)
     .optional(),
-  action: z.enum(["cut", "silence", "replace"]).optional(),
+  action: z.enum(["cut", "silence", "replace", "insert"]).optional(),
   start: z.number().finite().nonnegative().optional(),
   end: z.number().finite().positive().optional(),
   assetId: z.string().uuid().nullable().optional(),
@@ -42,10 +43,17 @@ export async function POST(
       );
     const input = schema.parse(await request.json());
     const review = await loadPolicyReview(podcastId, episodeId);
-    if (review.version !== input.version)
-      throw new Error("内容が更新されています。再読み込みしてください。");
-    if (!review.proposals.some((p) => p.id === input.proposalId))
-      throw new Error("編集案が見つかりません。");
+    const isPolicyProposal = review.proposals.some((p) => p.id === input.proposalId);
+    if (isPolicyProposal) {
+      if (input.version !== undefined && review.version !== input.version) {
+        throw new Error("内容が更新されています。再読み込みしてください。");
+      }
+    } else {
+      const interventions = await listDirectorInterventions(podcastId, episodeId);
+      if (!interventions.some((i) => i.id === input.proposalId)) {
+        throw new Error("編集案が見つかりません。");
+      }
+    }
     const prefix = `policy/${podcastId}/${episodeId}/`;
     const root = policyContentRef(podcastId, episodeId);
     const id = randomUUID();
@@ -54,12 +62,12 @@ export async function POST(
       if (
         input.start === undefined ||
         input.end === undefined ||
-        input.start >= input.end ||
+        (input.action !== "insert" && input.start >= input.end) ||
         !input.action
       )
         throw new Error("編集範囲が不正です。");
       let audioBase64: string | undefined;
-      if (input.action === "replace") {
+      if (input.action === "replace" || input.action === "insert") {
         if (!input.assetId) throw new Error("代替音声を準備してください。");
         const asset = (
           await root
