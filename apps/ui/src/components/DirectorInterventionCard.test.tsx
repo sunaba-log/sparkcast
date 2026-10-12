@@ -56,10 +56,61 @@ describe("DirectorInterventionCard", () => {
     expect(html).toContain("事実誤認");
     expect(html).toContain("田中の発話");
     expect(html).toContain("この製品は2020年に発売されました。");
+    expect(html).toContain("カット");
+    expect(html).toContain("無音化");
+    expect(html).toContain("代替音声による置換");
     expect(html).toContain("AIディレクターの台詞提案");
     expect(html).toContain("正しくは2021年発売です。");
     expect(html).toContain("承認");
     expect(html).toContain("却下");
+  });
+
+  it("renders action description when action is cut or silence", () => {
+    const cutHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{
+          id: "intervention-cut",
+          insertAt: 100,
+          sourceText: "カット対象の発話です。",
+          speaker: "田中",
+          severity: 3,
+          category: "事実誤認",
+          correctionScript: "訂正スクリプト",
+          status: "pending",
+          action: "cut",
+        }}
+        defaultExpanded={true}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(cutHtml).toContain("対象の発話をカットします。");
+    expect(cutHtml).not.toContain("AIディレクターの台詞提案");
+
+    const silenceHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{
+          id: "intervention-silence",
+          insertAt: 100,
+          sourceText: "無音化対象の発話です。",
+          speaker: "田中",
+          severity: 3,
+          category: "事実誤認",
+          correctionScript: "訂正スクリプト",
+          status: "pending",
+          action: "silence",
+        }}
+        defaultExpanded={true}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(silenceHtml).toContain("対象の発話を無音化します。");
+    expect(silenceHtml).not.toContain("AIディレクターの台詞提案");
   });
 
   it("renders reason and reference link when available", () => {

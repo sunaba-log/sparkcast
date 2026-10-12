@@ -12,6 +12,14 @@ const severityStyles: Record<DirectorIntervention["severity"], string> = {
   5: "bg-red-100 text-red-700",
 };
 
+const labels = {
+  cut: "カット",
+  silence: "無音化",
+  replace: "代替音声による置換",
+};
+const actionButton =
+  "rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40";
+
 export function formatDirectorTimestamp(seconds: number): string {
   const milliseconds = Math.max(0, Math.round(seconds * 1000));
   const minutes = Math.floor(milliseconds / 60_000);
@@ -41,10 +49,11 @@ export function DirectorInterventionCard({
   defaultExpanded?: boolean;
   disabled: boolean;
   canSeek: boolean;
-  onChange: (change: Partial<Pick<DirectorIntervention, "correctionScript" | "status">>) => void;
+  onChange: (change: Partial<Pick<DirectorIntervention, "correctionScript" | "status" | "action">>) => void;
   onSeek: (seconds: number) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const currentAction = intervention.action ?? "replace";
 
   return (
     <article className="rounded-xs border border-gray-200 bg-white transition-colors">
@@ -73,6 +82,9 @@ export function DirectorInterventionCard({
         </span>
         <span className="rounded-full bg-gray-200/80 px-2.5 py-0.5 text-xs font-medium text-gray-700">
           {intervention.category}
+        </span>
+        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+          {labels[currentAction]}
         </span>
         {intervention.status === "approved" && (
           <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
@@ -119,22 +131,48 @@ export function DirectorInterventionCard({
               )}
             </div>
           )}
-          <div>
-            <label
-              className="block text-xs font-bold text-gray-900 mb-1"
-              htmlFor={`correction-${intervention.id}`}
-            >
-              AIディレクターの台詞提案
-            </label>
-            <textarea
-              id={`correction-${intervention.id}`}
-              rows={2}
-              disabled={disabled || intervention.status === "rejected"}
-              value={intervention.correctionScript}
-              onChange={(event) => onChange({ correctionScript: event.target.value })}
-              className="w-full rounded-xs border border-brand/60 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
-            />
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(labels) as Array<keyof typeof labels>).map((action) => (
+              <button
+                key={action}
+                type="button"
+                className={`${actionButton} ${
+                  currentAction === action
+                    ? "bg-brand text-white border-brand"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+                aria-pressed={currentAction === action}
+                disabled={disabled || intervention.status === "rejected"}
+                onClick={() => onChange({ action })}
+              >
+                {labels[action]}
+              </button>
+            ))}
           </div>
+          {currentAction === "replace" ? (
+            <div>
+              <label
+                className="block text-xs font-bold text-gray-900 mb-1"
+                htmlFor={`correction-${intervention.id}`}
+              >
+                AIディレクターの台詞提案
+              </label>
+              <textarea
+                id={`correction-${intervention.id}`}
+                rows={2}
+                disabled={disabled || intervention.status === "rejected"}
+                value={intervention.correctionScript}
+                onChange={(event) => onChange({ correctionScript: event.target.value })}
+                className="w-full rounded-xs border border-brand/60 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-gray-600">
+              {currentAction === "cut"
+                ? "対象の発話をカットします。"
+                : "対象の発話を無音化します。"}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-3 pt-1">
             <button
               type="button"
@@ -165,7 +203,6 @@ export function DirectorInterventionCard({
           </div>
         </div>
       )}
-
     </article>
   );
 }

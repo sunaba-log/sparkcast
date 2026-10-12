@@ -10,10 +10,11 @@ type LoadState =
   | { status: "error"; message: string };
 
 function interventionPayload(interventions: DirectorIntervention[]) {
-  return interventions.map(({ id, correctionScript, status }) => ({
+  return interventions.map(({ id, correctionScript, status, action }) => ({
     id,
     correctionScript,
     status,
+    action: action ?? "replace",
   }));
 }
 
@@ -56,7 +57,7 @@ export function DirectorInterventionsPanel({
 
   const updateIntervention = (
     id: string,
-    change: Partial<Pick<DirectorIntervention, "correctionScript" | "status">>,
+    change: Partial<Pick<DirectorIntervention, "correctionScript" | "status" | "action">>,
   ) => {
     if (state.status !== "loaded") return;
     setState({

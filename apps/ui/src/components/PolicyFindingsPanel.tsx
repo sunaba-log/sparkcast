@@ -174,7 +174,7 @@ export function PolicyFindingsPanel({
   const allDecided = review.proposals.every((p) => p.status !== "pending");
   return (
     <section
-      className="space-y-4 border-t border-brand/20 pt-5"
+      className="space-y-1 border-t border-brand/20 pt-5"
       aria-label="ポリシー監査"
     >
       <div>

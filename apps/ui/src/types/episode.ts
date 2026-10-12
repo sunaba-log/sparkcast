@@ -75,6 +75,7 @@ export type TranscriptSegment = {
 };
 
 export type DirectorInterventionStatus = "pending" | "approved" | "rejected";
+export type DirectorInterventionAction = "cut" | "silence" | "replace";
 
 export type DirectorIntervention = {
   id: string;
@@ -87,6 +88,7 @@ export type DirectorIntervention = {
   reason?: string;
   referenceUrl?: string | null;
   status: DirectorInterventionStatus;
+  action?: DirectorInterventionAction;
 };
 
 export type PolicyFindingStatus = "pending" | "approved" | "rejected";

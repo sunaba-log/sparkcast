@@ -22,7 +22,7 @@ const categories = {
   third_party_risk: "第三者リスク",
 };
 const button =
-  "rounded border border-gray-300 px-3 py-2 text-xs disabled:opacity-40";
+  "rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-40";
 
 function FindingText({
   finding,
@@ -299,69 +299,70 @@ export function PolicyEditProposalCard({
                 {finding.entityType}
               </p>
               <FindingText finding={finding} />
-              <p className="text-amber-800">
-                検知箇所：{finding.evidenceText || finding.text}
-              </p>
             </div>
           ))}
           <p className="text-sm">
             推奨：{labels[proposal.recommendedAction]} — {proposal.reason}
           </p>
-          <div className="flex flex-wrap gap-3">
-            <label className="text-xs">
-              開始（秒）
-              <input
-                aria-label="編集開始秒"
-                type="number"
-                min="0"
-                step="0.001"
-                value={proposal.start}
-                disabled={locked}
-                onChange={(event) =>
-                  change({
-                    start: Number(event.target.value),
-                    rangeConfirmed: false,
-                  })
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs">
+                開始（秒）
+                <input
+                  aria-label="編集開始秒"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={proposal.start}
+                  disabled={locked}
+                  onChange={(event) =>
+                    change({
+                      start: Number(event.target.value),
+                      rangeConfirmed: false,
+                    })
+                  }
+                  className="ml-1 w-24 border p-1"
+                />
+              </label>
+              <label className="text-xs">
+                終了（秒）
+                <input
+                  aria-label="編集終了秒"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={proposal.end}
+                  disabled={locked}
+                  onChange={(event) =>
+                    change({
+                      end: Number(event.target.value),
+                      rangeConfirmed: false,
+                    })
+                  }
+                  className="ml-1 w-24 border p-1"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className={button}
+                disabled={
+                  !canSeek || !onPlayRange || proposal.start >= proposal.end
                 }
-                className="ml-1 w-24 border p-1"
-              />
-            </label>
-            <label className="text-xs">
-              終了（秒）
-              <input
-                aria-label="編集終了秒"
-                type="number"
-                min="0"
-                step="0.001"
-                value={proposal.end}
-                disabled={locked}
-                onChange={(event) =>
-                  change({
-                    end: Number(event.target.value),
-                    rangeConfirmed: false,
-                  })
+                onClick={() => onPlayRange?.(proposal.start, proposal.end)}
+              >
+                対象範囲を再生
+              </button>
+              <button
+                className={button}
+                disabled={!canSeek || !onPlayRange}
+                onClick={() =>
+                  onPlayRange?.(Math.max(0, proposal.start - 2), proposal.end + 2)
                 }
-                className="ml-1 w-24 border p-1"
-              />
-            </label>
-            <button
-              className={button}
-              disabled={
-                !canSeek || !onPlayRange || proposal.start >= proposal.end
-              }
-              onClick={() => onPlayRange?.(proposal.start, proposal.end)}
-            >
-              対象範囲を再生
-            </button>
-            <button
-              className={button}
-              disabled={!canSeek || !onPlayRange}
-              onClick={() =>
-                onPlayRange?.(Math.max(0, proposal.start - 2), proposal.end + 2)
-              }
-            >
-              前後を含めて再生
-            </button>
+              >
+                前後を含めて再生
+              </button>
+            </div>
           </div>
           <p className="text-xs text-gray-600">
             {proposal.rangePrecision === "chunk"

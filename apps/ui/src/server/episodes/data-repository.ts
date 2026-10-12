@@ -6,6 +6,7 @@ import { getAdminFirestore } from "@/server/firebase-admin";
 import type {
   Episode,
   DirectorIntervention,
+  DirectorInterventionAction,
   DirectorInterventionStatus,
   EpisodePromotion,
   EpisodeStatus,
@@ -74,6 +75,7 @@ type FirestoreDirectorIntervention = {
     choice?: string;
   };
   status?: string;
+  action?: string;
 };
 
 type FirestorePolicyFinding = {
@@ -206,6 +208,10 @@ function toDirectorIntervention(
   const severity = Math.min(5, Math.max(1, Math.round(Number(data.audit_metrics?.score ?? 1)))) as 1 | 2 | 3 | 4 | 5;
   const status: DirectorInterventionStatus =
     data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  const action: DirectorInterventionAction =
+    data.action === "cut" || data.action === "silence" || data.action === "replace"
+      ? data.action
+      : "replace";
   return {
     id,
     insertAt: Number(data.insert_timestamp_ms ?? 0) / 1_000,
@@ -217,6 +223,7 @@ function toDirectorIntervention(
     reason: data.reason ? String(data.reason) : undefined,
     referenceUrl: data.reference_url ? String(data.reference_url) : null,
     status,
+    action,
   };
 }
 
@@ -250,21 +257,25 @@ export async function listDirectorInterventions(
 export async function updateDirectorInterventions(input: {
   podcastId: number;
   episodeId: number;
-  interventions: Array<Pick<DirectorIntervention, "id" | "correctionScript" | "status">>;
+  interventions: Array<Pick<DirectorIntervention, "id" | "correctionScript" | "status"> & { action?: DirectorInterventionAction }>;
   updatedBy: string;
 }): Promise<void> {
   const batch = getAdminFirestore().batch();
   const collection = episodeContentRef(input.podcastId, input.episodeId)
     .collection("director_interventions");
   for (const intervention of input.interventions) {
+    const updateData: Record<string, unknown> = {
+      correction_script: intervention.correctionScript,
+      status: intervention.status,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: input.updatedBy,
+    };
+    if (intervention.action) {
+      updateData.action = intervention.action;
+    }
     batch.set(
       collection.doc(intervention.id),
-      {
-        correction_script: intervention.correctionScript,
-        status: intervention.status,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: input.updatedBy,
-      },
+      updateData,
       { merge: true },
     );
   }
