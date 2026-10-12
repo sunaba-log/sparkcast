@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CirclePlay, Play } from "lucide-react";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -289,8 +289,8 @@ export function DirectorInterventionCard({
             <p className="text-xs font-bold text-gray-900 mb-1">
               {intervention.speaker || "話者"}の発話
             </p>
-            <p className="text-sm text-gray-800 leading-relaxed">
-              {intervention.sourceText}
+            <p className="text-xs text-gray-800 leading-relaxed">
+              「{intervention.sourceText}」
             </p>
           </div>
           {(intervention.reason || intervention.referenceUrl) && (
@@ -357,21 +357,25 @@ export function DirectorInterventionCard({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className={actionButton}
+                className={`${actionButton} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={!canSeek || !onPlayRange || start >= end}
                 onClick={() => onPlayRange?.(start, end)}
+                title="対象範囲を再生"
+                aria-label="対象範囲を再生"
               >
-                対象範囲を再生
+                <Play className="w-3.5 h-3.5 fill-current" />
               </button>
               <button
                 type="button"
-                className={actionButton}
+                className={`${actionButton} inline-flex items-center justify-center p-1.5 cursor-pointer disabled:cursor-not-allowed`}
                 disabled={!canSeek || !onPlayRange}
                 onClick={() =>
                   onPlayRange?.(Math.max(0, start - 2), end + 2)
                 }
+                title="前後を含めて再生"
+                aria-label="前後を含めて再生"
               >
-                前後を含めて再生
+                <CirclePlay className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -424,7 +428,7 @@ export function DirectorInterventionCard({
                     setAsset(null);
                     onChange({ correctionScript: event.target.value, assetId: null });
                   }}
-                  className="w-full rounded-xs border border-brand/60 px-3 py-2 text-base md:text-sm leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
+                  className="w-full rounded-xs border border-brand/60 px-3 py-2 text-xs leading-relaxed text-gray-900 disabled:bg-gray-100 focus:outline-none focus:border-brand"
                 />
               </div>
               <div className="flex gap-2">
@@ -547,7 +551,7 @@ export function DirectorInterventionCard({
             </p>
           )}
           {message && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-xs text-red-600">
               {message}
             </p>
           )}
