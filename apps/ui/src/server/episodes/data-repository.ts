@@ -708,17 +708,46 @@ export async function deleteEpisodeRecord(
   return result.rowCount === 1;
 }
 
+// 再監査を始めてよい状態：失敗・承認待ち・公開確認待ち、または処理が上限時間（ジョブの最大 6 時間）を超えて止まっている場合。
+// 処理中・編集中のジョブとの並行実行や、公開済みの回の再公開を防ぐため、条件付きで更新する。
+export const REAUDITABLE_STATUSES = ["failed", "awaiting_approval", "awaiting_publish_confirmation"] as const;
+const STALE_RUNNING_INTERVAL = "7 hours";
+
+/** 再監査のために auditing へ移す。移せた場合は直前の状態、移せない場合は null を返す。 */
 export async function markEpisodeAuditing(
   podcastId: number,
   episodeId: number,
-): Promise<boolean> {
-  const result = await (await getDbPool()).query(
-    `UPDATE episodes
+): Promise<string | null> {
+  const result = await (await getDbPool()).query<{ previous: string }>(
+    `UPDATE episodes e
      SET status = 'auditing', processing_error = NULL, updated_at = now()
-     WHERE podcast_id = $1 AND episode_id = $2`,
-    [podcastId, episodeId],
+     FROM (
+       SELECT status AS previous FROM episodes
+       WHERE podcast_id = $1 AND episode_id = $2
+       FOR UPDATE
+     ) p
+     WHERE e.podcast_id = $1 AND e.episode_id = $2
+       AND (
+         e.status = ANY($3::text[])
+         OR (e.status IN ('processing', 'auditing', 'editing') AND e.updated_at < now() - $4::interval)
+       )
+     RETURNING p.previous`,
+    [podcastId, episodeId, [...REAUDITABLE_STATUSES], STALE_RUNNING_INTERVAL],
   );
-  return result.rowCount === 1;
+  return result.rows[0]?.previous ?? null;
+}
+
+/** ジョブを起動できなかったとき（未設定）に、再監査前の状態へ戻す。 */
+export async function restoreEpisodeStatusAfterSkippedAudit(
+  podcastId: number,
+  episodeId: number,
+  previous: string,
+): Promise<void> {
+  await (await getDbPool()).query(
+    `UPDATE episodes SET status = $3, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'auditing'`,
+    [podcastId, episodeId, previous],
+  );
 }
 
 export async function updateEpisodeMetadata(

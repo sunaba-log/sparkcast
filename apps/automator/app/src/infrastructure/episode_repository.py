@@ -166,6 +166,21 @@ class PostgresEpisodeRepository:
             episode_id=episode_id,
         )
 
+    def mark_awaiting_publish_confirmation(self, *, podcast_id: str, episode_id: str) -> None:
+        """再監査で指摘がなかったが以前に確認対象があった回を、公開の再確認待ちにする."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET status = 'awaiting_publish_confirmation',
+                processing_error = NULL,
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s AND status = 'auditing'
+            """,
+            (podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """番組設定の登場人物(改行・読点・カンマ区切り)を返す。未設定なら空."""
         with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:

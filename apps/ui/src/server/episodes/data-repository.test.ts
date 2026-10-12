@@ -70,16 +70,21 @@ describe("data-repository episode management", () => {
     );
   });
 
-  it("marks episode status as auditing", async () => {
-    const mockQuery = vi.fn().mockResolvedValue({ rowCount: 1 });
+  it("marks episode status as auditing only from re-auditable states", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ previous: "failed" }] });
     vi.mocked(getDbPool).mockResolvedValue({ query: mockQuery } as never);
 
     const result = await markEpisodeAuditing(1, 42);
-    expect(result).toBe(true);
+    expect(result).toBe("failed");
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("SET status = 'auditing'"),
-      [1, 42],
+      [1, 42, ["failed", "awaiting_approval", "awaiting_publish_confirmation"], "7 hours"],
     );
+  });
+
+  it("returns null when the episode cannot be re-audited", async () => {
+    vi.mocked(getDbPool).mockResolvedValue({ query: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }) } as never);
+    expect(await markEpisodeAuditing(1, 42)).toBeNull();
   });
 
   it("updates episode metadata title and description", async () => {

@@ -16,7 +16,8 @@ vi.mock("@/server/episodes/data-repository", () => ({
     title: "Episode 42",
     audioFileName: "audio.mp3",
   }),
-  markEpisodeAuditing: vi.fn().mockResolvedValue(true),
+  markEpisodeAuditing: vi.fn().mockResolvedValue("failed"),
+  restoreEpisodeStatusAfterSkippedAudit: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/server/db", () => ({
@@ -50,7 +51,20 @@ describe("api/episodes/[id]/retry-audit", () => {
     });
   });
 
+  it("rejects re-audit while running or after publication without starting a job", async () => {
+    const { markEpisodeAuditing } = await import("@/server/episodes/data-repository");
+    const { runAutomatorJob } = await import("@/server/episodes/automator-jobs");
+    vi.mocked(markEpisodeAuditing).mockResolvedValueOnce(null);
+    vi.mocked(runAutomatorJob).mockClear();
+
+    const request = new Request("http://localhost/api/episodes/42/retry-audit", { method: "POST" });
+    const response = await POST(request, { params: Promise.resolve({ id: "42" }) });
+    expect(response.status).toBe(409);
+    expect(runAutomatorJob).not.toHaveBeenCalled();
+  });
+
   it("returns 500 when automator job execution is skipped", async () => {
+    const { restoreEpisodeStatusAfterSkippedAudit } = await import("@/server/episodes/data-repository");
     const { runAutomatorJob } = await import("@/server/episodes/automator-jobs");
     vi.mocked(runAutomatorJob).mockResolvedValueOnce({
       executionName: null,
@@ -65,6 +79,7 @@ describe("api/episodes/[id]/retry-audit", () => {
     expect(response.status).toBe(500);
     const body = (await response.json()) as { error: string };
     expect(body.error).toContain("AUTOMATOR_JOB_NAME");
+    expect(restoreEpisodeStatusAfterSkippedAudit).toHaveBeenCalledWith(1, 42, "failed");
   });
 
   it("returns 500 when automator job throws an error", async () => {

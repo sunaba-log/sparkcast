@@ -132,6 +132,9 @@ class _EpisodeRepository:
     def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
         self.auditing = (podcast_id, episode_id)
 
+    def mark_awaiting_publish_confirmation(self, *, podcast_id: str, episode_id: str) -> None:
+        self.awaiting_publish_confirmation = (podcast_id, episode_id)
+
     def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
         self.awaiting_approval = (podcast_id, episode_id)
 
@@ -154,6 +157,10 @@ class _FirestoreManager:
     def save_episode_content(self, **values: object) -> str:
         self.episode_content = values
         return str(values["episode_id"])
+
+    def archive_review(self, **values: object) -> bool:
+        self.archived = values
+        return getattr(self, "had_review", False)
 
     def get_episode_content(self, **values: object) -> dict[str, object] | None:
         return self.episode_content

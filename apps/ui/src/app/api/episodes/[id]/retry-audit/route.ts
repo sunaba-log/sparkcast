@@ -4,6 +4,7 @@ import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import {
   findEpisode,
   markEpisodeAuditing,
+  restoreEpisodeStatusAfterSkippedAudit,
 } from "@/server/episodes/data-repository";
 import { getDbPool } from "@/server/db";
 import { runAutomatorJob } from "@/server/episodes/automator-jobs";
@@ -34,7 +35,15 @@ export async function POST(
       return NextResponse.json({ error: "見つかりません" }, { status: 404 });
     }
 
-    await markEpisodeAuditing(auth.podcastId, episodeId);
+    // 処理中・編集中・公開済みの回は再監査しない。以前の指摘・判断はジョブ側で履歴へ保存し、
+    // 新しい監査で指摘が無くても、以前に確認対象があった回は公開の再確認を求める。
+    const previous = await markEpisodeAuditing(auth.podcastId, episodeId);
+    if (!previous) {
+      return NextResponse.json(
+        { error: "処理中・公開済みのエピソードは再監査できません" },
+        { status: 409 },
+      );
+    }
 
     // GCSオブジェクトパスを取得
     const pool = await getDbPool();
@@ -56,6 +65,7 @@ export async function POST(
     });
 
     if (result.skipped) {
+      await restoreEpisodeStatusAfterSkippedAudit(auth.podcastId, episodeId, previous);
       console.error(
         "Failed to trigger automator Cloud Run job: AUTOMATOR_JOB_NAME is not set",
       );

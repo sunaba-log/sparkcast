@@ -360,6 +360,16 @@ class ProcessPodcastWorkflow:
                             "監査用の文字起こしがありません。音声認識の設定・結果を確認してください。"
                         )
                     self._logger.info("\n## Step2.5: Running Jev Fast Audit and Gemini Director Pipeline... ##")
+                    # 以前の指摘・訂正介入・判断は、新しい監査結果で上書きする前に保存する。
+                    # 以前に人の確認対象があった回は、新しい監査で指摘が出なくても自動公開しない。
+                    had_review = False
+                    if self._firestore_manager is not None:
+                        archived = self._firestore_manager.archive_review(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                            reason="reaudit",
+                        )
+                        had_review = archived is True
                     self._episode_repository.mark_auditing(
                         podcast_id=episode_ref.podcast_id,
                         episode_id=episode_ref.episode_id,
@@ -473,6 +483,18 @@ class ProcessPodcastWorkflow:
                         )
                         return
                     if policy_findings:
+                        return
+                    if had_review:
+                        self._episode_repository.mark_awaiting_publish_confirmation(
+                            podcast_id=episode_ref.podcast_id,
+                            episode_id=episode_ref.episode_id,
+                        )
+                        self._notifier.send_discord_message(
+                            message=(
+                                f"#{latest_episode_number} 再監査で新しい指摘はありませんでした。"
+                                "以前の確認内容があるため、公開には管理画面での確認が必要です。"
+                            )
+                        )
                         return
 
             edit_timeline = []

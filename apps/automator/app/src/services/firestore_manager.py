@@ -238,6 +238,50 @@ class FirestoreManager:
             results.append(data)
         return results
 
+    def get_policy_findings(self, *, podcast_id: str, episode_id: str) -> list[dict[str, Any]]:
+        """Return saved policy findings with their review status."""
+        results = []
+        for doc in self._policy_findings_collection(podcast_id, episode_id).stream():
+            data = doc.to_dict() or {}
+            data["id"] = doc.id
+            results.append(data)
+        return results
+
+    def archive_review(self, *, podcast_id: str, episode_id: str, reason: str) -> bool:
+        """再監査で上書きする前に、指摘・訂正介入・判断(統合レビュー)を review_history へ複製する.
+
+        複製したものが1件でもあれば True(以前に人の確認対象があった)。
+        """
+        root = self._episode_contents_collection(podcast_id).document(episode_id)
+        sources = {
+            "policy_findings": list(root.collection("policy_findings").stream()),
+            "director_interventions": list(root.collection("director_interventions").stream()),
+            "policy_reviews": list(root.collection("policy_reviews").stream()),
+        }
+        if not any(sources.values()):
+            return False
+        archive = root.collection("review_history").document(uuid.uuid4().hex)
+        archive.set(
+            {
+                "archived_at": firestore.SERVER_TIMESTAMP,
+                "reason": reason,
+                "counts": {name: len(docs) for name, docs in sources.items()},
+            }
+        )
+        batch = self._client.batch()
+        pending = 0
+        for name, docs in sources.items():
+            for doc in docs:
+                batch.set(archive.collection(name).document(doc.id), doc.to_dict() or {})
+                pending += 1
+                if pending >= BATCH_LIMIT:
+                    batch.commit()
+                    batch = self._client.batch()
+                    pending = 0
+        if pending:
+            batch.commit()
+        return True
+
     def save_policy_findings(
         self,
         *,

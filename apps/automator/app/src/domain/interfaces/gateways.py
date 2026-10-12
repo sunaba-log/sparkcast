@@ -135,6 +135,9 @@ class EpisodeRepository(Protocol):
     def assign_episode_number(self, *, podcast_id: str, episode_id: str) -> int:
         """Assign (once) and return the episode number within the podcast."""
 
+    def mark_awaiting_publish_confirmation(self, *, podcast_id: str, episode_id: str) -> None:
+        """Ask a person to confirm publication after a re-audit replaced earlier review items."""
+
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         """Mark an uploaded episode as processing."""
 
