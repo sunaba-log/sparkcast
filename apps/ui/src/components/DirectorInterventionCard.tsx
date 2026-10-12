@@ -382,26 +382,30 @@ export function DirectorInterventionCard({
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(labels) as Array<keyof typeof labels>).map((action) => (
-              <button
-                key={action}
-                type="button"
-                className={`${actionButton} ${currentAction === action
-                  ? "bg-brand text-white border-brand"
-                  : "bg-white hover:bg-gray-50 text-gray-700"
+          <div className="inline-flex w-full sm:w-auto p-0.5 rounded-xs bg-gray-100 border border-gray-200 text-xs">
+            {(Object.keys(labels) as Array<keyof typeof labels>).map((action) => {
+              const isSelected = currentAction === action;
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 rounded-xs text-xs ${
+                    isSelected
+                      ? "bg-brand text-white shadow-xs font-semibold"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
                   }`}
-                aria-pressed={currentAction === action}
-                disabled={locked}
-                onClick={() => {
-                  generation.current++;
-                  setPreviewUrl("");
-                  onChange({ action });
-                }}
-              >
-                {labels[action]}
-              </button>
-            ))}
+                  aria-pressed={isSelected}
+                  disabled={locked}
+                  onClick={() => {
+                    generation.current++;
+                    setPreviewUrl("");
+                    onChange({ action });
+                  }}
+                >
+                  {labels[action]}
+                </button>
+              );
+            })}
           </div>
           {(currentAction === "insert" || currentAction === "replace") && (
             <div className="space-y-2">
