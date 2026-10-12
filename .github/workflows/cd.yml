@@ -18,6 +18,7 @@ on:
       - "infra/**"
       - "apps/realtime/**"
       - ".github/workflows/cd.yml"
+      - ".github/scripts/policy-media-env.sh"
       # 手順書などドキュメントのみの変更で apply を走らせない（#125）。
       # 除外は後方のパターンが勝つため、必ず positive の後ろに置くこと。
       - "!infra/docs/**"
@@ -84,6 +85,7 @@ jobs:
             ui:
               - 'apps/ui/**'
               - '.github/workflows/cd.yml'
+              - '.github/scripts/policy-media-env.sh'
             # dorny/paths-filter は各パターンを OR で評価するため '!' は除外にならない
             # （'!infra/docs/**' が「infra/docs 以外の全ファイル」に一致してしまう）。
             # ドキュメントのみの変更は上の on.push.paths 側で弾く。
@@ -156,6 +158,9 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Resolve policy media configuration
+        run: bash .github/scripts/policy-media-env.sh
+
       - name: Configure docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
@@ -195,6 +200,7 @@ jobs:
           gcloud run deploy "$SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
+            --update-env-vars "POLICY_MEDIA_URL=$POLICY_MEDIA_URL,POLICY_AUDIO_BUCKET=$POLICY_AUDIO_BUCKET" \
             --image "$IMAGE:${{ github.sha }}" \
             --revision-suffix "$SUFFIX" \
             --no-traffic

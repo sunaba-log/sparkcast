@@ -142,6 +142,8 @@ https://<cloud-run-domain>/__/auth/handler
 | `POLICY_AUDIO_BUCKET` | Required | 永続的な代替音声・プレビュー用GCSバケット。UI、編集ジョブ、mediaサービスへ設定する。Eventarc入力バケットと7日削除のSTT作業バケットを流用しない。 |
 | `POLICY_MEDIA_ID_TOKEN` | ローカルのみOptional | 対象サービスをaudienceにしたIDトークン。Cloud Run上ではメタデータサーバから取得する。 |
 
+通常CDとPRプレビューは `.github/scripts/policy-media-env.sh` で対象環境のmediaサービスURLと音声バケットを確認し、UIリビジョンへ明示設定する。サービス・バケットが未作成の場合は先に対象環境のTerraformをapplyする。ローカルでは `.env.example` の `POLICY_MEDIA_URL` と `POLICY_AUDIO_BUCKET` を設定し、必要に応じてサービスをaudienceにした `POLICY_MEDIA_ID_TOKEN` を取得する。
+
 UIは利用者を認証してからmediaサービスへIDトークンでアクセスする。録音は120秒までとし、PCM化・再文字起こし・PII／Jev再監査を完了した音声だけを置換に使用する。合成台詞も同じポリシーで検査する。
 
 統合編集は `AUDIO_EDITOR_URL` ではなく、既存automatorジョブへ `EDIT_PLAN_ID` と `RESUME_FROM_AUDIT=true` を渡す。承認・範囲・音声ハッシュ・原本のGCS generationをFirestoreの `audio_edit_plans` に凍結する。送信結果が不明な場合は編集状態を保持し、「保存済みの編集要求を再送」で同じplanだけを再送する。workerはplanを一度だけ取得し、重複実行でエピソード状態を変更しない。
