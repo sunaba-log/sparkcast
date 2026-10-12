@@ -74,6 +74,10 @@ export async function POST(
               id: z.string().min(1).max(200),
               correctionScript: z.string().min(1).max(10000),
               status: z.enum(["approved", "rejected"]),
+              action: z.enum(["insert", "cut", "silence", "replace"]).optional(),
+              start: z.number().min(0).optional(),
+              end: z.number().min(0).optional(),
+              assetId: z.string().uuid().nullable().optional(),
             }),
           )
           .min(1),

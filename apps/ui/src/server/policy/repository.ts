@@ -296,19 +296,33 @@ export async function createPolicyEditPlan(
     sourcePath: inputs.source.path,
     sourceGeneration: inputs.source.generation,
     transcriptRevision: inputs.transcriptRevision,
-    corrections: corrections.map((i) => ({
-      startMs: Math.round(i.insertAt * 1000),
-      script: i.correctionScript,
-    })),
-    operations: approved.map((p) => ({
-      startMs: Math.round(p.start * 1000),
-      endMs: Math.round(p.end * 1000),
-      action: p.action,
-      assetPath: assets.find((a) => a.id === p.assetId)?.objectPath ?? null,
-      assetHash: assets.find((a) => a.id === p.assetId)?.sha256 ?? null,
-      replacementTranscript:
-        assets.find((a) => a.id === p.assetId)?.transcript ?? "",
-    })),
+    corrections: corrections
+      .filter((i) => !i.action || i.action === "insert" || i.action === "replace")
+      .map((i) => ({
+        startMs: Math.round(i.insertAt * 1000),
+        script: i.correctionScript,
+      })),
+    operations: [
+      ...approved.map((p) => ({
+        startMs: Math.round(p.start * 1000),
+        endMs: Math.round(p.end * 1000),
+        action: p.action,
+        assetPath: assets.find((a) => a.id === p.assetId)?.objectPath ?? null,
+        assetHash: assets.find((a) => a.id === p.assetId)?.sha256 ?? null,
+        replacementTranscript:
+          assets.find((a) => a.id === p.assetId)?.transcript ?? "",
+      })),
+      ...corrections
+        .filter((i) => i.action === "cut" || i.action === "silence")
+        .map((i) => ({
+          startMs: Math.round((i.start ?? i.insertAt) * 1000),
+          endMs: Math.round((i.end ?? i.insertAt) * 1000),
+          action: i.action as "cut" | "silence",
+          assetPath: null,
+          assetHash: null,
+          replacementTranscript: "",
+        })),
+    ],
     createdAt: new Date().toISOString(),
   };
   await getAdminFirestore().runTransaction(async (tx) => {

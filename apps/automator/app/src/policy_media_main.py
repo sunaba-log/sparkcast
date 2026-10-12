@@ -70,12 +70,13 @@ def process_media(data: dict) -> dict:
         blob = bucket.blob(data["sourcePath"], generation=int(data["sourceGeneration"]))
         raw = blob.download_as_bytes()
         source = AudioSegment.from_file(io.BytesIO(raw))
+        action = data["action"]
         start, end = int(data["startMs"]), int(data["endMs"])
         left, right = max(0, start - 2000), min(len(source), end + 2000)
         replacement = base64.b64decode(data["audioBase64"], validate=True) if data.get("audioBase64") else None
-        audio, _ = render_policy_audio(
-            source[left:right], [PolicyAudioEdit(start - left, end - left, data["action"], replacement)]
-        )
+        edit_start = end - left if action == "insert" else start - left
+        edit_end = end - left
+        audio, _ = render_policy_audio(source[left:right], [PolicyAudioEdit(edit_start, edit_end, action, replacement)])
         text = ""
     else:
         raise ValueError("Unknown media operation.")

@@ -6,6 +6,7 @@ import { getAdminFirestore } from "@/server/firebase-admin";
 import type {
   Episode,
   DirectorIntervention,
+  DirectorInterventionAction,
   DirectorInterventionStatus,
   EpisodePromotion,
   EpisodeStatus,
@@ -66,6 +67,8 @@ type FirestoreDirectorIntervention = {
   chunk_id?: string;
   target_speaker?: string;
   insert_timestamp_ms?: number;
+  start_ms?: number;
+  end_ms?: number;
   correction_script?: string;
   reason?: string;
   reference_url?: string;
@@ -74,6 +77,8 @@ type FirestoreDirectorIntervention = {
     choice?: string;
   };
   status?: string;
+  action?: string;
+  asset_id?: string | null;
 };
 
 type FirestorePolicyFinding = {
@@ -201,15 +206,35 @@ export async function listTranscriptSegments(
 function toDirectorIntervention(
   id: string,
   data: FirestoreDirectorIntervention,
-  sourceText: string,
+  transcript?: { text: string; start: number; end: number },
 ): DirectorIntervention {
   const severity = Math.min(5, Math.max(1, Math.round(Number(data.audit_metrics?.score ?? 1)))) as 1 | 2 | 3 | 4 | 5;
   const status: DirectorInterventionStatus =
     data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  const action: DirectorInterventionAction =
+    data.action === "cut" || data.action === "silence" || data.action === "replace" || data.action === "insert"
+      ? data.action
+      : "insert";
+  const insertAt = Number(data.insert_timestamp_ms ?? 0) / 1_000;
+  const start =
+    data.start_ms !== undefined
+      ? Number(data.start_ms) / 1_000
+      : transcript?.start !== undefined
+        ? transcript.start
+        : Math.max(0, insertAt - 2);
+  const end =
+    data.end_ms !== undefined
+      ? Number(data.end_ms) / 1_000
+      : transcript?.end !== undefined
+        ? transcript.end
+        : insertAt;
+
   return {
     id,
-    insertAt: Number(data.insert_timestamp_ms ?? 0) / 1_000,
-    sourceText,
+    insertAt,
+    start,
+    end,
+    sourceText: transcript?.text ?? "",
     speaker: String(data.target_speaker ?? ""),
     severity,
     category: String(data.audit_metrics?.choice ?? "other"),
@@ -217,6 +242,8 @@ function toDirectorIntervention(
     reason: data.reason ? String(data.reason) : undefined,
     referenceUrl: data.reference_url ? String(data.reference_url) : null,
     status,
+    action,
+    assetId: data.asset_id ?? null,
   };
 }
 
@@ -229,11 +256,18 @@ export async function listDirectorInterventions(
     contentRef.collection("director_interventions").get(),
     contentRef.collection("transcripts").get(),
   ]);
-  const sourceTextByChunkId = new Map(
-    transcriptsSnapshot.docs.map((document) => [
-      document.id,
-      String(document.data().text ?? ""),
-    ]),
+  const transcriptByChunkId = new Map(
+    transcriptsSnapshot.docs.map((document) => {
+      const data = document.data();
+      return [
+        document.id,
+        {
+          text: String(data.text ?? ""),
+          start: Number(data.start_time ?? 0),
+          end: Number(data.end_time ?? 0),
+        },
+      ];
+    }),
   );
   return interventionsSnapshot.docs
     .map((document) => {
@@ -241,7 +275,7 @@ export async function listDirectorInterventions(
       return toDirectorIntervention(
         document.id,
         data,
-        sourceTextByChunkId.get(String(data.chunk_id ?? "")) ?? "",
+        transcriptByChunkId.get(String(data.chunk_id ?? "")),
       );
     })
     .sort((left, right) => left.insertAt - right.insertAt);
@@ -250,21 +284,41 @@ export async function listDirectorInterventions(
 export async function updateDirectorInterventions(input: {
   podcastId: number;
   episodeId: number;
-  interventions: Array<Pick<DirectorIntervention, "id" | "correctionScript" | "status">>;
+  interventions: Array<
+    Pick<DirectorIntervention, "id" | "correctionScript" | "status"> & {
+      action?: DirectorInterventionAction;
+      start?: number;
+      end?: number;
+      assetId?: string | null;
+    }
+  >;
   updatedBy: string;
 }): Promise<void> {
   const batch = getAdminFirestore().batch();
   const collection = episodeContentRef(input.podcastId, input.episodeId)
     .collection("director_interventions");
   for (const intervention of input.interventions) {
+    const updateData: Record<string, unknown> = {
+      correction_script: intervention.correctionScript,
+      status: intervention.status,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: input.updatedBy,
+    };
+    if (intervention.action) {
+      updateData.action = intervention.action;
+    }
+    if (intervention.start !== undefined) {
+      updateData.start_ms = Math.round(intervention.start * 1000);
+    }
+    if (intervention.end !== undefined) {
+      updateData.end_ms = Math.round(intervention.end * 1000);
+    }
+    if (intervention.assetId !== undefined) {
+      updateData.asset_id = intervention.assetId;
+    }
     batch.set(
       collection.doc(intervention.id),
-      {
-        correction_script: intervention.correctionScript,
-        status: intervention.status,
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: input.updatedBy,
-      },
+      updateData,
       { merge: true },
     );
   }

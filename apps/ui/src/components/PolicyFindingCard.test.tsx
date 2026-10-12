@@ -124,7 +124,8 @@ describe("unified policy finding card", () => {
     render(<Harness />);
     expect(screen.getByText("2:06.200 - 2:08.600")).toBeTruthy();
     expand();
-    expect(screen.getByText("検知箇所：090-1234-5678")).toBeTruthy();
+    expect(screen.getByText("連絡先は090-1234-5678です")).toBeTruthy();
+    expect(screen.queryByText(/検知箇所：/)).toBeNull();
     for (const name of ["カット", "無音化", "代替音声による置換"])
       expect(screen.getByRole("button", { name })).toBeTruthy();
     expect(

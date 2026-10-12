@@ -75,6 +75,8 @@ export const UI_DEMO_DIRECTOR_INTERVENTIONS: DirectorIntervention[] = [
   {
     id: "demo-intervention-1",
     insertAt: 82.4,
+    start: 78.5,
+    end: 82.4,
     sourceText: "生成AIがあれば、番組制作はすべて自動化できると思います。",
     speaker: "山田 花子",
     severity: 4,
@@ -82,10 +84,13 @@ export const UI_DEMO_DIRECTOR_INTERVENTIONS: DirectorIntervention[] = [
     correctionScript:
       "生成AIは制作を支援できますが、番組の企画や最終的な表現には人の判断が欠かせません。",
     status: "pending",
+    action: "insert",
   },
   {
     id: "demo-intervention-2",
     insertAt: 244.8,
+    start: 241.0,
+    end: 244.8,
     sourceText: "このサービスなら必ずリスナー数が増えます。",
     speaker: "鈴木 太郎",
     severity: 3,
@@ -93,6 +98,7 @@ export const UI_DEMO_DIRECTOR_INTERVENTIONS: DirectorIntervention[] = [
     correctionScript:
       "このサービスは、番組の改善に役立つ選択肢の一つになるかもしれません。",
     status: "approved",
+    action: "insert",
   },
 ];
 

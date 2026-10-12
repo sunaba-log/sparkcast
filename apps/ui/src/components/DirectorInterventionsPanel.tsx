@@ -10,10 +10,14 @@ type LoadState =
   | { status: "error"; message: string };
 
 function interventionPayload(interventions: DirectorIntervention[]) {
-  return interventions.map(({ id, correctionScript, status }) => ({
+  return interventions.map(({ id, correctionScript, status, action, start, end, assetId }) => ({
     id,
     correctionScript,
     status,
+    action: action ?? "insert",
+    start,
+    end,
+    assetId: assetId ?? null,
   }));
 }
 
@@ -22,12 +26,14 @@ export function DirectorInterventionsPanel({
   episodeStatus,
   canSeek,
   onSeek,
+  onPlayRange,
   onEditingStarted,
 }: {
   episodeId: string;
   episodeStatus: EpisodeStatus;
   canSeek: boolean;
   onSeek: (seconds: number) => void;
+  onPlayRange?: (start: number, end: number) => void;
   onEditingStarted: () => void;
 }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -56,7 +62,7 @@ export function DirectorInterventionsPanel({
 
   const updateIntervention = (
     id: string,
-    change: Partial<Pick<DirectorIntervention, "correctionScript" | "status">>,
+    change: Partial<Pick<DirectorIntervention, "correctionScript" | "status" | "action" | "start" | "end" | "assetId">>,
   ) => {
     if (state.status !== "loaded") return;
     setState({
@@ -118,12 +124,14 @@ export function DirectorInterventionsPanel({
         {state.interventions.map((intervention, index) => (
           <DirectorInterventionCard
             key={intervention.id}
+            episodeId={episodeId}
             intervention={intervention}
             defaultExpanded={index === 0}
             disabled={!editable || applying}
             canSeek={canSeek}
             onChange={(change) => updateIntervention(intervention.id, change)}
             onSeek={onSeek}
+            onPlayRange={onPlayRange}
           />
         ))}
       </div>
