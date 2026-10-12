@@ -40,3 +40,20 @@ it("disables playback when no source exists", () => {
   expect(container.querySelector("audio")).toBeNull();
   expect((screen.getByTitle("再生") as HTMLButtonElement).disabled).toBe(true);
 });
+it("shows bottom action bar on overview tab and hides it on director and transcript tabs", () => {
+  render(<EpisodeMasterDetail initialEpisodes={[episode]} podcast={null} />);
+  expect(screen.getByRole("button", { name: "変更" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "キャンセル" })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: /AI監査/ }));
+  expect(screen.queryByRole("button", { name: "変更" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "キャンセル" })).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "文字起こし" }));
+  expect(screen.queryByRole("button", { name: "変更" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "キャンセル" })).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: "概要" }));
+  expect(screen.getByRole("button", { name: "変更" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "キャンセル" })).toBeTruthy();
+});

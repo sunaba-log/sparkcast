@@ -1044,39 +1044,41 @@ export function EpisodeMasterDetail({
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="mt-auto flex shrink-0 items-center justify-between border-t border-brand/30 p-4">
-              <div className="flex items-center gap-2">
-                {status === "saved" && (
-                  <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
-                )}
-                {status === "error" && (
-                  <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
-                )}
+            {activeTab !== "director" && activeTab !== "transcript" && (
+              <div className="mt-auto flex shrink-0 items-center justify-between border-t border-brand/30 p-4">
+                <div className="flex items-center gap-2">
+                  {status === "saved" && (
+                    <span className="text-xs text-emerald-600 font-semibold">保存しました</span>
+                  )}
+                  {status === "error" && (
+                    <span className="text-xs text-red-600 font-semibold">{errorMsg}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitle(selectedEpisode.title);
+                      setDescription(selectedEpisode.description);
+                      setMinutes(selectedEpisode.minutes);
+                      setPosts(selectedEpisode.xPosts);
+                      setMinutesTab("preview");
+                    }}
+                    className="min-h-[44px] px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={status === "saving"}
+                    className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {status === "saving" ? "保存中..." : "変更"}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTitle(selectedEpisode.title);
-                    setDescription(selectedEpisode.description);
-                    setMinutes(selectedEpisode.minutes);
-                    setPosts(selectedEpisode.xPosts);
-                    setMinutesTab("preview");
-                  }}
-                  className="min-h-[44px] px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={status === "saving"}
-                  className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
-                >
-                  {status === "saving" ? "保存中..." : "変更"}
-                </button>
-              </div>
-            </div>
+            )}
             </ResizableInspectorPanel>
           </InspectorPanelSlot>
         )}
