@@ -1,0 +1,58 @@
+
+ RUN  v4.1.8 
+
+(node:4029) MetadataLookupWarning: received unexpected error = Request failed with status code 403 code = UNKNOWN
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-01 (I-03) retry-audit only from failed / awaiting states or a stuck job
+{"case":"V1-UI-01","result":{"failed":{"http":200,"after":"auditing","jobs":1},"awaiting_approval":{"http":200,"after":"auditing","jobs":1},"awaiting_publish_confirmation":{"http":200,"after":"auditing","jobs":1},"completed":{"http":409,"after":"completed","jobs":0},"editing":{"http":409,"after":"editing","jobs":0},"auditing":{"http":409,"after":"auditing","jobs":0},"editing(8h stale)":{"http":200,"after":"auditing","jobs":1}}}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-08 (I-01) rejecting every item reaches publish confirmation and publishes the original once
+{"case":"V1-UI-08","saveProposals":[200,"awaiting_approval"],"rejectIntervention":[200,"awaiting_publish_confirmation"],"status":"awaiting_publish_confirmation","publish":200,"jobs":[{"gcsTriggerObjectName":"podcasts/4/episodes/3/source/A.mp3","resumeFromAudit":true,"publishOriginal":true,"podcastId":4}]}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-02 (I-05) legacy route cannot reach original publication while an intervention is undecided
+{"case":"V1-UI-02","legacy":[200,"awaiting_approval"],"statusAfter":"awaiting_approval","publish":409,"publishWithForcedStatus":[409,"未判断または承認済みの確認事項があります"],"jobs":0}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-03 (I-04) the order of decisions does not matter
+{"case":"V1-UI-03","interventionsFirst":"awaiting_approval","thenProposals":"awaiting_publish_confirmation"}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-04 (I-04) fact-check interventions only: rejecting all leads to publish confirmation
+{"case":"V1-UI-04","reject":"awaiting_publish_confirmation","publish":200,"jobs":[true]}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-09 (I-04) fact-check-only approval from the interventions panel creates the frozen edit plan
+{"case":"V1-UI-09","http":200,"status":"editing","corrections":[{"startMs":3000,"script":"Aの訂正です。"}],"jobs":["2d740502-8914-45e6-991e-e4489f8c97e2"]}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-10 normal operations: approve with edits, and partial decisions stop the panel request
+{"case":"V1-UI-10","panelWithoutDecisions":409,"saved":[200,"awaiting_approval"],"apply":200,"status":"editing","jobs":1}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-05 edit cannot start while items are undecided or with a stale version (no job, no state change)
+{"case":"V1-UI-05","interventionsPending":409,"proposalsPending":409,"saved":200,"staleVersion":[409,"判断を保存してから編集を開始してください。"],"status":"awaiting_approval","jobs":0}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-06 double submission of the same approval dispatches one job
+{"case":"V1-UI-06","http":[200,409],"jobs":1,"plans":1,"status":"editing"}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V1-UI-07 source audio replaced after audit blocks review and edit
+{"case":"V1-UI-07","reviewGet":[409,"監査後に原音声が変更されています。再監査してください。"],"apply":[409,"既存の訂正介入を先に判断・保存してください。"],"jobs":0,"status":"awaiting_approval"}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V2-UI-01 an approved correction script edited to contain the secret enters the frozen edit plan unchanged
+{"case":"V2-UI-01","interventionSave":200,"apply":200,"correctionContainsSecret":true,"jobs":1}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V2-UI-02 replacement script containing the secret is checked by the media service, not by the API
+{"case":"V2-UI-02","http":200,"note":"API はスクリプトを検査せず音声処理サービス（verify_text）に委ねる。本テストでは処理サービスを差し替えたため、検査は実行されていない"}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V2-UI-03 after an edit is published, chat knowledge still reads the original transcripts (deleted secret re-enters RAG)
+{"case":"V2-UI-03","ragContainsSecret":true,"episodeTranscriptApiContainsSecret":false}
+
+stdout | evaluations/hackathon_audit/ui-boundary.test.ts > hackathon audit: UI/API boundary (emulator) > V4-01 user A cannot read or change podcast B data by swapping episode/asset/plan IDs (no side effects)
+{"case":"V4-01","results":{"cookie=none GET policy-findings":404,"cookie=none GET policy-review":404,"cookie=none POST policy-review save":404,"cookie=none POST policy-review suggest":404,"cookie=none GET interventions":404,"cookie=none POST interventions":404,"cookie=none GET policy-audio (B asset)":404,"cookie=none GET policy-audio (B asset via A episode)":404,"cookie=none POST policy-audio synthesize":404,"cookie=none POST apply-interventions":404,"cookie=none POST apply-interventions retry B plan":404,"cookie=none POST review-policy-findings":404,"cookie=none POST retry-audit":404,"cookie=none POST confirm-original-publish":404,"cookie=none GET source-audio":404,"cookie=none GET transcript":404,"cookie=PB GET policy-findings":404,"cookie=PB GET policy-review":404,"cookie=PB POST policy-review save":404,"cookie=PB POST policy-review suggest":404,"cookie=PB GET interventions":404,"cookie=PB POST interventions":404,"cookie=PB GET policy-audio (B asset)":404,"cookie=PB GET policy-audio (B asset via A episode)":404,"cookie=PB POST policy-audio synthesize":404,"cookie=PB POST apply-interventions":404,"cookie=PB POST apply-interventions retry B plan":404,"cookie=PB POST review-policy-findings":404,"cookie=PB POST retry-audit":404,"cookie=PB POST confirm-original-publish":404,"cookie=PB GET source-audio":404,"cookie=PB GET transcript":404},"podcastBUnchanged":true,"jobsForB":0,"jobsTotal":0}
+
+ ✓ evaluations/hackathon_audit/ui-boundary.test.ts (14 tests) 3536ms
+     ✓ V1-UI-01 (I-03) retry-audit only from failed / awaiting states or a stuck job  661ms
+     ✓ V1-UI-05 edit cannot start while items are undecided or with a stale version (no job, no state change)  305ms
+     ✓ V4-01 user A cannot read or change podcast B data by swapping episode/asset/plan IDs (no side effects)  323ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  04:14:15
+   Duration  5.13s (transform 710ms, setup 0ms, import 1.42s, tests 3.54s, environment 0ms)
+
+JSON report written to evaluations/hackathon_audit/evidence/after/ui-results.json

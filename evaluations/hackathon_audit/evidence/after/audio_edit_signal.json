@@ -1,0 +1,97 @@
+[
+ {
+  "case": "V2-10 cut",
+  "length_ms": 4000,
+  "secret_ms": 0,
+  "prev_word_ms": 1000,
+  "next_word_ms": 1000
+ },
+ {
+  "case": "V2-11 silence",
+  "length_ms": 5000,
+  "secret_ms": 0,
+  "region_max_abs": 0
+ },
+ {
+  "case": "V2-12 replace",
+  "length_ms": 4800,
+  "secret_ms": 0,
+  "replacement_ms": 800,
+  "timeline": [
+   {
+    "sourceStartMs": 0,
+    "sourceEndMs": 2000,
+    "outputStartMs": 0,
+    "outputEndMs": 2000,
+    "kind": "original"
+   },
+   {
+    "sourceStartMs": 2000,
+    "sourceEndMs": 3000,
+    "outputStartMs": 2000,
+    "outputEndMs": 2800,
+    "kind": "replace"
+   },
+   {
+    "sourceStartMs": 3000,
+    "sourceEndMs": 5000,
+    "outputStartMs": 2800,
+    "outputEndMs": 4800,
+    "kind": "original"
+   }
+  ]
+ },
+ {
+  "case": "V2-13 cut start+0ms end+0ms",
+  "secret_residual_ms": 0,
+  "prev_lost_ms": 0,
+  "next_lost_ms": 0
+ },
+ {
+  "case": "V2-13 cut start+50ms end+0ms",
+  "secret_residual_ms": 50,
+  "prev_lost_ms": 0,
+  "next_lost_ms": 0
+ },
+ {
+  "case": "V2-13 cut start+150ms end+0ms",
+  "secret_residual_ms": 150,
+  "prev_lost_ms": 0,
+  "next_lost_ms": 0
+ },
+ {
+  "case": "V2-13 cut start+300ms end+0ms",
+  "secret_residual_ms": 300,
+  "prev_lost_ms": 0,
+  "next_lost_ms": 0
+ },
+ {
+  "case": "V2-13 cut start+0ms end-150ms",
+  "secret_residual_ms": 150,
+  "prev_lost_ms": 0,
+  "next_lost_ms": 0
+ },
+ {
+  "case": "V2-13 cut start-150ms end+150ms",
+  "secret_residual_ms": 0,
+  "prev_lost_ms": 150,
+  "next_lost_ms": 150
+ },
+ {
+  "case": "V2-13 cut start-300ms end+300ms",
+  "secret_residual_ms": 0,
+  "prev_lost_ms": 300,
+  "next_lost_ms": 300
+ },
+ {
+  "case": "V2-14 join after first edit",
+  "join_ms": 1000,
+  "peak_in_first_ms_after_join": 8229,
+  "full_scale": 32767
+ },
+ {
+  "case": "V2-15 mp3 roundtrip",
+  "secret_ms": 0,
+  "length_ms": 4000
+ }
+]

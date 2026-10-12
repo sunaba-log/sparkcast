@@ -1,0 +1,4 @@
+対象：修正後 dbfceea。上：automator 全テスト、下：UI 全テスト
+======================= 555 passed, 1 warning in 30.90s ========================
+ Test Files  51 passed (51)
+      Tests  219 passed (219)
