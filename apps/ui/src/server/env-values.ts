@@ -126,7 +126,7 @@ export function isLocalUiDemoEnabled(): boolean {
 }
 
 // ハッカソン審査等でログインなしにお試し利用させるゲストモード。
-// dev の Cloud Run にのみ設定する（prod では未設定＝無効）。
+// dev と stg（ハッカソン審査用）の Cloud Run にのみ設定する（prod では未設定＝無効）。
 export function isGuestModeEnabled(): boolean {
   return process.env.ENABLE_GUEST_MODE === "true";
 }
@@ -185,6 +185,17 @@ export function getPendingChatLimit(): number {
   const value = Number(raw);
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error("PENDING_CHAT_LIMIT must be a positive integer");
+  }
+  return value;
+}
+
+// ゲスト（共有のお試しアカウント）が 1 日にアップロードできる回数。
+// 誰でも入れるので、文字起こし・AI 解析の費用が膨らまないよう絞る。
+export function getGuestEpisodeUploadDailyLimit(): number {
+  const raw = process.env.GUEST_EPISODE_UPLOAD_DAILY_LIMIT ?? "10";
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("GUEST_EPISODE_UPLOAD_DAILY_LIMIT must be a positive integer");
   }
   return value;
 }

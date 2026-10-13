@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser, SESSION_COOKIE_NAME } from "@/server/auth";
+import { GUEST_FORBIDDEN_MESSAGE, isGuestUser } from "@/server/guest";
 import { getDbPool } from "@/server/db";
 import { getContactEmail, isAdminUser } from "@/server/env";
 import {
@@ -97,6 +98,9 @@ export async function DELETE() {
     const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    if (isGuestUser(user)) {
+      return NextResponse.json({ error: GUEST_FORBIDDEN_MESSAGE }, { status: 403 });
     }
     const client = await (await getDbPool()).connect();
     try {

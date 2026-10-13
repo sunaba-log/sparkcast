@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/server/auth";
+import { GUEST_FORBIDDEN_MESSAGE, isGuestUser } from "@/server/guest";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import {
   listEpisodesAndPromotionsPaginated,
@@ -105,6 +106,9 @@ export async function DELETE(request: Request) {
     const auth = await authorize();
     if (!auth) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    if (isGuestUser(auth.user)) {
+      return NextResponse.json({ error: GUEST_FORBIDDEN_MESSAGE }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
