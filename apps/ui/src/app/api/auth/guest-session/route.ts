@@ -15,7 +15,7 @@ import {
 const SESSION_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 
 // ハッカソン審査等のお試し用ゲストログイン。ENABLE_GUEST_MODE を設定した
-// 環境（dev のみ）でだけ有効。全ゲストが単一の共有アカウントに入る。
+// 環境（dev と stg）でだけ有効。全ゲストが単一の共有アカウントに入る。
 export async function POST() {
   if (!isGuestModeEnabled()) {
     return NextResponse.json(

@@ -3,12 +3,14 @@ import "server-only";
 import type { Pool } from "pg";
 import type { SessionUser } from "@/server/auth";
 import {
+  getGuestEpisodeUploadDailyLimit,
   getPendingChatLimit,
   getPendingEpisodeUploadLimit,
   getPendingRecordingSessionLimit,
   getRateLimitHourly,
   getRateLimitDaily,
 } from "@/server/env";
+import { isGuestUser } from "@/server/guest";
 
 export type UsageAction = "chat" | "episode_upload" | "recording_session";
 
@@ -45,6 +47,20 @@ export async function checkUsageAllowed(
       return {
         allowed: false,
         reason: "お試し枠の上限に達しました。管理者の承認をお待ちください",
+      };
+    }
+  } else if (action === "episode_upload" && isGuestUser(user)) {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const result = await pool.query<{ count: number }>(
+      `SELECT COUNT(*) as count FROM api_usage_logs
+       WHERE user_id = $1 AND endpoint = $2 AND called_at > $3`,
+      [user.uid, action, oneDayAgo],
+    );
+    const count = parseInt(result.rows[0]?.count?.toString() ?? "0", 10);
+    if (count >= getGuestEpisodeUploadDailyLimit()) {
+      return {
+        allowed: false,
+        reason: "お試しアカウントの 1 日のアップロード上限に達しました。明日以降にお試しください",
       };
     }
   } else if (action === "chat") {

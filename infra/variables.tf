@@ -1,10 +1,10 @@
 variable "environment" {
   type        = string
-  description = "Environment name (e.g., dev, prod)."
+  description = "Environment name (e.g., dev, stg, prod)."
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be one of: dev, prod."
+    condition     = contains(["dev", "stg", "prod"], var.environment)
+    error_message = "environment must be one of: dev, stg, prod."
   }
 }
 
@@ -307,7 +307,7 @@ variable "backup_scheduler_cron" {
 
 variable "enable_guest_mode" {
   type        = bool
-  description = "ゲストログイン（「ゲストとして試す」）機能の有効化フラグ（dev のみ true とする）"
+  description = "ゲストログイン（「ゲストとして試す」）機能の有効化フラグ（dev と stg のみ true とする）"
   default     = false
 }
 

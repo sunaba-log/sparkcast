@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser } from "@/server/auth";
+import { GUEST_FORBIDDEN_MESSAGE, isGuestUser } from "@/server/guest";
 import { isPodcastOwner } from "@/server/podcasts/data-repository";
 import {
   getChannelSecrets,
@@ -75,6 +76,9 @@ export async function PATCH(
     const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    if (isGuestUser(user)) {
+      return NextResponse.json({ error: GUEST_FORBIDDEN_MESSAGE }, { status: 403 });
     }
     const podcastId = parsePodcastId((await context.params).id);
     if (!podcastId) {
