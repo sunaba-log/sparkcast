@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Mic, Play, Sparkles, Square, Tally1, Tally2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  HelpCircle,
+  Mic,
+  Play,
+  Sparkles,
+  Square,
+  Tally1,
+  Tally2,
+  XCircle,
+} from "lucide-react";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -17,6 +28,14 @@ const severityStyles: Record<DirectorIntervention["severity"], string> = {
   3: "bg-amber-100 text-amber-800",
   4: "bg-red-100 text-red-700",
   5: "bg-red-100 text-red-700",
+};
+
+const severityLabels: Record<DirectorIntervention["severity"], string> = {
+  1: "Low",
+  2: "Low",
+  3: "Middle",
+  4: "High",
+  5: "High",
 };
 
 const labels = {
@@ -47,8 +66,7 @@ export function formatFullTimestamp(seconds: number): string {
   const hours = Math.floor(milliseconds / 3_600_000);
   const minutes = Math.floor((milliseconds % 3_600_000) / 60_000);
   const remainingSeconds = Math.floor((milliseconds % 60_000) / 1000);
-  const remainder = String(milliseconds % 1000).padStart(3, "0");
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}.${remainder}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 export function DirectorInterventionCard({
@@ -262,25 +280,49 @@ export function DirectorInterventionCard({
         >
           {formatFullTimestamp(start)} - {formatFullTimestamp(end)}
         </button>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityStyles[intervention.severity]}`}>
-          深刻度{intervention.severity}/5
-        </span>
-        <span className="rounded-full bg-gray-200/80 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+        <span className="text-xs font-semibold text-gray-900">
           {intervention.category}
         </span>
-        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-          {labels[currentAction]}
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${severityStyles[intervention.severity]}`}
+          title={`深刻度 ${intervention.severity}/5`}
+        >
+          {severityLabels[intervention.severity]}
         </span>
-        {intervention.status === "approved" && (
-          <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
-            承認済
+        <span
+          className="ml-auto inline-flex items-center"
+          title={
+            intervention.status === "approved"
+              ? `承認済：${labels[currentAction]}`
+              : intervention.status === "rejected"
+                ? "却下済"
+                : "未判断"
+          }
+        >
+          {intervention.status === "approved" ? (
+            <CheckCircle2
+              className="w-4 h-4 text-emerald-600"
+              aria-hidden="true"
+            />
+          ) : intervention.status === "rejected" ? (
+            <XCircle
+              className="w-4 h-4 text-red-500"
+              aria-hidden="true"
+            />
+          ) : (
+            <HelpCircle
+              className="w-4 h-4 text-gray-400"
+              aria-hidden="true"
+            />
+          )}
+          <span className="sr-only">
+            {intervention.status === "approved"
+              ? `承認済：${labels[currentAction]}`
+              : intervention.status === "rejected"
+                ? "却下済"
+                : "未判断"}
           </span>
-        )}
-        {intervention.status === "rejected" && (
-          <span className="ml-auto rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-            却下済
-          </span>
-        )}
+        </span>
       </div>
       {isExpanded && (
         <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100">

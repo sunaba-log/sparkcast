@@ -1,10 +1,21 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Mic, Play, Sparkles, Square, Tally1, Tally2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  HelpCircle,
+  Mic,
+  Play,
+  Sparkles,
+  Square,
+  Tally1,
+  Tally2,
+  XCircle,
+} from "lucide-react";
 
 
 
-import { formatDirectorTimestamp } from "@/components/DirectorInterventionCard";
+import { formatFullTimestamp } from "@/components/DirectorInterventionCard";
 import {
   createTrackRecorder,
   type TrackRecorder,
@@ -274,7 +285,7 @@ export function PolicyEditProposalCard({
           }}
           className="font-mono text-xs font-semibold text-brand hover:underline disabled:cursor-default disabled:no-underline"
         >
-          {formatDirectorTimestamp(proposal.start)} - {formatDirectorTimestamp(proposal.end)}
+          {formatFullTimestamp(proposal.start)} - {formatFullTimestamp(proposal.end)}
         </button>
         {[...new Set(proposal.findings.map((finding) => finding.category))].map(
           (category) => (
@@ -289,12 +300,39 @@ export function PolicyEditProposalCard({
         <span className="text-xs text-gray-600">
           {proposal.findings.length}件の根拠
         </span>
-        <span className="ml-auto text-xs">
-          {proposal.status === "approved"
-            ? `承認済：${labels[proposal.action]}`
-            : proposal.status === "rejected"
-              ? "却下済"
-              : "未判断"}
+        <span
+          className="ml-auto inline-flex items-center"
+          title={
+            proposal.status === "approved"
+              ? `承認済：${labels[proposal.action]}`
+              : proposal.status === "rejected"
+                ? "却下済"
+                : "未判断"
+          }
+        >
+          {proposal.status === "approved" ? (
+            <CheckCircle2
+              className="w-4 h-4 text-emerald-600"
+              aria-hidden="true"
+            />
+          ) : proposal.status === "rejected" ? (
+            <XCircle
+              className="w-4 h-4 text-red-500"
+              aria-hidden="true"
+            />
+          ) : (
+            <HelpCircle
+              className="w-4 h-4 text-gray-400"
+              aria-hidden="true"
+            />
+          )}
+          <span className="sr-only">
+            {proposal.status === "approved"
+              ? `承認済：${labels[proposal.action]}`
+              : proposal.status === "rejected"
+                ? "却下済"
+                : "未判断"}
+          </span>
         </span>
       </div>
       {expanded && (
