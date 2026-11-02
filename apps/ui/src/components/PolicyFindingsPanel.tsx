@@ -139,12 +139,12 @@ export function PolicyFindingsPanel({
   const allDecided = review.proposals.every((p) => p.status !== "pending");
   return (
     <section
-      className="space-y-1 border-t border-brand/20 pt-5"
+      className="space-y-4 border-t border-brand/20 pt-5"
       aria-label="ポリシー監査"
     >
       <div>
-        <h3 className="text-base font-bold">ポリシー監査</h3>
-        <p className="text-xs text-gray-600">
+        <h3 className="text-base font-bold text-gray-900">ポリシー監査</h3>
+        <p className="mt-1 text-xs text-gray-600">
           重複する指摘をまとめて判断します。範囲と音声を確認し、すべての判断を保存してから編集を開始してください。
         </p>
       </div>
@@ -163,42 +163,44 @@ export function PolicyFindingsPanel({
           指摘を統合してアクション・台詞を提案
         </button>
       )}
-      {review.proposals.map((proposal) => (
-        <PolicyEditProposalCard
-          key={proposal.id}
-          proposal={proposal}
-          episodeId={episodeId}
-          version={review.version}
-          disabled={
-            !editable ||
-            saving ||
-            (busyCards.length > 0 && !busyCards.includes(proposal.id))
-          }
-          canSeek={canSeek}
-          onSeek={onSeek}
-          onPlayRange={onPlayRange}
-          onBusy={(busy) =>
-            setBusyCards((ids) =>
-              busy
-                ? [...new Set([...ids, proposal.id])]
-                : ids.filter((id) => id !== proposal.id),
-            )
-          }
-          onChange={(next) => {
-            setReview((old) =>
-              old
-                ? {
-                    ...old,
-                    proposals: old.proposals.map((p) =>
-                      p.id === next.id ? next : p,
-                    ),
-                  }
-                : old,
-            );
-            setDirty(true);
-          }}
-        />
-      ))}
+      <div className="space-y-1">
+        {review.proposals.map((proposal) => (
+          <PolicyEditProposalCard
+            key={proposal.id}
+            proposal={proposal}
+            episodeId={episodeId}
+            version={review.version}
+            disabled={
+              !editable ||
+              saving ||
+              (busyCards.length > 0 && !busyCards.includes(proposal.id))
+            }
+            canSeek={canSeek}
+            onSeek={onSeek}
+            onPlayRange={onPlayRange}
+            onBusy={(busy) =>
+              setBusyCards((ids) =>
+                busy
+                  ? [...new Set([...ids, proposal.id])]
+                  : ids.filter((id) => id !== proposal.id),
+              )
+            }
+            onChange={(next) => {
+              setReview((old) =>
+                old
+                  ? {
+                      ...old,
+                      proposals: old.proposals.map((p) =>
+                        p.id === next.id ? next : p,
+                      ),
+                    }
+                  : old,
+              );
+              setDirty(true);
+            }}
+          />
+        ))}
+      </div>
       {message && (
         <p role="status" className="text-xs">
           {message}
