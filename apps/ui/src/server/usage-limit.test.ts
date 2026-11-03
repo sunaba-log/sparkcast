@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Pool } from "pg";
 import type { SessionUser } from "@/server/auth";
 import { checkUsageAllowed, recordUsage } from "@/server/usage-limit";
@@ -124,6 +124,53 @@ describe("usage-limit", () => {
       );
 
       expect(result.allowed).toBe(true);
+    });
+
+    describe("guest episode upload", () => {
+      const guestUser: SessionUser = {
+        ...activeUser,
+        uid: "guest_guest_sunabalog_com",
+        email: "guest@sunabalog.com",
+      };
+
+      beforeEach(() => {
+        vi.stubEnv("ENABLE_GUEST_MODE", "true");
+        vi.stubEnv("GUEST_EPISODE_UPLOAD_DAILY_LIMIT", "3");
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it("allows guest under the daily upload limit", async () => {
+        (mockPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+          rows: [{ count: 2 }],
+        });
+
+        const result = await checkUsageAllowed(mockPool, guestUser, "episode_upload");
+
+        expect(result.allowed).toBe(true);
+      });
+
+      it("blocks guest at the daily upload limit", async () => {
+        (mockPool.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+          rows: [{ count: 3 }],
+        });
+
+        const result = await checkUsageAllowed(mockPool, guestUser, "episode_upload");
+
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toContain("お試しアカウント");
+      });
+
+      it("does not limit the guest email when guest mode is off", async () => {
+        vi.stubEnv("ENABLE_GUEST_MODE", "false");
+
+        const result = await checkUsageAllowed(mockPool, guestUser, "episode_upload");
+
+        expect(result.allowed).toBe(true);
+        expect(mockPool.query).not.toHaveBeenCalled();
+      });
     });
   });
 

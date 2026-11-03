@@ -31,6 +31,7 @@ injected by the GitHub Actions workflows (`.github/workflows/`).
 | `CRON_SECRET` | Required | generated local value | Secret Manager (`cron-secret`) | Cloud Scheduler ジョブが `Authorization: Bearer` で送る値と一致させる。 |
 | `ENABLE_GUEST_MODE` | Optional | 通常は未設定（ローカルはモック認証を使う） | gcloud で dev の Cloud Run にのみ設定 | `true` でログイン画面に「ゲストとして試す」を表示し、共有ゲストアカウントで利用可能にする。prod には設定しない。 |
 | `GUEST_EMAIL` | Optional | 未設定 | 未設定（デフォルトを使用） | ゲストアカウントのメール。デフォルトは `guest@sunabalog.com`。 |
+| `GUEST_EPISODE_UPLOAD_DAILY_LIMIT` | Optional | 未設定 | 未設定（デフォルトを使用） | ゲストが 24 時間にアップロードできる回数。デフォルトは `10`。 |
 | `RATE_LIMIT_HOURLY` / `RATE_LIMIT_DAILY` | Optional | 未設定 | 未設定（デフォルト 20 / 100） | ユーザー単位のレート制限。ゲストモード中は全ゲストで共有されるため、審査期間中は dev で引き上げる。 |
 | `RECORDING_ENABLED` | Optional | `true`（収録ルームを試すとき） | `infra/ui_cloud_run.tf`（`enable_recording = true` の環境のみ） | ブラウザ収録ルーム（#166）。未設定なら `/record`・`/join`・API は 404。使えるのは admin と制限を解除したユーザーだけ（#174）。 |
 | `RECORDING_ROOM_SECRET` | 収録時のみ Required | 任意の長いランダム文字列（Worker の `.dev.vars` と揃える） | Secret Manager（`sparkcast-recording-room-secret`） | ルーム JWT・招待キー・再入室キーの署名。Worker の `ROOM_SECRET` と同じ値。 |

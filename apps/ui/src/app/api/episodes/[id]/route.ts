@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 import { getSessionUser } from "@/server/auth";
+import { GUEST_FORBIDDEN_MESSAGE, isGuestUser } from "@/server/guest";
 import { requireSelectedPodcastForApi } from "@/server/podcasts/selection";
 import {
   deleteEpisodeRecord,
@@ -209,6 +210,9 @@ export async function DELETE(
     const auth = await authorize();
     if (!auth) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+    }
+    if (isGuestUser(auth.user)) {
+      return NextResponse.json({ error: GUEST_FORBIDDEN_MESSAGE }, { status: 403 });
     }
     const episodeId = Number((await context.params).id);
     if (!Number.isInteger(episodeId) || episodeId <= 0) {
