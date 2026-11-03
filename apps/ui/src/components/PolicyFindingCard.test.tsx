@@ -122,7 +122,7 @@ describe("unified policy finding card", () => {
   });
   it("shows exact timestamp and evidence, with all three actions", () => {
     render(<Harness />);
-    expect(screen.getByText("2:06.200 - 2:08.600")).toBeTruthy();
+    expect(screen.getByText("00:02:06 - 00:02:08")).toBeTruthy();
     expand();
     expect(screen.getByText("連絡先は090-1234-5678です")).toBeTruthy();
     expect(screen.queryByText(/検知箇所：/)).toBeNull();
@@ -189,4 +189,28 @@ describe("unified policy finding card", () => {
     });
     expect(screen.queryByText(/挿入する音声/)).toBeNull();
   });
+  it("renders status icon with appropriate title and label for pending, approved, and rejected states", () => {
+    const { rerender } = render(
+      <Harness key="pending" proposal={{ ...initial, status: "pending" }} />,
+    );
+    expect(screen.getByTitle("未判断")).toBeTruthy();
+    expect(screen.getByText("未判断")).toBeTruthy();
+
+    rerender(
+      <Harness
+        key="approved"
+        proposal={{ ...initial, status: "approved", action: "silence" }}
+      />,
+    );
+    expect(screen.getByTitle("承認済：無音化")).toBeTruthy();
+    expect(screen.getByText("承認済：無音化")).toBeTruthy();
+
+    rerender(
+      <Harness key="rejected" proposal={{ ...initial, status: "rejected" }} />,
+    );
+    expect(screen.getByTitle("却下済")).toBeTruthy();
+    expect(screen.getByText("却下済")).toBeTruthy();
+  });
 });
+
+

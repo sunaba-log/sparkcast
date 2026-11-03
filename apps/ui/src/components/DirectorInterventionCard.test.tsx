@@ -24,8 +24,9 @@ describe("DirectorInterventionCard", () => {
       />,
     );
 
-    expect(html).toContain("00:12:32.500 - 00:12:34.500");
-    expect(html).toContain("深刻度4/5");
+    expect(html).toContain("00:12:32 - 00:12:34");
+    expect(html).toContain("High");
+    expect(html).toContain("深刻度 4/5");
     expect(html).toContain("事実誤認");
     expect(html).not.toContain("田中の発話");
   });
@@ -53,8 +54,9 @@ describe("DirectorInterventionCard", () => {
       />,
     );
 
-    expect(html).toContain("00:12:30.000 - 00:12:34.500");
-    expect(html).toContain("深刻度4/5");
+    expect(html).toContain("00:12:30 - 00:12:34");
+    expect(html).toContain("High");
+    expect(html).toContain("深刻度 4/5");
     expect(html).toContain("事実誤認");
     expect(html).toContain("田中の発話");
     expect(html).toContain("この製品は2020年に発売されました。");
@@ -203,4 +205,54 @@ describe("DirectorInterventionCard", () => {
     expect(replaceHtml).toContain("台詞から音声を生成");
     expect(replaceHtml).toContain("編集後の前後を確認");
   });
+
+  it("renders status icons with title and sr-only label for pending, approved, and rejected states", () => {
+    const baseIntervention = {
+      id: "intervention-status",
+      insertAt: 50.0,
+      sourceText: "テスト発話",
+      speaker: "ホスト",
+      severity: 2 as const,
+      category: "事実誤認",
+      correctionScript: "訂正スクリプト",
+      action: "cut" as const,
+    };
+
+    const pendingHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{ ...baseIntervention, status: "pending" }}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(pendingHtml).toContain('title="未判断"');
+    expect(pendingHtml).toContain("未判断");
+
+    const approvedHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{ ...baseIntervention, status: "approved" }}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(approvedHtml).toContain('title="承認済：カット"');
+    expect(approvedHtml).toContain("承認済：カット");
+
+    const rejectedHtml = renderToStaticMarkup(
+      <DirectorInterventionCard
+        intervention={{ ...baseIntervention, status: "rejected" }}
+        disabled={false}
+        canSeek
+        onChange={() => undefined}
+        onSeek={() => undefined}
+      />,
+    );
+    expect(rejectedHtml).toContain('title="却下済"');
+    expect(rejectedHtml).toContain("却下済");
+  });
 });
+
