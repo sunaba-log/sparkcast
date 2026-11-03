@@ -116,6 +116,15 @@ export function isLocalMockAuthEnabled(): boolean {
   return process.env.NEXT_PUBLIC_ENABLE_LOCAL_MOCK_AUTH === "true";
 }
 
+// ローカルでデータベースや Firebase を用意せずに画面確認するための UI デモモード。
+// 本番環境では環境変数が誤設定されても有効にしない。
+export function isLocalUiDemoEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ENABLE_LOCAL_UI_DEMO === "true"
+  );
+}
+
 // ハッカソン審査等でログインなしにお試し利用させるゲストモード。
 // dev の Cloud Run にのみ設定する（prod では未設定＝無効）。
 export function isGuestModeEnabled(): boolean {
@@ -228,6 +237,11 @@ export function getRealtimeBaseUrl(): string {
 // mixer の Cloud Run Job のリソース名（projects/{p}/locations/{r}/jobs/{name}）
 export function getMixerJobName(): string {
   return required("MIXER_JOB_NAME");
+}
+
+// automator の Cloud Run Job のリソース名（projects/{p}/locations/{r}/jobs/{name}）
+export function getAutomatorJobName(): string | undefined {
+  return process.env.AUTOMATOR_JOB_NAME;
 }
 
 export function getRecordingMaxParticipants(): number {

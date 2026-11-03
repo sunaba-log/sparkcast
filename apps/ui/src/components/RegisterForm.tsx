@@ -41,7 +41,7 @@ export function RegisterForm({
   }
 
   return (
-    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
+    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto bg-app-bg">
       <h1 className="text-xl font-bold text-gray-900">ユーザ登録</h1>
       <p className="mt-2 text-sm text-gray-500">
         {email} で利用を開始します。表示名を確認して登録してください。
@@ -66,13 +66,13 @@ export function RegisterForm({
             onChange={(event) => setDisplayName(event.target.value)}
             required
             maxLength={100}
-            className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+            className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
           />
         </div>
         <button
           type="submit"
           disabled={loading || displayName.trim().length === 0}
-          className="w-full px-4 py-2 bg-brand text-white text-sm font-medium rounded-xs hover:bg-brand-hover disabled:opacity-50"
+          className="w-full px-4 py-2 rounded-none bg-brand text-white text-xs font-medium transition-colors hover:bg-brand-hover disabled:opacity-50 flex items-center justify-center"
         >
           {loading ? "登録中..." : "登録して開始"}
         </button>

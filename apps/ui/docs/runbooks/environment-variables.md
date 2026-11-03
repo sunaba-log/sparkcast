@@ -38,6 +38,8 @@ injected by the GitHub Actions workflows (`.github/workflows/`).
 | `REALTIME_BASE_URL` | 収録時のみ Required | `http://localhost:8787`（`wrangler dev`） | `infra/ui_cloud_run.tf` | 収録ルームの Cloudflare Worker（apps/realtime）。 |
 | `MIXER_JOB_NAME` | エピソード化に Required | 未設定でも入室・録音は試せる | `infra/ui_cloud_run.tf` | `projects/{p}/locations/{r}/jobs/{name}`。ローカルから起動するときは `GOOGLE_OAUTH_ACCESS_TOKEN` も要る。 |
 | `RECORDING_MAX_PARTICIPANTS` / `RECORDING_ROOM_TTL_HOURS` / `PENDING_RECORDING_SESSION_LIMIT` | Optional | 未設定 | 未設定（6 人 / 6 時間 / 2 回） | 定員・ルームの期限・承認待ちユーザーの作成回数。 |
+| `AUDIO_EDITOR_URL` | AIディレクター編集時 Required | 音声編集ジョブのHTTPエンドポイント | `infra/ui_cloud_run.tf` | 承認済み訂正案を音声合成・カットイン編集ジョブへ送信するURL。 |
+| `AUDIO_EDITOR_API_TOKEN` | Optional | 音声編集ジョブの認証トークン | Secret Manager | 設定時、`AUDIO_EDITOR_URL` 呼び出しにBearerトークンとして送信する。 |
 
 ## Current Secret Stores
 
@@ -106,21 +108,46 @@ For upload testing, use the target environment's matching Cloud SQL database,
 GCS bucket, Firebase project, and service account. Mixing dev and prod values
 can create signed URLs that fail with GCS `AccessDenied`.
 
-## Firebase Redirect Sign-In on a Custom Host
+## Firebase Sign-In (Popup vs Redirect) on a Custom Host
 
-Mobile browsers may block the cross-origin storage access used by Firebase
-`signInWithRedirect()` when the app is served from a host other than
-`<project>.firebaseapp.com` while `authDomain` points at
-`<project>.firebaseapp.com`. In that state, Google sign-in appears to
-complete, but the app returns to `/login` because `getRedirectResult()` is empty
-and `/api/auth/session` is never called.
+Mobile browsers (Safari, Chrome) block cross-origin storage access / third-party
+cookies by default (ITP / storage partitioning). When `signInWithRedirect()` is
+used while the app is served from a host other than `<project>.firebaseapp.com`
+and `authDomain` points at `<project>.firebaseapp.com`, the redirect completes
+at Google, but upon return to `/login`, `getRedirectResult()` returns `null`
+because the iframe cannot access the auth credentials across origins.
 
-If mobile redirect sign-in is needed, set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to
-the serving host (Cloud Run domain) and keep `FIREBASE_AUTH_HELPER_DOMAIN` at
-the Firebase helper host. The Next.js rewrite proxies `/__/auth/*` to the
-Firebase helper domain. Also make sure Firebase Auth authorized domains include
-the serving host, and the Google OAuth client allows this redirect URI:
+To avoid this, `LoginForm` uses `signInWithPopup()` as the primary sign-in flow
+for both desktop and mobile browsers. `signInWithPopup()` communicates via
+window messaging (`postMessage`), which is not subject to cross-origin storage
+blocking.
+
+`signInWithRedirect()` is kept as a fallback only when popups are explicitly
+blocked (`auth/popup-blocked`). If redirect sign-in is required on a custom host,
+set `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` to the serving host (Cloud Run domain)
+and keep `FIREBASE_AUTH_HELPER_DOMAIN` at the Firebase helper host. The Next.js
+rewrite proxies `/__/auth/*` to the Firebase helper domain. Also make sure
+Firebase Auth authorized domains include the serving host, and the Google OAuth
+client allows this redirect URI:
 
 ```text
 https://<cloud-run-domain>/__/auth/handler
 ```
+
+### ポリシー監査の代替音声・編集計画
+
+| 変数 | 要否 | 内容 |
+|---|---|---|
+| `POLICY_MEDIA_URL` | Required | 非公開Cloud RunサービスのURL。Terraformの `policy_media.uri` をUIへ設定する。合成音声、録音の再監査、文脈プレビューを処理する。 |
+| `POLICY_AUDIO_BUCKET` | Required | 永続的な代替音声・プレビュー用GCSバケット。UI、編集ジョブ、mediaサービスへ設定する。Eventarc入力バケットと7日削除のSTT作業バケットを流用しない。 |
+| `POLICY_MEDIA_ID_TOKEN` | ローカルのみOptional | 対象サービスをaudienceにしたIDトークン。Cloud Run上ではメタデータサーバから取得する。 |
+
+通常CDとPRプレビューは `.github/scripts/policy-media-env.sh` で対象環境のmediaサービスURLと音声バケットを確認し、UIリビジョンへ明示設定する。サービス・バケットが未作成の場合は先に対象環境のTerraformをapplyする。ローカルでは `.env.example` の `POLICY_MEDIA_URL` と `POLICY_AUDIO_BUCKET` を設定し、必要に応じてサービスをaudienceにした `POLICY_MEDIA_ID_TOKEN` を取得する。
+
+UIは利用者を認証してからmediaサービスへIDトークンでアクセスする。録音は120秒までとし、PCM化・再文字起こし・PII／Jev再監査を完了した音声だけを置換に使用する。合成台詞も同じポリシーで検査する。
+
+統合編集は `AUDIO_EDITOR_URL` ではなく、既存automatorジョブへ `EDIT_PLAN_ID` と `RESUME_FROM_AUDIT=true` を渡す。承認・範囲・音声ハッシュ・原本のGCS generationをFirestoreの `audio_edit_plans` に凍結する。送信結果が不明な場合は編集状態を保持し、「保存済みの編集要求を再送」で同じplanだけを再送する。workerはplanを一度だけ取得し、重複実行でエピソード状態を変更しない。
+
+編集失敗はエピソードとplanの状態を確認し、既存の再監査操作で原音声からやり直す。再監査では以前の判断を破棄し、新たな編集案を承認する。原本と検知用文字起こしは保持し、編集済み文字起こしは `rendition_transcripts` に保存する。配信音声は `renditions/{plan_id}.mp3` へ生成する。
+
+GCPのAPI呼び出しは既存のADC経路を使用する。サービスアカウントでの認証とAPI利用権限については[Cloud TTS認証](https://docs.cloud.google.com/text-to-speech/docs/authentication)を参照。

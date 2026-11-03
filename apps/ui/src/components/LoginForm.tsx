@@ -13,20 +13,25 @@ import {
   getGoogleAuthProvider,
 } from "@/lib/firebase-client";
 
-function shouldUseRedirectLogin() {
-  if (typeof window === "undefined") return false;
+const REDIRECT_PENDING_KEY = "sparkcast_auth_redirect_pending";
+
+function shouldFallbackToRedirect(error: unknown) {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return false;
+  }
+  const code = (error as { code?: string }).code;
   return (
-    window.matchMedia("(pointer: coarse)").matches ||
-    /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)
+    code === "auth/popup-blocked" ||
+    code === "auth/operation-not-supported-in-this-environment"
   );
 }
 
-function isPopupBlocked(error: unknown) {
+function isPopupClosedByUser(error: unknown) {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    (error as { code?: string }).code === "auth/popup-blocked"
+    (error as { code?: string }).code === "auth/popup-closed-by-user"
   );
 }
 
@@ -57,11 +62,31 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
     let active = true;
 
     async function completeRedirectLogin() {
+      let isPendingRedirect = false;
       try {
+        isPendingRedirect =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem(REDIRECT_PENDING_KEY) === "1";
+        if (isPendingRedirect) {
+          sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+        }
+      } catch {
+        // ignore storage error
+      }
+
+      try {
+        const credential = await getRedirectResult(getFirebaseAuth());
+        if (!credential) {
+          if (isPendingRedirect && active) {
+            setError(
+              "認証情報を取得できませんでした。ブラウザのセキュリティ設定（クロスサイト追跡の防止など）をご確認いただくか、ポップアップを許可して再度お試しください。",
+            );
+          }
+          return;
+        }
+        if (!active) return;
         setLoading(true);
         setError("");
-        const credential = await getRedirectResult(getFirebaseAuth());
-        if (!credential) return;
         await createSession(credential);
       } catch (caught) {
         if (!active) return;
@@ -85,16 +110,20 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
       setError("");
       const auth = getFirebaseAuth();
       const provider = getGoogleAuthProvider();
-      if (shouldUseRedirectLogin()) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
 
       const credential = await signInWithPopup(auth, provider);
       await createSession(credential);
     } catch (caught) {
-      if (isPopupBlocked(caught)) {
+      if (shouldFallbackToRedirect(caught)) {
+        try {
+          sessionStorage.setItem(REDIRECT_PENDING_KEY, "1");
+        } catch {
+          // ignore storage error
+        }
         await signInWithRedirect(getFirebaseAuth(), getGoogleAuthProvider());
+        return;
+      }
+      if (isPopupClosedByUser(caught)) {
         return;
       }
       setError(
@@ -156,7 +185,7 @@ export function LoginForm({ guestEnabled = false }: { guestEnabled?: boolean }) 
   }
 
   return (
-    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto">
+    <div className="border border-brand rounded-xs p-8 max-w-md mx-auto bg-app-bg">
       <h1 className="text-xl font-bold text-gray-900">SparkCast にログイン</h1>
       <p className="mt-2 text-sm text-gray-500">
         ポッドキャストの運営を自動化・支援するツールです。Google アカウントで開始できます。

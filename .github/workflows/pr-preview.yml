@@ -11,12 +11,14 @@ on:
     paths:
       - "apps/ui/**"
       - ".github/workflows/pr-preview.yml"
+      - ".github/scripts/policy-media-env.sh"
 
 concurrency:
   group: pr-preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
+  ENVIRONMENT: dev
   PROJECT_ID: sunabalog-dev
   REGION: asia-northeast1
   SERVICE: sparkcast-ui-dev
@@ -49,6 +51,9 @@ jobs:
           service_account: ${{ env.DEPLOYER_SA }}
 
       - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve policy media configuration
+        run: bash .github/scripts/policy-media-env.sh
 
       - name: Configure docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -88,6 +93,7 @@ jobs:
           gcloud run deploy "$SERVICE" \
             --project "$PROJECT_ID" \
             --region "$REGION" \
+            --update-env-vars "POLICY_MEDIA_URL=$POLICY_MEDIA_URL,POLICY_AUDIO_BUCKET=$POLICY_AUDIO_BUCKET" \
             --image "$IMAGE:$TAG" \
             --no-traffic \
             --tag "$TAG"

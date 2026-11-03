@@ -26,3 +26,10 @@ resource "google_storage_bucket_iam_member" "app_upload_object_creator" {
   role   = "roles/storage.objectCreator"
   member = "serviceAccount:${google_service_account.app.email}"
 }
+
+# 元音声プレビューの署名付き GET URL に必要な読み取り権限。
+resource "google_storage_bucket_iam_member" "app_preview_object_viewer" {
+  bucket = google_storage_bucket.input.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.app.email}"
+}

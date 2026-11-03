@@ -88,7 +88,7 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-3">
+      <div className="border border-brand/20 rounded-xs bg-app-bg p-4 space-y-3">
         <div className="flex items-center gap-2">
           <RecordingStatusBadge status={recordingDisplayStatus(view.status, view.episodeStatus)} />
           {view.episodeStatus && view.episodeStatus !== "failed" && (
@@ -151,7 +151,7 @@ export function PostRecordingPanel({ sessionId }: { sessionId: string }) {
       </div>
 
       {downloads.length > 0 && (
-        <div className="border border-brand/20 rounded-xs bg-white/60 p-4 space-y-2">
+        <div className="border border-brand/20 rounded-xs bg-app-bg p-4 space-y-2">
           <p className="text-sm font-medium text-gray-700">話者別の録音（編集用・30 日で削除されます）</p>
           <ul className="space-y-1">
             {downloads.map((track) => (

@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Radio, Rss, Key, RefreshCw, Eye, EyeOff, Users } from "lucide-react";
+import { Save, Radio, Rss, Key, RefreshCw, Eye, EyeOff, Users, ShieldCheck } from "lucide-react";
+
+type ChannelSecretsResponse = {
+  x_api_key?: string;
+  x_api_secret?: string;
+  x_access_token?: string;
+  x_access_token_secret?: string;
+  discord_bot_token?: string;
+  error?: string;
+};
 
 export function SettingsForm({
   podcastId,
@@ -10,18 +19,27 @@ export function SettingsForm({
   description: initialDescription,
   rssFeedPath: initialRssFeedPath,
   castMembers: initialCastMembers,
+  audioAuditEnabled: initialAudioAuditEnabled = true,
+  confidentialTerms: initialConfidentialTerms = [],
+  allowedTerms: initialAllowedTerms = [],
 }: {
   podcastId: number;
   title: string;
   description: string;
   rssFeedPath: string;
   castMembers: string;
+  audioAuditEnabled?: boolean;
+  confidentialTerms?: string[];
+  allowedTerms?: string[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [rssFeedPath, setRssFeedPath] = useState(initialRssFeedPath);
   const [castMembers, setCastMembers] = useState(initialCastMembers);
+  const [audioAuditEnabled, setAudioAuditEnabled] = useState(initialAudioAuditEnabled);
+  const [confidentialTerms, setConfidentialTerms] = useState(initialConfidentialTerms.join("\n"));
+  const [allowedTerms, setAllowedTerms] = useState(initialAllowedTerms.join("\n"));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -51,23 +69,27 @@ export function SettingsForm({
     async function fetchSecrets() {
       try {
         setLoadingSecrets(true);
+        setSecretsError("");
         const response = await fetch(`/api/podcasts/${podcastId}/secrets`);
-        if (response.ok) {
-          const data = await response.json();
-          setXApiKey(data.x_api_key || "");
-          setXApiSecret(data.x_api_secret || "");
-          setXAccessToken(data.x_access_token || "");
-          setXAccessTokenSecret(data.x_access_token_secret || "");
-          setDiscordBotToken(data.discord_bot_token || "");
-        } else {
-          console.error("Failed to load secrets");
+        const result = (await response.json()) as ChannelSecretsResponse;
+        if (!response.ok) {
+          setSecretsError(result.error ?? "シークレットの取得に失敗しました");
+          return;
         }
+        setXApiKey(result.x_api_key || "");
+        setXApiSecret(result.x_api_secret || "");
+        setXAccessToken(result.x_access_token || "");
+        setXAccessTokenSecret(result.x_access_token_secret || "");
+        setDiscordBotToken(result.discord_bot_token || "");
       } catch (err) {
-        console.error("Error loading secrets:", err);
+        setSecretsError(
+          err instanceof Error ? err.message : "シークレットの取得に失敗しました",
+        );
       } finally {
         setLoadingSecrets(false);
       }
     }
+
     fetchSecrets();
   }, [podcastId]);
 
@@ -127,6 +149,9 @@ export function SettingsForm({
           description: description.trim() || undefined,
           rssFeedPath: rssFeedPath.trim(),
           castMembers: castMembers.trim(),
+          audioAuditEnabled,
+          confidentialTerms: confidentialTerms.split("\n").map((term) => term.trim()).filter(Boolean),
+          allowedTerms: allowedTerms.split("\n").map((term) => term.trim()).filter(Boolean),
         }),
       });
       const result = (await response.json()) as { error?: string };
@@ -144,19 +169,13 @@ export function SettingsForm({
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center text-xs text-gray-500 gap-2">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">番組設定</span>
-      </div>
-
       {error && (
         <p className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
           {error}
         </p>
       )}
 
-      <div className="rounded-xs border border-brand/30 p-6 space-y-6">
+      <div className="rounded-xs border border-brand/30 p-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Radio className="w-5 h-5 text-brand" />
@@ -181,7 +200,7 @@ export function SettingsForm({
               }}
               required
               maxLength={255}
-              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -197,7 +216,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={2000}
-              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -213,7 +232,7 @@ export function SettingsForm({
                 setSaved(false);
               }}
               maxLength={2000}
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs font-mono text-gray-800 focus:outline-none focus:border-brand"
             />
           </div>
 
@@ -234,21 +253,92 @@ export function SettingsForm({
               }}
               maxLength={500}
               placeholder="例: さとう、すずき、たかはし"
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base sm:text-sm text-gray-900 focus:outline-none focus:border-brand"
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
             />
             <p className="text-xs text-gray-500 mt-1">
               読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
             </p>
           </div>
 
-          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+          <div className="flex items-center justify-between p-3.5 rounded-xs border border-brand/30 bg-gray-50/60">
+            <div className="pr-4">
+              <span id="audio-audit-toggle-label" className="text-xs font-semibold text-gray-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-brand" />
+                AI監査（ファクトチェック・ポリシー監査）を有効にする
+              </span>
+              <p className="text-xs text-gray-500 mt-1">
+                音声アップロード時に Jev 監査および Gemini ディレクター介入（事実確認・訂正生成）を実行します。無効化すると AI 利用料を最適化できます。
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={audioAuditEnabled}
+              aria-labelledby="audio-audit-toggle-label"
+              onClick={() => {
+                setAudioAuditEnabled((prev) => !prev);
+                setSaved(false);
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
+                audioAuditEnabled ? "bg-brand" : "bg-gray-300"
+              }`}
+            >
+              <span className="sr-only">AI監査（ファクトチェック・ポリシー監査）を有効にする</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  audioAuditEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div>
+            <label htmlFor="confidential-terms" className="block text-xs font-semibold text-gray-700 mb-1.5">
+              音声監査: 機密語句
+            </label>
+            <textarea
+              id="confidential-terms"
+              rows={4}
+              value={confidentialTerms}
+              onChange={(event) => {
+                setConfidentialTerms(event.target.value);
+                setSaved(false);
+              }}
+              maxLength={40_000}
+              placeholder={"1行に1語句\n例: 未公開プロジェクト名"}
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">一致した語句は機密情報として承認待ちになります。</p>
+          </div>
+
+          <div>
+            <label htmlFor="allowed-terms" className="block text-xs font-semibold text-gray-700 mb-1.5">
+              音声監査: 許可語句
+            </label>
+            <textarea
+              id="allowed-terms"
+              rows={4}
+              value={allowedTerms}
+              onChange={(event) => {
+                setAllowedTerms(event.target.value);
+                setSaved(false);
+              }}
+              maxLength={40_000}
+              placeholder={"1行に1語句\n例: 公開済みの代表メールアドレス"}
+              className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:border-brand"
+            />
+            <p className="text-xs text-gray-500 mt-1">許可語句はローカル PII・カスタム語句検知から除外されます。</p>
+          </div>
+
+          <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
             <span className="text-xs text-emerald-600 font-semibold">
               {saved ? "設定を更新しました" : ""}
             </span>
             <button
               type="submit"
               disabled={saving || title.trim().length === 0}
-              className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+              className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> {saving ? "保存中..." : "設定を保存"}
             </button>
@@ -256,7 +346,7 @@ export function SettingsForm({
         </form>
       </div>
 
-      <div className="rounded-xs border border-brand/30 p-6 space-y-6">
+      <div className="rounded-xs border border-brand/30 p-4 sm:p-6 space-y-6">
         <div>
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Key className="w-5 h-5 text-brand" />
@@ -299,12 +389,13 @@ export function SettingsForm({
                           setXApiKey(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXApiKey ? "API Keyを隠す" : "API Keyを表示"}
                         onClick={() => setShowXApiKey(!showXApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -323,12 +414,13 @@ export function SettingsForm({
                           setXApiSecret(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXApiSecret ? "API Secretを隠す" : "API Secretを表示"}
                         onClick={() => setShowXApiSecret(!showXApiSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXApiSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -347,12 +439,13 @@ export function SettingsForm({
                           setXAccessToken(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXAccessToken ? "Access Tokenを隠す" : "Access Tokenを表示"}
                         onClick={() => setShowXAccessToken(!showXAccessToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXAccessToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -371,12 +464,13 @@ export function SettingsForm({
                           setXAccessTokenSecret(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showXAccessTokenSecret ? "Access Token Secretを隠す" : "Access Token Secretを表示"}
                         onClick={() => setShowXAccessTokenSecret(!showXAccessTokenSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showXAccessTokenSecret ? (
                           <EyeOff className="w-4 h-4" />
@@ -407,12 +501,13 @@ export function SettingsForm({
                           setDiscordBotToken(e.target.value);
                           setSavedSecrets(false);
                         }}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                        className="w-full pl-3.5 pr-11 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                       />
                       <button
                         type="button"
+                        aria-label={showDiscordBotToken ? "Discord Bot Tokenを隠す" : "Discord Bot Tokenを表示"}
                         onClick={() => setShowDiscordBotToken(!showDiscordBotToken)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                        className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
                       >
                         {showDiscordBotToken ? (
                           <EyeOff className="w-4 h-4" />
@@ -426,38 +521,14 @@ export function SettingsForm({
               </div>
             </div>
 
-            <div>
-            <label
-              htmlFor="cast-members"
-              className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5"
-            >
-              <Users className="w-3.5 h-3.5 text-brand" /> 登場人物
-            </label>
-            <input
-              id="cast-members"
-              type="text"
-              value={castMembers}
-              onChange={(e) => {
-                setCastMembers(e.target.value);
-                setSaved(false);
-              }}
-              maxLength={500}
-              placeholder="例: さとう、すずき、たかはし"
-              className="w-full px-3.5 py-2 rounded-xs border border-brand text-sm text-gray-900 focus:outline-none focus:border-brand"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              読点（、）かカンマで区切ります。アップロードしたエピソードの文字起こしで、誰の発言かを判定するのに使います。
-            </p>
-          </div>
-
-          <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+            <div className="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-gray-100">
               <span className="text-xs text-emerald-600 font-semibold">
                 {savedSecrets ? "シークレット設定を更新しました" : ""}
               </span>
               <button
                 type="submit"
                 disabled={savingSecrets}
-                className="px-6 py-2.5 bg-brand hover:bg-brand-hover text-white rounded-xs text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />{" "}
                 {savingSecrets ? "保存中..." : "シークレットを保存"}

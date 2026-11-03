@@ -45,6 +45,14 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = var.project_id
       }
+      env {
+        name  = "POLICY_MEDIA_URL"
+        value = google_cloud_run_v2_service.policy_media.uri
+      }
+      env {
+        name  = "POLICY_AUDIO_BUCKET"
+        value = google_storage_bucket.policy_audio.name
+      }
       # Supabase(Postgres) へ DATABASE_URL で接続する。
       # CLOUD_SQL_INSTANCE_CONNECTION_NAME を渡さないことで db-pool.ts の
       # DATABASE_URL 経路（discrete params + SSL）に載る。
@@ -64,6 +72,10 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
       env {
         name  = "GCS_SIGNED_URL_TTL_SECONDS"
         value = "900"
+      }
+      env {
+        name  = "AUTOMATOR_JOB_NAME"
+        value = "projects/${var.project_id}/locations/${var.region}/jobs/${local.automator_name_prefix}-app-${var.environment}"
       }
       env {
         name = "CRON_SECRET"
@@ -150,7 +162,10 @@ resource "google_cloud_run_v2_service" "sparkcast_ui" {
       # （#72 Stage 8 の SA 改名では実際にそうした）。
       # （#166 で収録用の env を足したときも、dev への反映の間だけ外して戻した）。
       # （#174 で prod に収録用の env を足したときも、prod への反映の間だけ外して戻した）。
-      template[0].revision,
+      #
+      # ⚠️ #211: AUTOMATOR_JOB_NAME の環境変数を反映するため、いま一時的に外している。
+      # dev / prod への apply が済んだら、次のリリースで元に戻す。
+      # template[0].revision,
       template[0].labels,
       template[0].annotations,
       # default_labels によるサービスラベル更新を抑止（gcloud 管理サービスへの不要 PATCH 回避）。

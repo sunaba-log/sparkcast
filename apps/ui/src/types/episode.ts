@@ -2,6 +2,10 @@ export type EpisodeStatus =
   | "upload_pending"
   | "uploaded"
   | "processing"
+  | "auditing"
+  | "awaiting_approval"
+  | "awaiting_publish_confirmation"
+  | "editing"
   | "completed"
   | "failed";
 
@@ -25,8 +29,12 @@ export type Episode = {
   status: EpisodeStatus;
   audioFileName: string;
   audioUrl: string | null;
+  sourceAudioUrl?: string | null;
   artworkUrl: string | null;
   processingError: string | null;
+  publishedAt?: string | null;
+  isPublished?: boolean;
+  rssGuid?: string;
   minutesGenerated: boolean;
   // 話者・時刻つきの文字起こしがあるか（#166 以降に処理したエピソード）
   transcriptAvailable: boolean;
@@ -64,4 +72,92 @@ export type TranscriptSegment = {
   speaker: string;
   speakerId: string | null;
   text: string;
+};
+
+export type DirectorInterventionStatus = "pending" | "approved" | "rejected";
+export type DirectorInterventionAction = "insert" | "cut" | "silence" | "replace";
+
+export type DirectorIntervention = {
+  id: string;
+  insertAt: number;
+  start?: number;
+  end?: number;
+  sourceText: string;
+  speaker: string;
+  severity: 1 | 2 | 3 | 4 | 5;
+  category: string;
+  correctionScript: string;
+  reason?: string;
+  referenceUrl?: string | null;
+  status: DirectorInterventionStatus;
+  action?: DirectorInterventionAction;
+  assetId?: string | null;
+};
+
+export type PolicyFindingStatus = "pending" | "approved" | "rejected";
+
+export type PolicyFinding = {
+  id: string;
+  chunkId: string;
+  category: "pii" | "confidential_information" | "third_party_risk";
+  source: "presidio" | "jev";
+  start: number;
+  end: number;
+  text: string;
+  entityType: string | null;
+  action: "silence" | "cut" | "replace";
+  segmentIds?: string[];
+  evidenceText?: string;
+  evidenceStart?: number | null;
+  evidenceEnd?: number | null;
+  wordIds?: string[];
+  contextWordIds?: string[];
+  rangePrecision?: "word" | "chunk";
+  probability?: number | null;
+  status: PolicyFindingStatus;
+};
+
+export type TranscriptWord = {
+  wordId: string;
+  text: string;
+  start: number;
+  end: number;
+};
+
+export type PolicyEditProposal = {
+  id: string;
+  findingIds: string[];
+  findings: PolicyFinding[];
+  start: number;
+  end: number;
+  action: "cut" | "silence" | "replace";
+  recommendedAction: "cut" | "silence" | "replace";
+  reason: string;
+  script: string;
+  status: PolicyFindingStatus;
+  rangeConfirmed: boolean;
+  rangePrecision: "word" | "chunk";
+  assetId: string | null;
+};
+
+export type PolicyReview = {
+  version: number;
+  sourceGeneration: string;
+  transcriptRevision: string;
+  proposals: PolicyEditProposal[];
+  words: TranscriptWord[];
+  dispatchRetryPlanId?: string | null;
+};
+
+export type ReplacementAudioAsset = {
+  id: string;
+  proposalId: string;
+  kind: "synthesized" | "recorded";
+  script: string;
+  transcript: string;
+  durationMs: number;
+  objectPath: string;
+  sha256?: string;
+  sourceGeneration?: string;
+  transcriptRevision?: string;
 };

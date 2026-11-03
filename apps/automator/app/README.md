@@ -5,6 +5,11 @@ Cloud Run Jobs 上で動作するポッドキャスト配信自動化アプリ�
 - Podcast Processing Job: GCS 音声を文字起こし・要約し、R2 配信と RSS 更新、Discord 通知まで実行
 - Weekly Agenda Job: Discord の transcript から収録アジェンダを生成し、Discord 通知
 
+訂正スクリプトを承認後に挿入するための音声編集部品も提供します。`DirectorVoiceSynthesizer` は
+Google Cloud TTS の Japanese Neural2/Journey 音声を MP3 として生成し、`AudioCutInEditor` は
+元タイムラインのミリ秒位置に無音境界・フェード・ローカル RMS 正規化を施して挿入します。
+複数の訂正は元タイムライン順に処理され、先行する挿入時間を自動的にオフセットします。
+
 ## アーキテクチャ概要
 
 DDD 構成に段階移行済みです。レイヤ責務は次の通りです。

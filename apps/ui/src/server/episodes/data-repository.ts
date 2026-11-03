@@ -5,8 +5,13 @@ import { getDbPool } from "@/server/db";
 import { getAdminFirestore } from "@/server/firebase-admin";
 import type {
   Episode,
+  DirectorIntervention,
+  DirectorInterventionAction,
+  DirectorInterventionStatus,
   EpisodePromotion,
   EpisodeStatus,
+  PolicyFinding,
+  PolicyFindingStatus,
   TranscriptSegment,
 } from "@/types/episode";
 
@@ -20,6 +25,7 @@ type EpisodeRow = QueryResultRow & {
   status: EpisodeStatus;
   processing_error: string | null;
   created_at: Date;
+  published_at: Date | null;
   artwork_url: string | null;
 };
 
@@ -35,12 +41,64 @@ type FirestoreEpisodeContent = {
   editorial?: {
     minutes?: string;
   };
+  rss_guid?: string;
+  published_at?: Date | { toDate: () => Date } | string | null;
+  is_published?: boolean;
+  audio_metadata?: {
+    audio_url?: string;
+    duration_str?: string;
+    file_size_bytes?: number;
+    mime_type?: string;
+  };
+  ai_generated_meta?: {
+    title?: string;
+    description?: string;
+  };
 };
 
 type EpisodeContent = {
   minutes: string;
   transcriptAvailable: boolean;
   promotions: EpisodePromotion[];
+  rssGuid?: string;
+};
+
+type FirestoreDirectorIntervention = {
+  chunk_id?: string;
+  target_speaker?: string;
+  insert_timestamp_ms?: number;
+  start_ms?: number;
+  end_ms?: number;
+  correction_script?: string;
+  reason?: string;
+  reference_url?: string;
+  audit_metrics?: {
+    score?: number;
+    choice?: string;
+  };
+  status?: string;
+  action?: string;
+  asset_id?: string | null;
+};
+
+type FirestorePolicyFinding = {
+  chunk_id?: string;
+  category?: string;
+  source?: string;
+  start_ms?: number;
+  end_ms?: number;
+  text?: string;
+  entity_type?: string | null;
+  segment_ids?: string[];
+  evidence_text?: string;
+  evidence_start?: number;
+  evidence_end?: number;
+  word_ids?: string[];
+  context_word_ids?: string[];
+  range_precision?: "word" | "chunk";
+  probability?: number;
+  action?: string;
+  status?: string;
 };
 
 function audioFileName(path: string | null): string {
@@ -100,7 +158,15 @@ async function loadEpisodeContent(
     };
   });
 
-  return { minutes, transcriptAvailable, promotions };
+  promotions.sort((a, b) => {
+    const timeA = new Date(a.scheduledTime || a.generatedAt).getTime();
+    const timeB = new Date(b.scheduledTime || b.generatedAt).getTime();
+    const diff = (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+    if (diff !== 0) return diff;
+    return (b.id || "").localeCompare(a.id || "");
+  });
+
+  return { minutes, transcriptAvailable, promotions, rssGuid: content?.rss_guid };
 }
 
 function episodeContentRef(podcastId: number, episodeId: number) {
@@ -116,8 +182,10 @@ export async function listTranscriptSegments(
   podcastId: number,
   episodeId: number,
 ): Promise<TranscriptSegment[]> {
-  const snapshot = await episodeContentRef(podcastId, episodeId)
-    .collection("transcripts")
+  const root = episodeContentRef(podcastId, episodeId);
+  const content = await root.get();
+  const snapshot = await root
+    .collection(content.data()?.active_edit_plan_id ? "rendition_transcripts" : "transcripts")
     .orderBy("chunk_id")
     .get();
   return snapshot.docs
@@ -135,6 +203,232 @@ export async function listTranscriptSegments(
     .filter((segment) => segment.text.trim().length > 0);
 }
 
+function toDirectorIntervention(
+  id: string,
+  data: FirestoreDirectorIntervention,
+  transcript?: { text: string; start: number; end: number },
+): DirectorIntervention {
+  const severity = Math.min(5, Math.max(1, Math.round(Number(data.audit_metrics?.score ?? 1)))) as 1 | 2 | 3 | 4 | 5;
+  const status: DirectorInterventionStatus =
+    data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  const action: DirectorInterventionAction =
+    data.action === "cut" || data.action === "silence" || data.action === "replace" || data.action === "insert"
+      ? data.action
+      : "insert";
+  const insertAt = Number(data.insert_timestamp_ms ?? 0) / 1_000;
+  const start =
+    data.start_ms !== undefined
+      ? Number(data.start_ms) / 1_000
+      : transcript?.start !== undefined
+        ? transcript.start
+        : Math.max(0, insertAt - 2);
+  const end =
+    data.end_ms !== undefined
+      ? Number(data.end_ms) / 1_000
+      : transcript?.end !== undefined
+        ? transcript.end
+        : insertAt;
+
+  return {
+    id,
+    insertAt,
+    start,
+    end,
+    sourceText: transcript?.text ?? "",
+    speaker: String(data.target_speaker ?? ""),
+    severity,
+    category: String(data.audit_metrics?.choice ?? "other"),
+    correctionScript: String(data.correction_script ?? ""),
+    reason: data.reason ? String(data.reason) : undefined,
+    referenceUrl: data.reference_url ? String(data.reference_url) : null,
+    status,
+    action,
+    assetId: data.asset_id ?? null,
+  };
+}
+
+export async function listDirectorInterventions(
+  podcastId: number,
+  episodeId: number,
+): Promise<DirectorIntervention[]> {
+  const contentRef = episodeContentRef(podcastId, episodeId);
+  const [interventionsSnapshot, transcriptsSnapshot] = await Promise.all([
+    contentRef.collection("director_interventions").get(),
+    contentRef.collection("transcripts").get(),
+  ]);
+  const transcriptByChunkId = new Map(
+    transcriptsSnapshot.docs.map((document) => {
+      const data = document.data();
+      return [
+        document.id,
+        {
+          text: String(data.text ?? ""),
+          start: Number(data.start_time ?? 0),
+          end: Number(data.end_time ?? 0),
+        },
+      ];
+    }),
+  );
+  return interventionsSnapshot.docs
+    .map((document) => {
+      const data = document.data() as FirestoreDirectorIntervention;
+      return toDirectorIntervention(
+        document.id,
+        data,
+        transcriptByChunkId.get(String(data.chunk_id ?? "")),
+      );
+    })
+    .sort((left, right) => left.insertAt - right.insertAt);
+}
+
+export async function updateDirectorInterventions(input: {
+  podcastId: number;
+  episodeId: number;
+  interventions: Array<
+    Pick<DirectorIntervention, "id" | "correctionScript" | "status"> & {
+      action?: DirectorInterventionAction;
+      start?: number;
+      end?: number;
+      assetId?: string | null;
+    }
+  >;
+  updatedBy: string;
+}): Promise<void> {
+  const batch = getAdminFirestore().batch();
+  const collection = episodeContentRef(input.podcastId, input.episodeId)
+    .collection("director_interventions");
+  for (const intervention of input.interventions) {
+    const updateData: Record<string, unknown> = {
+      correction_script: intervention.correctionScript,
+      status: intervention.status,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: input.updatedBy,
+    };
+    if (intervention.action) {
+      updateData.action = intervention.action;
+    }
+    if (intervention.start !== undefined) {
+      updateData.start_ms = Math.round(intervention.start * 1000);
+    }
+    if (intervention.end !== undefined) {
+      updateData.end_ms = Math.round(intervention.end * 1000);
+    }
+    if (intervention.assetId !== undefined) {
+      updateData.asset_id = intervention.assetId;
+    }
+    batch.set(
+      collection.doc(intervention.id),
+      updateData,
+      { merge: true },
+    );
+  }
+  await batch.commit();
+}
+
+function toPolicyFinding(id: string, data: FirestorePolicyFinding): PolicyFinding {
+  const category =
+    data.category === "pii" || data.category === "confidential_information" || data.category === "third_party_risk"
+      ? data.category
+      : "pii";
+  const source = data.source === "jev" ? "jev" : "presidio";
+  const status: PolicyFindingStatus =
+    data.status === "approved" || data.status === "rejected" ? data.status : "pending";
+  return {
+    id,
+    chunkId: String(data.chunk_id ?? ""),
+    category,
+    source,
+    start: Number(data.start_ms ?? 0) / 1_000,
+    end: Number(data.end_ms ?? 0) / 1_000,
+    text: String(data.text ?? ""),
+    entityType: data.entity_type ? String(data.entity_type) : null,
+    action: data.action === "cut" || data.action === "replace" ? data.action : "silence",
+    segmentIds: data.segment_ids ?? [],
+    evidenceText: data.evidence_text,
+    evidenceStart: data.evidence_start ?? null,
+    evidenceEnd: data.evidence_end ?? null,
+    wordIds: data.word_ids ?? [],
+    contextWordIds: data.context_word_ids ?? [],
+    rangePrecision: data.range_precision ?? "chunk",
+    probability: data.probability ?? null,
+    status,
+  };
+}
+
+export async function listPolicyFindings(
+  podcastId: number,
+  episodeId: number,
+): Promise<PolicyFinding[]> {
+  const snapshot = await episodeContentRef(podcastId, episodeId)
+    .collection("policy_findings")
+    .get();
+  return snapshot.docs
+    .map((document) => toPolicyFinding(document.id, document.data() as FirestorePolicyFinding))
+    .sort((left, right) => left.start - right.start || left.id.localeCompare(right.id));
+}
+
+export async function updatePolicyFindings(input: {
+  podcastId: number;
+  episodeId: number;
+  findings: Array<Pick<PolicyFinding, "id" | "status">>;
+  updatedBy: string;
+}): Promise<void> {
+  const batch = getAdminFirestore().batch();
+  const collection = episodeContentRef(input.podcastId, input.episodeId)
+    .collection("policy_findings");
+  for (const finding of input.findings) {
+    batch.set(
+      collection.doc(finding.id),
+      {
+        status: finding.status,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: input.updatedBy,
+      },
+      { merge: true },
+    );
+  }
+  await batch.commit();
+}
+
+export async function markEpisodeEditing(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'editing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_approval'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function markEpisodeAwaitingPublishConfirmation(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'awaiting_publish_confirmation', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_approval'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function markEpisodePublishingOriginal(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'processing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2 AND status = 'awaiting_publish_confirmation'`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
 function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
   return {
     id: String(row.episode_id),
@@ -145,8 +439,14 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
     status: row.status,
     audioFileName: audioFileName(row.source_audio_path ?? row.audio_file_path),
     audioUrl: row.status === "completed" ? row.audio_file_path : null,
+    sourceAudioUrl: row.source_audio_path && row.status !== "upload_pending"
+      ? `/api/episodes/${row.episode_id}/source-audio`
+      : null,
     artworkUrl: row.artwork_url || null,
     processingError: row.processing_error,
+    publishedAt: row.published_at ? row.published_at.toISOString() : null,
+    isPublished: Boolean(row.published_at && row.status === "completed"),
+    rssGuid: content.rssGuid,
     minutesGenerated: Boolean(content.minutes),
     transcriptAvailable: content.transcriptAvailable,
     xPostsGenerated: content.promotions.length > 0,
@@ -160,7 +460,7 @@ function toEpisode(row: EpisodeRow, content: EpisodeContent): Episode {
 export async function listEpisodes(podcastId: number): Promise<Episode[]> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC`,
@@ -179,7 +479,7 @@ export async function findEpisode(
 ): Promise<Episode | null> {
   const result = await (await getDbPool()).query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1 AND episode_id = $2`,
     [podcastId, episodeId],
@@ -251,7 +551,7 @@ export async function listEpisodesAndPromotionsPaginated(
 
   const result = await pool.query<EpisodeRow>(
     `SELECT episode_id, podcast_id, title, description, source_audio_path,
-            audio_file_path, status, processing_error, created_at, artwork_url
+            audio_file_path, status, processing_error, created_at, published_at, artwork_url
      FROM episodes
      WHERE podcast_id = $1
      ORDER BY created_at DESC
@@ -317,4 +617,197 @@ export async function deleteSnsPromotion(input: {
     .collection("sns_promotions")
     .doc(input.promotionId)
     .delete();
+}
+
+export async function setEpisodePublished(
+  podcastId: number,
+  episodeId: number,
+  published: boolean,
+): Promise<boolean> {
+  const pool = await getDbPool();
+  const contentRef = episodeContentRef(podcastId, episodeId);
+
+  let publishedAtDate: Date | null = null;
+  if (published) {
+    const docSnapshot = await contentRef.get().catch(() => null);
+    const docData = docSnapshot?.data() as FirestoreEpisodeContent | undefined;
+    const rssGuid = docData?.rss_guid || crypto.randomUUID();
+
+    if (docData?.published_at) {
+      if (typeof docData.published_at === "object" && "toDate" in docData.published_at && typeof docData.published_at.toDate === "function") {
+        publishedAtDate = docData.published_at.toDate();
+      } else if (docData.published_at instanceof Date) {
+        publishedAtDate = docData.published_at;
+      } else if (typeof docData.published_at === "string") {
+        publishedAtDate = new Date(docData.published_at);
+      }
+    } else {
+      const dbRow = await pool.query<{ published_at: Date | null }>(
+        `SELECT published_at FROM episodes WHERE podcast_id = $1 AND episode_id = $2`,
+        [podcastId, episodeId],
+      ).catch(() => null);
+      if (dbRow?.rows?.[0]?.published_at) {
+        publishedAtDate = new Date(dbRow.rows[0].published_at);
+      } else {
+        publishedAtDate = new Date();
+      }
+    }
+
+    try {
+      await contentRef.set(
+        {
+          is_published: true,
+          rss_guid: rssGuid,
+          published_at: publishedAtDate,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      console.warn(`Failed to update firestore publish status for ep ${episodeId}:`, err);
+    }
+  } else {
+    try {
+      await contentRef.set(
+        {
+          is_published: false,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      console.warn(`Failed to update firestore unpublish status for ep ${episodeId}:`, err);
+    }
+  }
+
+  const result = await pool.query(
+    `UPDATE episodes
+     SET published_at = $1, updated_at = now()
+     WHERE podcast_id = $2 AND episode_id = $3`,
+    [published ? (publishedAtDate ?? new Date()) : null, podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function updateEpisodeAudio(input: {
+  podcastId: number;
+  episodeId: number;
+  audioUrl: string;
+  durationSeconds?: number;
+  fileSizeBytes?: number;
+  mimeType?: string;
+}): Promise<boolean> {
+  const pool = await getDbPool();
+  const result = await pool.query(
+    `UPDATE episodes
+     SET audio_file_path = $1,
+         duration_seconds = COALESCE($2, duration_seconds),
+         updated_at = now()
+     WHERE podcast_id = $3 AND episode_id = $4`,
+    [input.audioUrl, input.durationSeconds ?? null, input.podcastId, input.episodeId],
+  );
+
+  try {
+    const contentRef = episodeContentRef(input.podcastId, input.episodeId);
+    const audioMetadataUpdate: Record<string, unknown> = {
+      audio_url: input.audioUrl,
+    };
+    if (input.durationSeconds !== undefined) {
+      const hours = Math.floor(input.durationSeconds / 3600);
+      const minutes = Math.floor((input.durationSeconds % 3600) / 60);
+      const seconds = input.durationSeconds % 60;
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      audioMetadataUpdate.duration_str = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    if (input.fileSizeBytes !== undefined) {
+      audioMetadataUpdate.file_size_bytes = input.fileSizeBytes;
+    }
+    if (input.mimeType !== undefined) {
+      audioMetadataUpdate.mime_type = input.mimeType;
+    }
+
+    await contentRef.set(
+      {
+        audio_metadata: audioMetadataUpdate,
+        updated_at: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    console.warn(`Failed to update firestore audio metadata for ep ${input.episodeId}:`, err);
+  }
+
+  return result.rowCount === 1;
+}
+
+export async function deleteEpisodeRecord(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const pool = await getDbPool();
+  const result = await pool.query(
+    `DELETE FROM episodes
+     WHERE podcast_id = $1 AND episode_id = $2`,
+    [podcastId, episodeId],
+  );
+
+  // Firestore 内のコンテンツもクリーンアップ
+  try {
+    const contentRef = episodeContentRef(podcastId, episodeId);
+    await contentRef.delete();
+  } catch (error) {
+    console.warn(`Failed to delete firestore episode content for ${episodeId}:`, error);
+  }
+
+  return result.rowCount === 1;
+}
+
+export async function markEpisodeAuditing(
+  podcastId: number,
+  episodeId: number,
+): Promise<boolean> {
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET status = 'auditing', processing_error = NULL, updated_at = now()
+     WHERE podcast_id = $1 AND episode_id = $2`,
+    [podcastId, episodeId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function updateEpisodeMetadata(
+  podcastId: number,
+  episodeId: number,
+  title?: string,
+  description?: string,
+): Promise<boolean> {
+  if (title === undefined && description === undefined) return true;
+  const result = await (await getDbPool()).query(
+    `UPDATE episodes
+     SET title = COALESCE($1, title),
+         description = COALESCE($2, description),
+         updated_at = now()
+     WHERE podcast_id = $3 AND episode_id = $4`,
+    [title ?? null, description ?? null, podcastId, episodeId],
+  );
+
+  try {
+    const contentRef = episodeContentRef(podcastId, episodeId);
+    const metaUpdate: Record<string, unknown> = {};
+    if (title !== undefined) metaUpdate.title = title;
+    if (description !== undefined) metaUpdate.description = description;
+    if (Object.keys(metaUpdate).length > 0) {
+      await contentRef.set(
+        {
+          ai_generated_meta: metaUpdate,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    }
+  } catch (err) {
+    console.warn(`Failed to update firestore metadata for ep ${episodeId}:`, err);
+  }
+
+  return result.rowCount === 1;
 }

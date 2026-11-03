@@ -17,6 +17,9 @@ const updateSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   rssFeedPath: z.string().trim().max(2000).optional(),
   castMembers: z.string().trim().max(500).optional(),
+  audioAuditEnabled: z.boolean().optional(),
+  confidentialTerms: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
+  allowedTerms: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
 });
 
 function parsePodcastId(raw: string): number | null {
@@ -56,6 +59,16 @@ export async function PATCH(
         input.rssFeedPath === undefined ? undefined : input.rssFeedPath || null,
       castMembers:
         input.castMembers === undefined ? undefined : input.castMembers || null,
+      audioAuditPolicy:
+        input.audioAuditEnabled === undefined &&
+        input.confidentialTerms === undefined &&
+        input.allowedTerms === undefined
+          ? undefined
+          : {
+              enabled: input.audioAuditEnabled,
+              confidentialTerms: input.confidentialTerms,
+              allowedTerms: input.allowedTerms,
+            },
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

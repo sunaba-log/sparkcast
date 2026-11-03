@@ -12,11 +12,10 @@ module "cloud_run_job" {
   job_name                       = "${local.automator_name_prefix}-app-${var.environment}"
   service_account_email          = local.default_compute_service_account
 
-  # 音声認識を急がない処理（ダイナミックバッチ）にしたので、結果を待つ時間が延びうる（#166）。
-  # 認識を待つ上限（SPEECH_TIMEOUT_SECONDS = 5 時間）に、その前後の処理の分を足した長さ
-  timeout            = "21600s"
-  memory             = "8Gi"
-  cpu                = "2"
+  # 動的文字起こしの待機に加え、Pydub/ffmpeg の音声差し替えを行うため余裕を持たせる（#173）。
+  timeout            = "25200s"
+  memory             = "12Gi"
+  cpu                = "4"
   max_instance_count = 1
 
   environment_variables = {
@@ -41,22 +40,39 @@ module "cloud_run_job" {
     PODCAST_ID                               = var.podcast_id
     SNS_SCHEDULE_OFFSET_HOURS                = var.sns_schedule_offset_hours
     # 話者・時刻つきの文字起こし（#166、transcription.tf）
-    WORK_BUCKET     = google_storage_bucket.work.name
-    SPEECH_LOCATION = "asia-northeast1"
-    SPEECH_MODEL    = "long"
+    POLICY_AUDIO_BUCKET = google_storage_bucket.policy_audio.name
+    WORK_BUCKET         = google_storage_bucket.work.name
+    SPEECH_LOCATION     = "asia-northeast1"
+    SPEECH_MODEL        = "long"
     # 1 分 $0.016 → $0.003。結果が出るまでの時間に保証は無いので、待つ上限を長めにする
     SPEECH_DYNAMIC_BATCH   = "true"
     SPEECH_TIMEOUT_SECONDS = "18000"
     # エピソードが完成したらチャット用の索引をすぐ作り直してもらう（#166。認証は定期実行と同じ CRON_SECRET）
     APP_BASE_URL = local.app_base_url
+    # Jev 入出力トレースログ保存（#220）
+    AUDIT_TRACE_ENABLED    = tostring(var.audit_trace_enabled)
+    AUDIT_TRACE_GCS_BUCKET = google_storage_bucket.audit_traces.name
+    AUDIT_TRACE_PREFIX     = var.audit_trace_prefix
   }
 
   secret_environment_variables = {
-    DATABASE_URL = var.database_url_secret_name
-    CRON_SECRET  = data.google_secret_manager_secret.cron_secret.secret_id
+    DATABASE_URL     = var.database_url_secret_name
+    CRON_SECRET      = data.google_secret_manager_secret.cron_secret.secret_id
+    JEV_API_KEY      = google_secret_manager_secret.jev_api_key.secret_id
+    TYPESAFE_API_KEY = google_secret_manager_secret.jev_api_key.secret_id
   }
 
   depends_on = [
     google_project_service.required,
+    google_storage_bucket_iam_member.job_audit_traces_access,
   ]
+}
+
+# UI のアプリ SA は、automator の Job を env の上書き（GCS_TRIGGER_OBJECT_NAME, RESUME_FROM_AUDIT 等）付きで起動できる（#204, #205）
+resource "google_cloud_run_v2_job_iam_member" "app_run_automator" {
+  project  = var.project_id
+  location = var.region
+  name     = module.cloud_run_job.job_name
+  role     = "roles/run.jobsExecutorWithOverrides"
+  member   = "serviceAccount:${google_service_account.app.email}"
 }

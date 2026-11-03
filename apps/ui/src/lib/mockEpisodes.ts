@@ -2,7 +2,7 @@ import { Episode } from "@/types/episode";
 
 export const mockEpisodes: Episode[] = [
   {
-    id: "ep-001",
+    id: "1",
     podcastId: 1,
     title: "AIとポッドキャストの未来について語る",
     description: "",
@@ -51,7 +51,7 @@ AI技術の進化により、ポッドキャスト制作の民主化が加速し
     ],
   },
   {
-    id: "ep-002",
+    id: "2",
     podcastId: 1,
     title: "スタートアップ創業期のリアルな話",
     description: "",
@@ -94,12 +94,12 @@ AI技術の進化により、ポッドキャスト制作の民主化が加速し
     conversationSeeds: [],
   },
   {
-    id: "ep-003",
+    id: "3",
     podcastId: 1,
     title: "リモートワーク3年目の本音",
     description: "",
     createdAt: "2026-05-20T09:00:00Z",
-    status: "processing",
+    status: "awaiting_approval",
     audioFileName: "episode-003.mp3",
     audioUrl: null,
     artworkUrl: null,
@@ -113,7 +113,7 @@ AI技術の進化により、ポッドキャスト制作の民主化が加速し
     conversationSeeds: [],
   },
   {
-    id: "ep-004",
+    id: "4",
     podcastId: 1,
     title: "エンジニアのキャリアパスを考える",
     description: "",
@@ -132,7 +132,7 @@ AI技術の進化により、ポッドキャスト制作の民主化が加速し
     conversationSeeds: [],
   },
   {
-    id: "ep-005",
+    id: "5",
     podcastId: 1,
     title: "デザインとエンジニアリングの境界線",
     description: "",

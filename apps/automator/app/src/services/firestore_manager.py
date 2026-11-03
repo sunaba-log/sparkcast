@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 from google.cloud import firestore
 
+from domain.models.transcript import TranscriptSegment, TranscriptWord
+
 if TYPE_CHECKING:
-    from domain.models.transcript import TranscriptSegment
+    from domain.models.director import DirectorIntervention, PolicyFinding
 
 # Firestore の 1 バッチの書き込み上限(500)より少し小さく区切る
 BATCH_LIMIT = 400
@@ -38,11 +40,15 @@ class FirestoreManager:
         audio_metadata: dict[str, Any],
         minutes: str | None = None,
         transcript_meta: dict[str, Any] | None = None,
+        rss_guid: str | None = None,
+        published_at: Any = None,
+        is_published: bool | None = None,
     ) -> str:
         """Upsert episode content document.
 
         minutes は AI が作った議事録(#166 以降。それ以前は transcripts に議事録を分割して入れていた)。
         transcript_meta は文字起こしの作り方(engine / speaker_source / segment_count など)。
+        rss_guid, published_at, is_published は RSS 完全再生成用のメタデータ(#221)。
         """
         doc_ref = self._episode_contents_collection(podcast_id).document(episode_id)
         data: dict[str, Any] = {
@@ -58,8 +64,73 @@ class FirestoreManager:
             data["minutes"] = minutes
         if transcript_meta is not None:
             data["transcript_meta"] = transcript_meta
+        if rss_guid is not None:
+            data["rss_guid"] = rss_guid
+        if published_at is not None:
+            data["published_at"] = published_at
+        if is_published is not None:
+            data["is_published"] = is_published
         doc_ref.set(data, merge=True)
         return doc_ref.id
+
+    def list_all_episode_contents(
+        self,
+        *,
+        podcast_id: str,
+    ) -> list[dict[str, Any]]:
+        """Fetch all episode contents under a podcast."""
+        docs = self._episode_contents_collection(podcast_id).stream()
+        results: list[dict[str, Any]] = []
+        for doc in docs:
+            d = doc.to_dict() or {}
+            d["id"] = doc.id
+            results.append(d)
+        return results
+
+    def update_episode_fields(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        fields: dict[str, Any],
+    ) -> None:
+        """Partially update episode content document."""
+        doc_ref = self._episode_contents_collection(podcast_id).document(episode_id)
+        doc_ref.set(fields, merge=True)
+
+    def get_episode_content(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> dict[str, Any] | None:
+        """Fetch episode content document."""
+        doc = self._episode_contents_collection(podcast_id).document(episode_id).get()
+        return doc.to_dict() if doc.exists else None
+
+    def get_transcript_segments(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> list[TranscriptSegment]:
+        """Fetch transcript segments ordered by chunk_id."""
+        collection = self._transcripts_collection(podcast_id, episode_id)
+        docs = collection.order_by("chunk_id").stream()
+        segments: list[TranscriptSegment] = []
+        for doc in docs:
+            data = doc.to_dict()
+            segments.append(
+                TranscriptSegment(
+                    start=float(data.get("start_time", 0.0)),
+                    end=float(data.get("end_time", 0.0)),
+                    speaker=str(data.get("speaker", "")),
+                    speaker_id=data.get("speaker_id"),
+                    text=str(data.get("text", "")),
+                    words=tuple(TranscriptWord(**word) for word in data.get("words", [])),
+                )
+            )
+        return segments
 
     def save_transcript_segments(
         self,
@@ -71,6 +142,9 @@ class FirestoreManager:
         """発話ごとに transcripts に保存する(#166)。前回の処理で書いたものは先に消す."""
         collection = self._transcripts_collection(podcast_id, episode_id)
         self._clear_collection(collection)
+        self._episode_contents_collection(podcast_id).document(episode_id).set(
+            {"active_edit_plan_id": None, "audio_timeline": []}, merge=True
+        )
         batch = self._client.batch()
         pending = 0
         for index, segment in enumerate(segments, start=1):
@@ -84,6 +158,18 @@ class FirestoreManager:
                     "speaker": segment.speaker,
                     "speaker_id": segment.speaker_id,
                     "text": segment.text,
+                    "words": [
+                        {
+                            "text": w.text,
+                            "start": w.start,
+                            "end": w.end,
+                            "char_start": w.char_start,
+                            "char_end": w.char_end,
+                            "word_id": f"{chunk_id}:w{n:04d}",
+                            "timing_confident": w.timing_confident,
+                        }
+                        for n, w in enumerate(segment.words)
+                    ],
                 },
             )
             pending += 1
@@ -94,6 +180,89 @@ class FirestoreManager:
         if pending:
             batch.commit()
         return len(segments)
+
+    def save_rendition_segments(self, *, podcast_id: str, episode_id: str, segments: list[TranscriptSegment]) -> None:
+        """Keep rendered transcripts separate from immutable audit transcripts."""
+        collection = (
+            self._episode_contents_collection(podcast_id).document(episode_id).collection("rendition_transcripts")
+        )
+        self._clear_collection(collection)
+        for index, segment in enumerate(segments, start=1):
+            collection.document(f"seg_{index:05d}").set(
+                {
+                    "chunk_id": f"seg_{index:05d}",
+                    "start_time": segment.start,
+                    "end_time": segment.end,
+                    "speaker": segment.speaker,
+                    "speaker_id": segment.speaker_id,
+                    "text": segment.text,
+                }
+            )
+
+    def save_director_interventions(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        interventions: list[DirectorIntervention],
+    ) -> int:
+        """AIディレクターの訂正介入候補を Firestore に保存する(#170)."""
+        collection = self._director_interventions_collection(podcast_id, episode_id)
+        self._clear_collection(collection)
+        batch = self._client.batch()
+        pending = 0
+        for intervention in interventions:
+            doc_ref = collection.document(intervention.intervention_id)
+            batch.set(doc_ref, intervention.to_dict())
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+        return len(interventions)
+
+    def get_director_interventions(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+    ) -> list[dict[str, Any]]:
+        """AIディレクターの訂正介入候補一覧を取得する(#170)."""
+        collection = self._director_interventions_collection(podcast_id, episode_id)
+        results = []
+        for doc in collection.stream():
+            data = doc.to_dict()
+            data["id"] = doc.id
+            results.append(data)
+        return results
+
+    def save_policy_findings(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        findings: list[PolicyFinding],
+    ) -> int:
+        """Persist the separate audio-policy findings without altering director interventions."""
+        collection = self._policy_findings_collection(podcast_id, episode_id)
+        self._clear_collection(collection)
+        self._clear_collection(
+            self._episode_contents_collection(podcast_id).document(episode_id).collection("policy_reviews")
+        )
+        batch = self._client.batch()
+        pending = 0
+        for finding in findings:
+            batch.set(collection.document(finding.finding_id), finding.to_dict())
+            pending += 1
+            if pending >= BATCH_LIMIT:
+                batch.commit()
+                batch = self._client.batch()
+                pending = 0
+        if pending:
+            batch.commit()
+        return len(findings)
 
     def save_transcript_chunks(
         self,
@@ -271,6 +440,12 @@ class FirestoreManager:
 
     def _transcripts_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
         return self._episode_contents_collection(podcast_id).document(episode_id).collection("transcripts")
+
+    def _director_interventions_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
+        return self._episode_contents_collection(podcast_id).document(episode_id).collection("director_interventions")
+
+    def _policy_findings_collection(self, podcast_id: str, episode_id: str) -> firestore.CollectionReference:
+        return self._episode_contents_collection(podcast_id).document(episode_id).collection("policy_findings")
 
     def _clear_collection(self, collection: firestore.CollectionReference) -> None:
         """再処理で古い文字起こしが残らないよう、サブコレクションを空にする."""

@@ -9,6 +9,19 @@ const firebaseAuthHelperDomain =
 const nextConfig: NextConfig = {
   // Cloud Run 用コンテナで動かすため、self-contained な出力にする
   output: "standalone",
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
+      },
+    ],
+  },
   async headers() {
     return [
       {

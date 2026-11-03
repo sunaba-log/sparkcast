@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import psycopg
 
 from domain.interfaces import RecordingSpeaker, RecordingSpeakers
+from domain.models import AudioAuditPolicy
 
 
 class PostgresEpisodeRepository:
@@ -15,6 +16,13 @@ class PostgresEpisodeRepository:
     def __init__(self, *, database_url: str) -> None:
         """Initialize the repository."""
         self._database_url = database_url
+
+    def get_episode_count(self, *, podcast_id: str) -> int:
+        """Return the number of episodes for a given podcast."""
+        with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM episodes WHERE podcast_id = %s", (podcast_id,))
+            row = cursor.fetchone()
+        return row[0] if row else 0
 
     def mark_processing(self, *, podcast_id: str, episode_id: str, source_audio_path: str) -> None:
         """Mark an uploaded episode as processing."""
@@ -63,6 +71,30 @@ class PostgresEpisodeRepository:
             episode_id=episode_id,
         )
 
+    def update_metadata(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        description: str,
+        duration_seconds: int | None = None,
+    ) -> None:
+        """Store interim metadata (title, description, duration) before audit."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET title = %s,
+                description = %s,
+                duration_seconds = COALESCE(%s, duration_seconds),
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (title, description, duration_seconds, podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
         self._execute_update(
@@ -79,12 +111,68 @@ class PostgresEpisodeRepository:
             episode_id=episode_id,
         )
 
+    def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as auditing."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET status = 'auditing',
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
+    def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as awaiting approval for director interventions."""
+        self._execute_update(
+            """
+            UPDATE episodes
+            SET status = 'awaiting_approval',
+                processing_error = NULL,
+                updated_at = now()
+            WHERE podcast_id = %s AND episode_id = %s
+            """,
+            (podcast_id, episode_id),
+            podcast_id=podcast_id,
+            episode_id=episode_id,
+        )
+
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """番組設定の登場人物(改行・読点・カンマ区切り)を返す。未設定なら空."""
         with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT cast_members FROM podcasts WHERE podcast_id = %s", (podcast_id,))
             row = cursor.fetchone()
         return split_cast_names(row[0] if row else None)
+
+    def get_audio_audit_policy(self, *, podcast_id: str) -> AudioAuditPolicy:
+        """Return validated program-level confidential terms and allowlist."""
+        with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT audio_audit_policy FROM podcasts WHERE podcast_id = %s", (podcast_id,))
+            row = cursor.fetchone()
+        raw = row[0] if row else {}
+        if not isinstance(raw, dict):
+            return AudioAuditPolicy()
+        version = raw.get("version", "v1")
+        enabled = raw.get("enabled", True)
+        confidential_terms = raw.get("confidential_terms", [])
+        allowed_terms = raw.get("allowed_terms", [])
+        if (
+            not isinstance(version, str)
+            or not isinstance(enabled, bool)
+            or not isinstance(confidential_terms, list)
+            or not isinstance(allowed_terms, list)
+            or not all(isinstance(term, str) for term in confidential_terms + allowed_terms)
+        ):
+            raise ValueError("Invalid audio audit policy configuration")
+        return AudioAuditPolicy(
+            version=version,
+            enabled=enabled,
+            confidential_terms=tuple(cast("list[str]", confidential_terms)),
+            allowed_terms=tuple(cast("list[str]", allowed_terms)),
+        )
 
     def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
         """ブラウザ収録(#166)で作られたエピソードなら、位置合わせ済みトラックのある参加者を返す."""

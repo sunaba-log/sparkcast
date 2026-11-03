@@ -1,32 +1,33 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2, Clock, CheckCircle2, X } from "lucide-react";
 
-export type SNSPostItem = {
-  id: string;
-  episodeId: string;
-  episodeTitle: string;
-  status: "pending" | "posted";
-  scheduledDate: { yyyy: string; mm: string; dd: string; hh: string; min: string };
-  message: string;
-  platformUrls: { apple: string; amazon: string; spotify: string };
-  hashtags: string[];
-  generatedAt: string;
-  updatedAt: string;
-};
+import {
+  type SNSPostItem,
+  sortPostsDesc,
+} from "@/lib/sns";
+import { InspectorPanelSlot } from "@/components/InspectorPanelSlot";
+import { ResizableInspectorPanel } from "@/components/ResizableInspectorPanel";
+
+export type { SNSPostItem } from "@/lib/sns";
+export { getPostSortTimestamp, sortPostsDesc } from "@/lib/sns";
 
 export function SNSPostMasterDetail({
   initialPosts = [],
   initialHasMore = false,
   initialSelectedId,
+  detailOnly = false,
 }: {
   initialPosts?: SNSPostItem[];
   initialHasMore?: boolean;
   /** ディープリンク（/sns?post=...）で初期選択する投稿 ID。 */
   initialSelectedId?: string;
+  detailOnly?: boolean;
 }) {
-  const [posts, setPosts] = useState<SNSPostItem[]>(initialPosts);
+  const router = useRouter();
+  const [posts, setPosts] = useState<SNSPostItem[]>(() => sortPostsDesc(initialPosts));
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (
       initialSelectedId &&
@@ -34,7 +35,8 @@ export function SNSPostMasterDetail({
     ) {
       return initialSelectedId;
     }
-    return initialPosts.length > 0 ? initialPosts[0].id : "";
+    const sorted = sortPostsDesc(initialPosts);
+    return sorted.length > 0 ? sorted[0].id : "";
   });
 
   // クライアント遷移（チャットのリンク等）では再マウントされないため、
@@ -49,7 +51,7 @@ export function SNSPostMasterDetail({
       setPosts((prev) => {
         const existing = new Set(prev.map((p) => p.id));
         const added = initialPosts.filter((p) => !existing.has(p.id));
-        return added.length > 0 ? [...prev, ...added] : prev;
+        return added.length > 0 ? sortPostsDesc([...prev, ...added]) : prev;
       });
       setSelectedId(initialSelectedId);
     }
@@ -119,7 +121,7 @@ export function SNSPostMasterDetail({
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
         const newPosts = data.posts.filter((p) => !existingIds.has(p.id));
-        return [...prev, ...newPosts];
+        return sortPostsDesc([...prev, ...newPosts]);
       });
       setHasMore(data.hasMore);
       setOffset((prev) => prev + 5);
@@ -155,6 +157,7 @@ export function SNSPostMasterDetail({
   }, [hasMore, isLoading, loadMore]);
 
   const handleSelect = (post: SNSPostItem) => {
+    router.push(`/sns?episode=${encodeURIComponent(post.episodeId)}&post=${encodeURIComponent(post.id)}`);
     setSelectedId(post.id);
   };
 
@@ -200,16 +203,18 @@ export function SNSPostMasterDetail({
       }
 
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === selectedPost.id
-            ? {
-              ...p,
-              scheduledDate,
-              message,
-              platformUrls,
-              hashtags,
-            }
-            : p
+        sortPostsDesc(
+          prev.map((p) =>
+            p.id === selectedPost.id
+              ? {
+                ...p,
+                scheduledDate,
+                message,
+                platformUrls,
+                hashtags,
+              }
+              : p
+          )
         )
       );
       setSaveStatus("saved");
@@ -253,20 +258,17 @@ export function SNSPostMasterDetail({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      {/* Breadcrumb Header */}
-      <div className="flex items-center text-xs text-gray-500 gap-2 shrink-0">
-        <span>ホーム</span>
-        <span>&gt;</span>
-        <span className="font-medium text-gray-800">SNS投稿</span>
-      </div>
+    <div className="flex h-full min-h-0 flex-col space-y-4">
+      {!detailOnly && (
+        <h1 className="shrink-0 text-sm font-bold text-gray-900">SNS投稿</h1>
+      )}
 
       {/* Master-Detail Container */}
-      <div className="flex-1 grid grid-cols-12 gap-5 min-h-0">
+      <div className={detailOnly ? "h-full min-h-0 flex-1" : "flex-1 flex min-h-0 flex-col gap-5 lg:flex-row lg:gap-0"}>
         {/* Left Column: Timeline Master List (6 cols) */}
-        <div
+        {!detailOnly && <div
           ref={containerRef}
-          className="col-span-6 flex flex-col space-y-4 overflow-y-auto pr-2 relative"
+          className={`${initialSelectedId ? "hidden lg:flex" : "flex"} min-h-0 flex-col space-y-4 overflow-y-auto pr-2 relative lg:flex-1 lg:pr-5 @container`}
         >
           {/* Vertical Timeline Line */}
           <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gray-300 z-0" />
@@ -279,7 +281,7 @@ export function SNSPostMasterDetail({
                 ref={(el) => {
                   listItemRefs.current[post.id] = el;
                 }}
-                className="flex items-start gap-4 relative z-10"
+                className="flex items-start gap-3 relative z-10 min-w-0 w-full"
               >
                 {/* Timeline Icon Node */}
                 <div className="mt-1 shrink-0 bg-app-bg p-1 rounded-full">
@@ -290,46 +292,49 @@ export function SNSPostMasterDetail({
                   )}
                 </div>
 
-                {/* Date Label Pill */}
-                <div className="mt-2 shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700">
-                  {post.scheduledDate.yyyy}/{post.scheduledDate.mm}/{post.scheduledDate.dd}
-                </div>
-
-                {/* Post Preview Card */}
-                <div
-                  onClick={() => handleSelect(post)}
-                  className={`flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-white/40 ${isSelected
-                    ? "border-2 border-brand shadow-sm"
-                    : "border-gray-200 hover:border-brand/50 shadow-sm"
-                    }`}
-                >
-                  {/* Mock Twitter Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
-                        SC
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-gray-900 leading-none">
-                          SparkCast Official
-                        </div>
-                        <div className="text-[10px] text-gray-400">@sparkcast_jp</div>
-                      </div>
-                    </div>
+                {/* Content wrapper: responsive column (narrow) or row (wide) */}
+                <div className="flex-1 min-w-0 w-full flex flex-col @[500px]:flex-row items-start gap-1.5 @[500px]:gap-3">
+                  {/* Date Label Pill */}
+                  <div className="shrink-0 text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-gray-200/80 text-gray-700 @[500px]:mt-1.5">
+                    {post.scheduledDate.yyyy}/{post.scheduledDate.mm}/{post.scheduledDate.dd}
                   </div>
 
-                  <p className="text-xs text-gray-800 leading-relaxed line-clamp-3 mb-2">
-                    {post.message}
-                  </p>
+                  {/* Post Preview Card */}
+                  <div
+                    onClick={() => handleSelect(post)}
+                    className={`w-full min-w-0 @[500px]:flex-1 p-4 rounded-xl cursor-pointer transition-all duration-150 border bg-app-bg ${isSelected
+                      ? "border-2 border-brand shadow-sm"
+                      : "border-gray-200 hover:border-brand/50 shadow-sm"
+                      }`}
+                  >
+                    {/* Mock Twitter Header */}
+                    <div className="flex items-center justify-between mb-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs shrink-0">
+                          SC
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-900 leading-none truncate">
+                            SparkCast Official
+                          </div>
+                          <div className="text-[10px] text-gray-400 truncate">@sparkcast_jp</div>
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono">
-                    <span>
-                      {post.scheduledDate.hh}:{post.scheduledDate.min}
-                    </span>
-                    <span>・</span>
-                    <span className="text-brand font-medium">
-                      #{post.episodeId} {post.episodeTitle}
-                    </span>
+                    <p className="text-xs text-gray-800 leading-relaxed line-clamp-3 mb-2 break-words [overflow-wrap:anywhere]">
+                      {post.message}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono min-w-0">
+                      <span className="shrink-0">
+                        {post.scheduledDate.hh}:{post.scheduledDate.min}
+                      </span>
+                      <span className="shrink-0">・</span>
+                      <span className="text-brand font-medium truncate min-w-0">
+                        #{post.episodeId} {post.episodeTitle}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -356,11 +361,26 @@ export function SNSPostMasterDetail({
               SNS投稿文が見つかりません
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Right Column: Inspector Panel (6 cols) */}
         {selectedPost ? (
-          <div className="col-span-6 rounded-sm border-l border-brand/30 flex flex-col overflow-hidden">
+          <InspectorPanelSlot enabled={!detailOnly}>
+            <ResizableInspectorPanel
+              className={`${detailOnly || initialSelectedId ? "flex h-full min-h-0 flex-1" : "hidden"} lg:flex`}
+              resizable={!detailOnly}
+            >
+            {!detailOnly && (
+              <div className="border-b border-brand/30 pr-2 py-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => router.push("/sns")}
+                  className="min-h-4 px-2 text-xs font-medium text-brand hover:text-brand-hover"
+                >
+                  ← SNS投稿一覧に戻る
+                </button>
+              </div>
+            )}
             {/* Top Action Bar */}
             <div className="px-5 py-1 border-b border-brand flex items-center justify-between">
               <span
@@ -380,7 +400,10 @@ export function SNSPostMasterDetail({
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div
+              data-testid="sns-inspector-content"
+              className="min-h-0 flex-1 overflow-y-auto space-y-5 p-6"
+            >
               <div className="text-xs text-gray-500">更新日時 : {selectedPost.updatedAt}</div>
 
               {/* Form: Scheduled Datetime */}
@@ -391,21 +414,21 @@ export function SNSPostMasterDetail({
                     type="text"
                     value={scheduledDate.yyyy}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, yyyy: e.target.value })}
-                    className="col-span-3 px-1 py-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-3 px-1 py-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="YYYY"
                   />
                   <input
                     type="text"
                     value={scheduledDate.mm}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, mm: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="MM"
                   />
                   <input
                     type="text"
                     value={scheduledDate.dd}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, dd: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="DD"
                   />
                   <div className="col-span-1 flex items-center justify-center font-bold">:</div>
@@ -413,14 +436,14 @@ export function SNSPostMasterDetail({
                     type="text"
                     value={scheduledDate.hh}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, hh: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="HH"
                   />
                   <input
                     type="text"
                     value={scheduledDate.min}
                     onChange={(e) => setScheduledDate({ ...scheduledDate, min: e.target.value })}
-                    className="col-span-2 rounded-xs border border-brand text-sm text-center focus:outline-none focus:border-brand"
+                    className="col-span-2 rounded-xs border border-brand text-base md:text-sm text-center focus:outline-none focus:border-brand"
                     placeholder="mm"
                   />
                 </div>
@@ -428,12 +451,13 @@ export function SNSPostMasterDetail({
 
               {/* Form: Message */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Message</label>
+                <label htmlFor="sns-post-message" className="block text-xs font-semibold text-gray-700 mb-1.5">Message</label>
                 <textarea
+                  id="sns-post-message"
                   rows={5}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  className="w-full px-3.5 py-2.5 rounded-xs border border-brand text-base md:text-sm text-gray-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 />
               </div>
 
@@ -445,21 +469,21 @@ export function SNSPostMasterDetail({
                   value={platformUrls.apple}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, apple: e.target.value })}
                   placeholder="Apple Podcast"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.amazon}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, amazon: e.target.value })}
                   placeholder="Amazon Music"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
                 <input
                   type="text"
                   value={platformUrls.spotify}
                   onChange={(e) => setPlatformUrls({ ...platformUrls, spotify: e.target.value })}
                   placeholder="Spotify"
-                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
+                  className="w-full px-3.5 py-2 rounded-xs border border-brand text-base md:text-xs text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-brand"
                 />
               </div>
 
@@ -490,14 +514,17 @@ export function SNSPostMasterDetail({
                     onChange={(e) => setNewTagInput(e.target.value)}
                     onKeyDown={handleAddHashtag}
                     placeholder="+ タグを入力してEnter"
-                    className="px-2 py-1 text-xs bg-transparent text-gray-700 focus:outline-none placeholder:text-gray-400"
+                    className="px-2 py-1 text-base md:text-xs bg-transparent text-gray-700 focus:outline-none placeholder:text-gray-400"
                   />
                 </div>
               </div>
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 border-t border-brand/30 flex items-center justify-between shrink-0">
+            <div
+              data-testid="sns-inspector-actions"
+              className="mt-auto flex shrink-0 items-center justify-between border-t border-brand/30 p-4"
+            >
               <div>
                 {saveStatus === "saved" && (
                   <span className="text-xs text-emerald-600 font-semibold">変更を保存しました</span>
@@ -512,7 +539,7 @@ export function SNSPostMasterDetail({
                     setPlatformUrls(selectedPost.platformUrls);
                     setHashtags(selectedPost.hashtags);
                   }}
-                  className="px-5 py-2 rounded-xs bg-gray-200/80 hover:bg-gray-300/80 text-gray-700 font-medium text-sm transition-colors"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-xs transition-colors flex items-center justify-center"
                 >
                   キャンセル
                 </button>
@@ -520,15 +547,16 @@ export function SNSPostMasterDetail({
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-6 py-2 rounded-xs bg-brand hover:bg-brand-hover text-white font-medium text-sm transition-colors disabled:opacity-50"
+                  className="min-h-[44px] px-4 py-2 rounded-none bg-brand hover:bg-brand-hover text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
                   {isSaving ? "保存中..." : "変更"}
                 </button>
               </div>
             </div>
-          </div>
+            </ResizableInspectorPanel>
+          </InspectorPanelSlot>
         ) : (
-          <div className="col-span-6 rounded-sm border-l border-brand/30 flex items-center justify-center text-sm text-gray-400">
+          <div className={`${detailOnly ? "h-full flex" : "hidden lg:col-span-6 lg:flex"} rounded-sm border-t border-brand/30 items-center justify-center text-sm text-gray-400 lg:border-t-0 lg:border-l`}>
             投稿文を選択してください
           </div>
         )}

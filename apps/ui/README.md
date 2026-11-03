@@ -11,6 +11,7 @@ SparkCast の Web 管理アプリです。Next.jsのUIとWeb APIを
 - エピソード作成とGCS V4署名付きURL発行
 - ブラウザからGCSへの音声ファイル直接アップロード
 - Cloud SQLの処理状態を使ったエピソード一覧・詳細表示
+- AIディレクターの訂正案を確認・編集・承認し、カットイン音声編集を起動
 - Firestoreの議事録、X投稿候補、収録アジェンダの閲覧・編集
 - 配信済み議事録を横断するRAGチャット（Vertex AI Gemini + Firestoreベクトル検索）
 - アップロード結果通知と放置アップロードの定期クリーンアップ
@@ -58,6 +59,17 @@ owner権限が付与され、選択中チャンネルはCookie（`selected_podca
 2. `npm run dev` で起動後、ログイン画面（`/login`）に「開発用ワンクリックログイン」ボタンが表示されます。
 3. ボタンをクリックすると、`DEV_ALLOWED_EMAILS` に設定されたメールアドレス（デフォルト: `admin@sunabalog.com`）でFirebase認証なしで即座にログインできます。未登録の場合は通常のログインと同様に`/register`からユーザ登録します。
 
+### ローカル UI デモ
+
+DB や Firebase を準備せず、各画面をダミーデータで確認するには `.env.local` に
+`NEXT_PUBLIC_ENABLE_LOCAL_UI_DEMO="true"` を設定して `npm run dev` を実行します。
+ローカル開発時だけデモ管理者としてログインし、チャンネル、エピソード、議題、SNS 投稿、
+設定、管理画面をサンプルデータで表示します。デモモードの編集・送信操作は保存先を持たないため、
+表示確認専用として利用してください。
+
+AI ディレクター監査は `/episodes?episode=3` を開き、`AIディレクター監査` タブを選ぶと確認できます。
+訂正提案と音声校正ポリシー検知を表示し、承認・却下・音声編集開始の各状態遷移を画面上で確認できます。
+
 ## デプロイ（Cloud Run + GitHub Actions）
 
 Cloud Run（asia-northeast1）でホスティングします。環境はプロジェクト単位で分離
@@ -89,12 +101,21 @@ podcasts/{podcast_id}/episodes/{episode_id}/source/{filename}
 ## アップロード状態
 
 ```text
-upload_pending -> uploaded -> processing -> completed
+upload_pending -> uploaded -> processing -> auditing -> awaiting_approval -> editing -> completed
                                       \-> failed
 ```
 
 ブラウザから結果通知が届かない`upload_pending`レコードは、Cloud Schedulerによって
 24時間後に`failed`へ更新されます（1日1回実行）。
+
+AIディレクターの監査結果は Firestore の
+`podcasts/{podcastId}/episodes_contents/{episodeId}/director_interventions` に保存されます。
+各ドキュメントには `chunk_id`、`target_speaker`、`insert_timestamp_ms`、
+`audit_metrics.score`（1〜5）、`audit_metrics.choice`、`correction_script`、
+`status`（`pending` / `approved` / `rejected`）を持たせます。元の発話は
+対応する `transcripts/{chunk_id}` から参照します。
+承認後の音声編集ジョブには `AUDIO_EDITOR_URL` を設定します。必要に応じて
+`AUDIO_EDITOR_API_TOKEN` を設定すると、呼び出し時に Bearer トークンとして送信されます。
 
 ## 議事録チャット（RAG）
 

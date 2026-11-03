@@ -1,6 +1,9 @@
 import "server-only";
 import { getDbPool } from "@/server/db";
-import type { PodcastSummary } from "@/types/podcast";
+import { runAutomatorJob } from "@/server/episodes/automator-jobs";
+import type { AudioAuditPolicy, PodcastSummary } from "@/types/podcast";
+
+export type { AudioAuditPolicy };
 
 export type Podcast = {
   id: number;
@@ -10,13 +13,14 @@ export type Podcast = {
   rssFeedPath: string | null;
   // 登場人物（読点・カンマ・改行区切り）。文字起こしの話者推定と議事録で使う（#166）
   castMembers?: string | null;
+  audioAuditPolicy: AudioAuditPolicy;
 };
 
 const DEFAULT_COVER_IMAGE_URL = "/images/default-podcast-cover.png";
 
 export async function getPodcast(podcastId: number): Promise<Podcast | null> {
   const result = await (await getDbPool()).query(
-    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path, cast_members
+    `SELECT podcast_id, title, description, cover_image_url, rss_feed_path, cast_members, audio_audit_policy
      FROM podcasts
      WHERE podcast_id = $1`,
     [podcastId]
@@ -30,6 +34,16 @@ export async function getPodcast(podcastId: number): Promise<Podcast | null> {
     coverImageUrl: row.cover_image_url,
     rssFeedPath: row.rss_feed_path,
     castMembers: row.cast_members ?? null,
+    audioAuditPolicy: {
+      version: typeof row.audio_audit_policy?.version === "string" ? row.audio_audit_policy.version : "v1",
+      enabled: typeof row.audio_audit_policy?.enabled === "boolean" ? row.audio_audit_policy.enabled : true,
+      confidentialTerms: Array.isArray(row.audio_audit_policy?.confidential_terms)
+        ? row.audio_audit_policy.confidential_terms.map(String)
+        : [],
+      allowedTerms: Array.isArray(row.audio_audit_policy?.allowed_terms)
+        ? row.audio_audit_policy.allowed_terms.map(String)
+        : [],
+    },
   };
 }
 
@@ -77,18 +91,41 @@ export async function createPodcast(input: {
       [input.title, input.description, DEFAULT_COVER_IMAGE_URL]
     );
     const row = inserted.rows[0];
+    const defaultRssFeedPath = `podcasts/${row.podcast_id}/feed.xml`;
+    await client.query(
+      `UPDATE podcasts
+       SET rss_feed_path = $1
+       WHERE podcast_id = $2`,
+      [defaultRssFeedPath, row.podcast_id]
+    );
+    row.rss_feed_path = defaultRssFeedPath;
+
     await client.query(
       `INSERT INTO podcast_ownerships (podcast_id, user_id, role)
        VALUES ($1, $2, 'owner')`,
       [row.podcast_id, input.ownerUserId]
     );
     await client.query("COMMIT");
+
+    runAutomatorJob({
+      action: "sync_rss",
+      podcastId: row.podcast_id,
+    }).catch((err) => {
+      console.warn("Failed to trigger sync_rss after podcast creation:", err);
+    });
+
     return {
       id: row.podcast_id,
       title: row.title,
       description: row.description,
       coverImageUrl: row.cover_image_url,
       rssFeedPath: row.rss_feed_path,
+      audioAuditPolicy: {
+        version: "v1",
+        enabled: true,
+        confidentialTerms: [],
+        allowedTerms: [],
+      },
     };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -178,11 +215,40 @@ export async function updatePodcast(input: {
   rssFeedPath?: string | null;
   // undefined のときは cast_members を変更しない
   castMembers?: string | null;
+  audioAuditPolicy?: {
+    enabled?: boolean;
+    confidentialTerms?: string[];
+    allowedTerms?: string[];
+  };
 }): Promise<void> {
   if (input.castMembers !== undefined) {
     await (await getDbPool()).query(
       `UPDATE podcasts SET cast_members = $2 WHERE podcast_id = $1`,
       [input.podcastId, input.castMembers],
+    );
+  }
+  if (input.audioAuditPolicy !== undefined) {
+    await (await getDbPool()).query(
+      `UPDATE podcasts
+       SET audio_audit_policy = jsonb_build_object(
+         'version', to_char(now(), 'YYYYMMDDHH24MISS'),
+         'enabled', COALESCE($4::boolean, (audio_audit_policy->>'enabled')::boolean, true),
+         'confidential_terms', COALESCE($2::jsonb, audio_audit_policy->'confidential_terms', '[]'::jsonb),
+         'allowed_terms', COALESCE($3::jsonb, audio_audit_policy->'allowed_terms', '[]'::jsonb)
+       )
+       WHERE podcast_id = $1`,
+      [
+        input.podcastId,
+        input.audioAuditPolicy.confidentialTerms !== undefined
+          ? JSON.stringify(input.audioAuditPolicy.confidentialTerms)
+          : null,
+        input.audioAuditPolicy.allowedTerms !== undefined
+          ? JSON.stringify(input.audioAuditPolicy.allowedTerms)
+          : null,
+        input.audioAuditPolicy.enabled !== undefined
+          ? input.audioAuditPolicy.enabled
+          : null,
+      ],
     );
   }
   if (input.rssFeedPath === undefined) {

@@ -10,12 +10,19 @@ if TYPE_CHECKING:
 
     from domain.models import (
         AgendaResult,
+        AudioAuditPolicy,
+        AuditBundle,
+        AuditChunkTrace,
+        DirectorIntervention,
         DiscordMessage,
+        FactCheckAuditMetric,
+        FactVerificationResult,
         NewsItem,
         SnsPromotionsResponse,
         Summary,
         TopicMatch,
         TranscriptSegment,
+        UtteranceChunk,
     )
 
 
@@ -140,14 +147,98 @@ class EpisodeRepository(Protocol):
     ) -> None:
         """Store published episode metadata and mark processing complete."""
 
+    def update_metadata(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        title: str,
+        description: str,
+        duration_seconds: int | None = None,
+    ) -> None:
+        """Store interim metadata (title, description, duration) before audit."""
+
     def mark_failed(self, *, podcast_id: str, episode_id: str, error_message: str) -> None:
         """Record a processing failure."""
+
+    def mark_auditing(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as auditing."""
+
+    def mark_awaiting_approval(self, *, podcast_id: str, episode_id: str) -> None:
+        """Mark an episode as awaiting approval for director interventions."""
 
     def get_cast_names(self, *, podcast_id: str) -> list[str]:
         """Return the cast (登場人物) registered in the podcast settings."""
 
+    def get_audio_audit_policy(self, *, podcast_id: str) -> AudioAuditPolicy:
+        """Return the current program-level audio audit policy."""
+
     def find_recording_speakers(self, *, episode_id: str) -> RecordingSpeakers | None:
         """Return the speakers when the episode was recorded in the browser recording room."""
+
+
+class FactCheckAuditorGateway(Protocol):
+    """Jev 高速監査ゲートキーパー (#170)."""
+
+    def audit_chunks(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        concurrency_limit: int = 10,
+    ) -> list[tuple[UtteranceChunk, FactCheckAuditMetric]]:
+        """発話チャンク配列を非同期バッチで高速監査し、各チャンクの評価メトリクスを返す."""
+
+    def audit_bundle(
+        self,
+        chunks: list[UtteranceChunk],
+        *,
+        policy: AudioAuditPolicy,
+        concurrency_limit: int = 10,
+    ) -> AuditBundle:
+        """Return the complete fact-check and audio-policy audit results."""
+
+
+class AuditTraceRecorderGateway(Protocol):
+    """Jev 監査入出力トレース保存ゲートウェイ (#220)."""
+
+    def record(
+        self,
+        *,
+        podcast_id: str,
+        episode_id: str,
+        traces: Sequence[AuditChunkTrace],
+    ) -> str | None:
+        """Format and save audit traces as JSONL, returning the stored URI or None."""
+
+
+class DirectorScriptGeneratorGateway(Protocol):
+    """Gemini ディレクター訂正スクリプトジェネレーター (#170)."""
+
+    def generate_intervention(
+        self,
+        *,
+        chunk: UtteranceChunk,
+        metric: FactCheckAuditMetric,
+        all_chunks: list[UtteranceChunk],
+        cast_names: list[str] | None = None,
+        model_id: str | None = None,
+        verification: FactVerificationResult | None = None,
+    ) -> DirectorIntervention:
+        """Score >= 3 のチャンクに対して、愛嬌あるカットイン訂正スクリプトを生成する."""
+
+
+class FactVerificationAgentGateway(Protocol):
+    """Google Search による自律ファクトチェック裏取りエージェント."""
+
+    def verify_chunk(
+        self,
+        *,
+        chunk: UtteranceChunk,
+        metric: FactCheckAuditMetric,
+        all_chunks: list[UtteranceChunk],
+        model_id: str | None = None,
+    ) -> FactVerificationResult | None:
+        """疑義のある発話チャンクに対して自律的にGoogle検索を実行し、裏取り検証を行う."""
 
 
 @dataclass(frozen=True)

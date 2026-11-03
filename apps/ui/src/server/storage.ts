@@ -12,7 +12,7 @@ declare global {
   var podcastStorage: Storage | undefined;
 }
 
-function getStorage(): Storage {
+export function getStorage(): Storage {
   if (!globalThis.podcastStorage) {
     globalThis.podcastStorage = new Storage({
       projectId: getGoogleCloudProject(),
@@ -36,4 +36,16 @@ export async function createAudioUploadUrl(
     });
 
   return { uploadUrl, expiresAt };
+}
+
+export async function createAudioPreviewUrl(objectPath: string): Promise<string> {
+  const [url] = await getStorage()
+    .bucket(getUploadBucket())
+    .file(objectPath)
+    .getSignedUrl({
+      version: "v4",
+      action: "read",
+      expires: new Date(Date.now() + getSignedUrlTtlMs()),
+    });
+  return url;
 }

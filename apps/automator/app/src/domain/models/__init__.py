@@ -21,6 +21,18 @@ from .common import (
     SpeakerAssignments,
     Summary,
 )
+from .director import (
+    AudioAuditPolicy,
+    AuditBundle,
+    AuditChunkTrace,
+    ChoiceCategory,
+    DirectorIntervention,
+    EvidenceSource,
+    FactCheckAuditMetric,
+    FactVerificationResult,
+    PolicyFinding,
+    UtteranceChunk,
+)
 from .episode import EpisodeObjectReference
 from .sns_post import SnsPost
 from .transcript import TranscriptSegment
@@ -29,12 +41,21 @@ __all__ = [
     "ActionItem",
     "AgendaMetadata",
     "AgendaResult",
+    "AudioAuditPolicy",
+    "AuditBundle",
+    "AuditChunkTrace",
+    "ChoiceCategory",
+    "DirectorIntervention",
     "DiscordMessage",
     "DiscussionPrompt",
     "Episode",
     "EpisodeObjectReference",
+    "EvidenceSource",
+    "FactCheckAuditMetric",
+    "FactVerificationResult",
     "MentionEvidence",
     "NewsItem",
+    "PolicyFinding",
     "PromptType",
     "SeedTopic",
     "SnsPost",
@@ -46,4 +67,5 @@ __all__ = [
     "Summary",
     "TopicMatch",
     "TranscriptSegment",
+    "UtteranceChunk",
 ]

@@ -20,9 +20,14 @@ from infrastructure.secret_manager import SecretManagerClient
 from infrastructure.speech_transcriber import ChirpTranscriber
 from infrastructure.storage import GCSClient, R2Client, get_audio_info
 from services.audio_converter import AudioConverter
+from services.audit_trace_recorder import AuditTraceRecorder
+from services.director_script_generator import DirectorScriptGenerator
 from services.episode_transcription import EpisodeTranscription
+from services.fact_check_auditor import FactCheckAuditor
+from services.fact_verification_agent import FactVerificationAgent
 from services.firestore_manager import FirestoreManager
 from services.rss_manager import PodcastRssManager
+from services.rss_rebuilder import PodcastRssRebuilder
 from services.speech_audio import GcsSpeechAudioPreparer
 from services.track_energy import load_track_energy
 from services.voiced_audio import GcsVoicedTrackPreparer
@@ -65,6 +70,18 @@ class PodcastEnvConfig:
     # チャット用の索引の作り直し(UI の URL と、定期実行と同じ CRON_SECRET)。無ければ毎朝の定期実行だけ
     app_base_url: str | None = None
     cron_secret: str | None = None
+    # Jev 高速監査・Gemini ディレクター介入(#170)
+    typesafe_api_key: str | None = None
+    jev_enabled: bool = True
+    director_enabled: bool = True
+    resume_from_audit: bool = False
+    publish_original: bool = False
+    edit_plan_id: str | None = None
+    # Jev 監査入出力トレースログ保存(#220)
+    audit_trace_enabled: bool = False
+    audit_trace_gcs_bucket: str | None = None
+    audit_trace_local_dir: str | None = None
+    audit_trace_prefix: str = "audit_traces"
 
 
 def _required_env(environ: Mapping[str, str], key: str) -> str:
@@ -105,6 +122,15 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
     work_bucket = environ.get("WORK_BUCKET") or None
     app_base_url = environ.get("APP_BASE_URL") or None
     cron_secret = environ.get("CRON_SECRET") or None
+    typesafe_api_key = environ.get("TYPESAFE_API_KEY") or environ.get("JEV_API_KEY") or None
+    jev_enabled = environ.get("JEV_ENABLED", "true").lower() != "false"
+    director_enabled = environ.get("DIRECTOR_ENABLED", "true").lower() != "false"
+    resume_from_audit = environ.get("RESUME_FROM_AUDIT", "false").lower() in ("true", "1")
+    publish_original = environ.get("PUBLISH_ORIGINAL", "false").lower() in ("true", "1")
+    audit_trace_enabled = environ.get("AUDIT_TRACE_ENABLED", "false").lower() in ("true", "1")
+    audit_trace_gcs_bucket = environ.get("AUDIT_TRACE_GCS_BUCKET") or None
+    audit_trace_local_dir = environ.get("AUDIT_TRACE_LOCAL_DIR") or None
+    audit_trace_prefix = environ.get("AUDIT_TRACE_PREFIX", "audit_traces")
 
     if secret_name is None and (r2_access_key_id is None or r2_secret_access_key is None):
         msg = "Either SECRET_NAME or both R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be provided."
@@ -135,6 +161,16 @@ def _load_podcast_env(environ: Mapping[str, str]) -> PodcastEnvConfig:
         work_bucket=work_bucket,
         app_base_url=app_base_url,
         cron_secret=cron_secret,
+        typesafe_api_key=typesafe_api_key,
+        jev_enabled=jev_enabled,
+        director_enabled=director_enabled,
+        resume_from_audit=resume_from_audit,
+        publish_original=publish_original,
+        edit_plan_id=environ.get("EDIT_PLAN_ID") or None,
+        audit_trace_enabled=audit_trace_enabled,
+        audit_trace_gcs_bucket=audit_trace_gcs_bucket,
+        audit_trace_local_dir=audit_trace_local_dir,
+        audit_trace_prefix=audit_trace_prefix,
     )
 
 
@@ -163,6 +199,16 @@ def _log_environment(config: PodcastEnvConfig) -> None:
     )
     logger.info("WORK_BUCKET: %s", config.work_bucket)
     logger.info("APP_BASE_URL: %s (reindex %s)", config.app_base_url, "on" if config.cron_secret else "off")
+    logger.info("JEV_ENABLED: %s (api_key configured: %s)", config.jev_enabled, bool(config.typesafe_api_key))
+    logger.info("DIRECTOR_ENABLED: %s", config.director_enabled)
+    logger.info("PUBLISH_ORIGINAL: %s", config.publish_original)
+    logger.info(
+        "AUDIT_TRACE_ENABLED: %s (gcs_bucket=%s, local_dir=%s, prefix=%s)",
+        config.audit_trace_enabled,
+        config.audit_trace_gcs_bucket,
+        config.audit_trace_local_dir,
+        config.audit_trace_prefix,
+    )
     logger.info("###########################\n")
 
 
@@ -239,12 +285,20 @@ def process_podcast_workflow() -> None:
     )
     gcs_client = GCSClient(project_id=config.project_id)
 
+    rss_rebuilder = PodcastRssRebuilder(
+        database_url=config.database_url,
+        object_storage=r2_client,
+        firestore_manager=firestore_manager,
+        logger_instance=logger,
+    )
+
     usecase = ProcessPodcastWorkflow(
         transcript_provider=audio_analyzer,
         object_storage=r2_client,
         blob_source=gcs_client,
         notifier=notifier_client,
         rss_manager_factory=PodcastRssManager,
+        rss_rebuilder=rss_rebuilder,
         audio_converter=AudioConverter.convert_to_mp3,
         audio_info_reader=get_audio_info,
         firestore_manager=firestore_manager,
@@ -273,6 +327,22 @@ def process_podcast_workflow() -> None:
         knowledge_reindexer=HttpKnowledgeReindexer(base_url=config.app_base_url, secret=config.cron_secret)
         if config.app_base_url and config.cron_secret
         else None,
+        fact_check_auditor=FactCheckAuditor(api_key=config.typesafe_api_key) if config.jev_enabled else None,
+        director_script_generator=DirectorScriptGenerator(
+            project_id=config.project_id,
+            model_id=config.ai_model_id,
+        )
+        if config.director_enabled
+        else None,
+        fact_verification_agent=FactVerificationAgent(
+            project_id=config.project_id,
+            model_id=config.ai_model_id,
+        )
+        if config.director_enabled
+        else None,
+        audit_trace_recorder=AuditTraceRecorder.from_env(os.environ, logger_instance=logger)
+        if config.audit_trace_enabled
+        else None,
     )
     usecase.run(
         ProcessPodcastWorkflowInput(
@@ -285,7 +355,57 @@ def process_podcast_workflow() -> None:
             ai_model_id=config.ai_model_id,
             r2_custom_domain=config.r2_custom_domain,
             sns_promotion_count=config.sns_promotion_count,
+            resume_from_audit=config.resume_from_audit,
+            publish_original=config.publish_original,
+            edit_plan_id=config.edit_plan_id,
         )
+    )
+
+
+def sync_podcast_rss(environ: Mapping[str, str]) -> None:
+    """Sync the podcast RSS feed in R2 with published episodes in DB and Firestore."""
+    podcast_id = environ.get("PODCAST_ID")
+    if not podcast_id:
+        logger.error("PODCAST_ID environment variable is required for sync_rss")
+        return
+
+    database_url = _required_env(environ, "DATABASE_URL")
+    project_id = _required_env(environ, "PROJECT_ID")
+    r2_bucket = _required_env(environ, "R2_BUCKET")
+    r2_key_prefix = environ.get("R2_KEY_PREFIX", "sunabalog")
+    r2_account_id = environ.get("CLOUDFLARE_ACCOUNT_ID", "8ed20f6872cea7c9219d68bfcf5f98ae")
+    r2_endpoint_url = environ.get("R2_ENDPOINT_URL", f"https://{r2_account_id}.r2.cloudflarestorage.com")
+    r2_access_key = environ.get("CLOUDFLARE_ACCESS_KEY_ID")
+    r2_secret_key = environ.get("CLOUDFLARE_SECRET_ACCESS_KEY")
+    r2_custom_domain = environ.get("R2_CUSTOM_DOMAIN", "podcast.sunabalog.com")
+    secret_name = environ.get("SECRET_NAME")
+
+    if secret_name and (not r2_access_key or not r2_secret_key):
+        secrets_client = SecretManagerClient(project_id)
+        if not r2_access_key:
+            r2_access_key = secrets_client.access_secret(secret_name)
+        if not r2_secret_key:
+            r2_secret_key = secrets_client.access_secret(secret_name)
+
+    r2_client = R2Client(
+        project_id=project_id,
+        endpoint_url=r2_endpoint_url,
+        bucket_name=r2_bucket,
+        access_key=r2_access_key,
+        secret_key=r2_secret_key,
+    )
+    firestore_manager = FirestoreManager(project_id=project_id)
+
+    rebuilder = PodcastRssRebuilder(
+        database_url=database_url,
+        object_storage=r2_client,
+        firestore_manager=firestore_manager,
+        logger_instance=logger,
+    )
+    rebuilder.rebuild(
+        podcast_id=podcast_id,
+        r2_key_prefix=r2_key_prefix,
+        r2_custom_domain=r2_custom_domain,
     )
 
 
@@ -293,7 +413,11 @@ def main() -> None:
     """Main entry point for the podcast processor."""
     for arg in sys.argv:
         logger.info("Argument: %s", arg)
-    process_podcast_workflow()
+    action = os.environ.get("ACTION")
+    if action == "sync_rss":
+        sync_podcast_rss(os.environ)
+    else:
+        process_podcast_workflow()
 
 
 if __name__ == "__main__":

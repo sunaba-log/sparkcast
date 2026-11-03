@@ -95,7 +95,7 @@ erDiagram
 | description | TEXT | NULL | 説明文 |
 | source_audio_path | TEXT | NULL | GCS入力オブジェクトパス |
 | audio_file_path | TEXT | NULL | 処理後の公開音声URL |
-| status | VARCHAR(20) | NOT NULL | upload_pending, uploaded, processing, completed, failed |
+| status | VARCHAR(20) | NOT NULL | upload_pending, uploaded, processing, auditing, awaiting_approval, editing, completed, failed |
 | duration_seconds | INT | NULL | 再生時間（秒） |
 | processing_error | TEXT | NULL | 失敗理由 |
 | processing_started_at | TIMESTAMP | NULL | 処理開始日時 |
@@ -192,7 +192,47 @@ podcasts/{podcast_id}/episodes_contents/{episode_id}/sns_promotions/{promotion_i
 }
 ```
 
-### 3.4 次回収録向けの議題提案（トップレベル）
+### 3.4 AI ディレクターの介入提案（サブコレクション）
+
+パス:
+
+podcasts/{podcast_id}/episodes_contents/{episode_id}/director_interventions/{intervention_id}
+
+```json
+{
+  "intervention_id": "c6fd8ef2-6ac2-4f61-b43f-7b91a0e6dc27",
+  "start_ms": 12500,
+  "end_ms": 18750,
+  "original_text": "ここは言い直して、えっと、その……",
+  "speaker": "ゲストA",
+  "jev_audit": {
+    "noul": 0.82,
+    "score": 0.91,
+    "choice": "replace"
+  },
+  "suggested_script": "ここは改めて説明します。",
+  "approved_script": null,
+  "status": "pending",
+  "created_at": "2026-10-06T00:00:00Z"
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `intervention_id` | string (UUID) | ドキュメント ID と同一の介入提案 ID |
+| `start_ms` | number | 介入対象の開始位置（音声先頭からのミリ秒） |
+| `end_ms` | number | 介入対象の終了位置（音声先頭からのミリ秒） |
+| `original_text` | string | 置換または削除を提案する元の発話 |
+| `speaker` | string | 対象発話者 |
+| `jev_audit.noul` | number | Jev 監査の NOUL 指標 |
+| `jev_audit.score` | number | Jev 監査の総合スコア |
+| `jev_audit.choice` | string | Jev が選択した処理種別 |
+| `suggested_script` | string | AI が提案する差し替え原稿 |
+| `approved_script` | string \| null | 承認済みの差し替え原稿。未承認時は `null` |
+| `status` | string | `pending`、`approved`、`rejected`、`applied` のいずれか |
+| `created_at` | string (ISO 8601) | 介入提案を生成した UTC 時刻 |
+
+### 3.5 次回収録向けの議題提案（トップレベル）
 
 パス:
 
@@ -244,7 +284,8 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 
 1. collectionGroup: sns_promotions に対して (status ASC, scheduled_time ASC)
 2. collectionGroup: transcripts に対して (speaker ASC, start_time ASC)（必要時）
-3. podcasts/{podcast_id}/topic_proposals に対して (generated_at DESC)
+3. collectionGroup: director_interventions に対して (status ASC, start_ms ASC)（UI で未処理提案を時刻順に読む場合）
+4. podcasts/{podcast_id}/topic_proposals に対して (generated_at DESC)
 
 ## 5. Cloud SQL と Firestore の責務分離
 
@@ -259,6 +300,7 @@ podcasts/{podcast_id}/topic_proposals/{proposal_id}
 
 - AI生成メタ情報
 - 文字起こしチャンク
+- AI ディレクターの介入提案と承認状態
 - SNS投稿候補（予約投稿状態含む）
 - 次回収録向け議題提案
 
